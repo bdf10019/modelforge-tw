@@ -118,10 +118,13 @@ def create_app(
         metrics.inflight.inc()
         slot_acquired = False
         engine_task: asyncio.Task[Any] | None = None
+        engine_job_started = False
         release_deferred = False
+        engine_job_gauge = metrics.engine_jobs.labels(engine=engine.name)
 
         def release_after_background_completion(task: asyncio.Task[Any]) -> None:
             app.state.semaphore.release()
+            engine_job_gauge.dec()
             if not task.cancelled():
                 task.exception()
 
@@ -129,6 +132,8 @@ def create_app(
             await app.state.semaphore.acquire()
             slot_acquired = True
             engine_task = asyncio.create_task(asyncio.to_thread(engine.generate, request))
+            engine_job_gauge.inc()
+            engine_job_started = True
             try:
                 result = await asyncio.wait_for(
                     asyncio.shield(engine_task),
@@ -151,6 +156,7 @@ def create_app(
             except Exception:
                 outcome = "error_fallback"
                 fallback = conservative_fallback("MODEL_INFERENCE_ERROR")
+            metrics.validation_warnings.labels(code=outcome.upper()).inc()
             return TriageResponse(
                 request_id=request_id,
                 output=fallback,
@@ -175,6 +181,8 @@ def create_app(
         finally:
             if slot_acquired and not release_deferred:
                 app.state.semaphore.release()
+            if engine_job_started and not release_deferred:
+                engine_job_gauge.dec()
             metrics.inflight.dec()
             elapsed = time.perf_counter() - started
             metrics.requests.labels(

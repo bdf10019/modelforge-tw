@@ -19,7 +19,13 @@ class ServiceMetrics:
         )
         self.inflight = Gauge(
             "modelforge_inflight_requests",
-            "Requests currently executing inference.",
+            "HTTP requests currently queued or waiting for inference.",
+            registry=self.registry,
+        )
+        self.engine_jobs = Gauge(
+            "modelforge_active_engine_jobs",
+            "Underlying engine jobs still running, including jobs that exceeded HTTP timeout.",
+            ["engine"],
             registry=self.registry,
         )
         self.validation_warnings = Counter(

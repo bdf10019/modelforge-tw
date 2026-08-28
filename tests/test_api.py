@@ -156,6 +156,13 @@ async def test_timed_out_worker_keeps_concurrency_slot_until_it_finishes():
             "/v1/triage", json={"incident_text": "設備持續異音但背景工作尚未結束"}
         )
         assert "TIMEOUT_FALLBACK" in first.json()["validation_warnings"]
+        metrics_while_timed_out = (await client.get("/metrics")).text
+        assert 'modelforge_active_engine_jobs{engine="fixture-adapted"} 1.0' in (
+            metrics_while_timed_out
+        )
+        assert 'modelforge_validation_warnings_total{code="TIMEOUT_FALLBACK"} 1.0' in (
+            metrics_while_timed_out
+        )
 
         second_task = asyncio.create_task(
             client.post("/v1/triage", json={"incident_text": "第二筆設備事件等待容量釋放"})
