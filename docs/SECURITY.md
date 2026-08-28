@@ -10,6 +10,8 @@
 ## Controls
 
 - 輸入／輸出均 `extra=forbid`，限制長度、陣列大小與控制字元。
+- OpenAI-compatible 路由只接受已文件化的參數子集；未部署模型、非零 temperature、過小生成預算
+  與未知參數會拒絕，不會靜默忽略。
 - llama.cpp 出站請求使用 strict JSON Schema，所有欄位 required，enum 與 reason code 採允許清單。
 - prompt 明確把事件視為不可信資料；server 另做注入 regex，不依賴模型服從。
 - 證據必須逐字存在輸入；否則移除並強制人工複核。

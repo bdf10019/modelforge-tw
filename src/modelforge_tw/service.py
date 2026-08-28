@@ -8,12 +8,12 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from importlib.resources import files
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from modelforge_tw.engines import FixtureEngine, InferenceEngine, OpenAIHTTPInferenceEngine
 from modelforge_tw.metrics import ServiceMetrics
@@ -26,17 +26,28 @@ REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,96}$")
 
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    role: str
+    role: Literal["system", "user", "assistant", "tool"]
     content: str = Field(min_length=1, max_length=4000)
 
 
 class ChatCompletionRequest(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
     model: str | None = None
     messages: list[ChatMessage] = Field(min_length=1, max_length=32)
-    temperature: float = 0
-    max_tokens: int = Field(default=256, ge=1, le=512)
+    temperature: Literal[0] = 0
+    max_tokens: int | None = Field(default=None, ge=1, le=512)
     stream: bool = False
+
+    @model_validator(mode="after")
+    def validate_triage_user_message(self) -> ChatCompletionRequest:
+        user_messages = [
+            message.content.strip() for message in self.messages if message.role == "user"
+        ]
+        if not user_messages:
+            raise ValueError("at least one user message is required")
+        if not 8 <= len(user_messages[-1]) <= 2000:
+            raise ValueError("the last user message must contain 8 to 2000 characters")
+        return self
 
 
 def build_engine(settings: Settings) -> InferenceEngine:
@@ -196,9 +207,16 @@ def create_app(
 
     @app.post("/v1/chat/completions")
     async def chat(payload: ChatCompletionRequest, request: Request) -> Response:
+        engine: InferenceEngine = app.state.engine
+        if payload.model not in {None, "released", engine.model_id}:
+            raise HTTPException(status_code=404, detail="requested model is not deployed")
+        deployed_max_tokens = engine.max_new_tokens or selected_settings.max_new_tokens
+        if payload.max_tokens is not None and payload.max_tokens < deployed_max_tokens:
+            raise HTTPException(
+                status_code=400,
+                detail=f"max_tokens must be at least {deployed_max_tokens} for this schema",
+            )
         user_messages = [message.content for message in payload.messages if message.role == "user"]
-        if not user_messages:
-            raise HTTPException(status_code=422, detail="at least one user message is required")
         triage_request = TriageRequest(incident_text=user_messages[-1])
         request_id = resolve_request_id(request.headers.get("X-Request-ID"))
         result = await infer(triage_request, request_id)

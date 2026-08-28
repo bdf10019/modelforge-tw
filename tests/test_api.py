@@ -79,6 +79,42 @@ async def test_openai_compatible_non_streaming_and_streaming():
         assert invalid_id.status_code == 400
 
 
+async def test_openai_compatible_rejects_unsupported_or_misleading_parameters():
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    async with app_client(app) as client:
+        messages = [{"role": "user", "content": "馬達溫度持續升高"}]
+        assert (
+            await client.post(
+                "/v1/chat/completions",
+                json={"model": "not-deployed", "messages": messages},
+            )
+        ).status_code == 404
+        assert (
+            await client.post(
+                "/v1/chat/completions",
+                json={"model": "released", "messages": messages, "temperature": 0.2},
+            )
+        ).status_code == 422
+        assert (
+            await client.post(
+                "/v1/chat/completions",
+                json={"model": "released", "messages": messages, "top_p": 0.9},
+            )
+        ).status_code == 422
+        assert (
+            await client.post(
+                "/v1/chat/completions",
+                json={"model": "released", "messages": messages, "max_tokens": 64},
+            )
+        ).status_code == 400
+        assert (
+            await client.post(
+                "/v1/chat/completions",
+                json={"model": "released", "messages": [{"role": "user", "content": "太短"}]},
+            )
+        ).status_code == 422
+
+
 class SlowFailingEngine(FixtureEngine):
     def generate(self, request):
         time.sleep(0.05)
