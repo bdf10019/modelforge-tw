@@ -2,6 +2,8 @@
 
 模型權重、生成資料、逐案輸入輸出與 benchmark 原始報告依隱私／大小政策排除於 Git。本索引保存
 可公開的本機實測識別碼、hash 與重現入口；所有列為 measured 的項目皆在同一台作品機執行。
+不含逐案文字的機器可讀摘要位於 [`docs/measured-evidence.json`](measured-evidence.json)，其資料總數、
+稽核值、公平比較欄位與指標差異由測試自動檢查。
 
 ## 訓練與資料
 

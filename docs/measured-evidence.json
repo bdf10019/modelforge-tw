@@ -1,0 +1,208 @@
+{
+  "schema_version": "1.0",
+  "evidence_kind": "measured",
+  "scope": "2026-08-28/29 本機實測的去識別摘要；不含逐案文字、模型權重或生成資料",
+  "environment": {
+    "os": "Windows 11",
+    "python": "3.11.9",
+    "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "gpu_memory_mib": 8151,
+    "torch": "2.13.0+cu130",
+    "transformers": "5.16.1",
+    "llama_cpp_build": "b10665",
+    "llama_cpp_commit": "ca3d5a3e10d53f7ea672cb9b6178faca3e2807bc"
+  },
+  "dataset": {
+    "generator_version": "1.3.0",
+    "source_kind": "original-synthetic-and-curated-fixture",
+    "license": "CC-BY-4.0",
+    "records": 1204,
+    "splits": {
+      "train": 840,
+      "validation": 140,
+      "test": 210,
+      "challenge": 14
+    },
+    "manifest_sha256": "873a72f19398c494539024a2fafb09a7a893e99302c1c4873738b7aa0d67094c",
+    "evaluation_input_sha256": "01893121075ce7b2436f18407292e44dccc0e6a13b2299c9929af259e58d7f17",
+    "audit": {
+      "duplicate_record_ids": 0,
+      "cross_split_normalized_texts": 0,
+      "cross_split_template_ids": 0,
+      "cross_split_scenario_families": 0,
+      "invalid_evidence_spans": 0,
+      "policy_severity_mismatches": 0
+    }
+  },
+  "training": {
+    "run": "qwen3-1.7b-qlora-v5",
+    "base_model": "Qwen/Qwen3-1.7B",
+    "base_revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+    "epochs": 1,
+    "optimizer_steps": 53,
+    "duration_seconds": 1467.509,
+    "train_loss": 0.235826,
+    "validation_loss": 0.017484,
+    "trainable_parameters": 8716288,
+    "total_parameters": 1729291264,
+    "trainable_percent": 0.504038,
+    "peak_allocated_bytes": 4523375616,
+    "adapter_sha256": "07ce2d7ee13a1f8a9cdd3f3c4509caa99e349c502a14449157601cb77ab61a6b",
+    "training_config_sha256": "0a67dff1892ecc33b85f7492537752f0b92a51e0aecc8e53b1d02f4cc543752b"
+  },
+  "evaluations": {
+    "qlora_nf4": {
+      "source_report": "outputs/eval-C-peft-v5-full-policy-fixed.json",
+      "run_id": "05b114aa-394b-4561-899a-806361150408",
+      "cases": 224,
+      "prompt_version": "optimized-v2",
+      "max_new_tokens": null,
+      "structured_output_contract": null,
+      "release_gate_sha256": "ce8dca55a5ec9c87b9ea52e66c98e79d0ff2f18ad8cfaa1ffbaa8b30846326f9",
+      "release_passed": true,
+      "metrics": {
+        "raw_json_schema_rate": 0.995536,
+        "required_field_rate": 1.0,
+        "event_type_accuracy": 0.875,
+        "event_type_macro_f1": 0.875341,
+        "severity_accuracy": 0.946429,
+        "severity_macro_f1": 0.954901,
+        "high_critical_escalation_recall": 1.0,
+        "unknown_accuracy": 1.0,
+        "evidence_span_precision": 1.0,
+        "injection_resistance": 1.0,
+        "case_pass_rate": 0.834821
+      },
+      "latency_ms": {
+        "mean": 9432.4091,
+        "p50": 8689.517,
+        "p95": 13238.4736,
+        "max": 14605.8298
+      }
+    },
+    "gguf_q8_fair_v2": {
+      "source_report": "outputs/eval-E4-q8-v5-full-fair.json",
+      "run_id": "d7ba673e-6d12-4fb6-abd2-e00d56b7212b",
+      "cases": 224,
+      "prompt_version": "optimized-v2",
+      "max_new_tokens": 192,
+      "structured_output_contract": "json-schema-v2",
+      "release_gate_sha256": "2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a",
+      "release_passed": true,
+      "metrics": {
+        "raw_json_schema_rate": 1.0,
+        "required_field_rate": 1.0,
+        "event_type_accuracy": 0.852679,
+        "event_type_macro_f1": 0.851593,
+        "severity_accuracy": 0.834821,
+        "severity_macro_f1": 0.853403,
+        "high_critical_escalation_recall": 1.0,
+        "unknown_accuracy": 0.967742,
+        "evidence_span_precision": 1.0,
+        "injection_resistance": 1.0,
+        "case_pass_rate": 0.754464
+      },
+      "latency_ms": {
+        "mean": 975.0945,
+        "p50": 957.5822,
+        "p95": 1256.6233,
+        "max": 1543.0881
+      }
+    },
+    "gguf_q4_fair_v2": {
+      "source_report": "outputs/eval-F2-q4-v5-full-fair.json",
+      "run_id": "efb240d2-330f-4285-b86f-c8ad6ada264c",
+      "cases": 224,
+      "prompt_version": "optimized-v2",
+      "max_new_tokens": 192,
+      "structured_output_contract": "json-schema-v2",
+      "release_gate_sha256": "2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a",
+      "release_passed": false,
+      "metrics": {
+        "raw_json_schema_rate": 1.0,
+        "required_field_rate": 1.0,
+        "event_type_accuracy": 0.745536,
+        "event_type_macro_f1": 0.744321,
+        "severity_accuracy": 0.90625,
+        "severity_macro_f1": 0.910413,
+        "high_critical_escalation_recall": 1.0,
+        "unknown_accuracy": 0.83871,
+        "evidence_span_precision": 1.0,
+        "injection_resistance": 1.0,
+        "case_pass_rate": 0.714286
+      },
+      "latency_ms": {
+        "mean": 829.1387,
+        "p50": 811.5222,
+        "p95": 1040.1274,
+        "max": 1209.6697
+      }
+    }
+  },
+  "q8_to_q4_comparison": {
+    "source_report": "outputs/compare-E4-F2-q4-full-fair.json",
+    "compatibility_checks": {
+      "dataset_hash": true,
+      "release_gate_hash": true,
+      "prompt_version": true,
+      "max_new_tokens": true,
+      "structured_output_contract": true
+    },
+    "metric_deltas_candidate_minus_baseline": {
+      "event_type_macro_f1": -0.107272,
+      "severity_macro_f1": 0.05701,
+      "raw_json_schema_rate": 0.0,
+      "unknown_accuracy": -0.129032,
+      "case_pass_rate": -0.040178
+    },
+    "event_macro_f1_max_regression": 0.015,
+    "quantization_gate_passed": false
+  },
+  "artifacts": {
+    "merged_safetensors": {
+      "bytes": 3441185608,
+      "sha256": "d7fb897a84c0553b934717fb1b2cf4299a67cdcd6a709c2f7d07ca0bb2e303e1"
+    },
+    "gguf_f16": {
+      "bytes": 3447349024,
+      "sha256": "1a1cbf88f5575f7fa3377187e2b4916114d69efeed3e46b2c9742c88a7c739fa"
+    },
+    "gguf_q8_0": {
+      "bytes": 1834426144,
+      "sha256": "d4729ea11ea540d46be45effe7b41ffbe55bc51ce7e42bf7443cd2bbf84ca9ed"
+    },
+    "gguf_q4_k_m": {
+      "bytes": 1107408672,
+      "sha256": "8745574ab802c7ac799c4d2261fea0e067c638e87ea1f5591e4a9bf2cc49566d"
+    }
+  },
+  "concurrency_benchmarks": {
+    "q8_0": {
+      "requests": 36,
+      "errors": 0,
+      "host_gpu_peak_mib": 3134,
+      "concurrency_4": {
+        "requests_per_second": 2.1159,
+        "output_tokens_per_second": 201.8893,
+        "latency_p95_ms": 2433.7425,
+        "ttft_p50_ms": 404.4909
+      }
+    },
+    "q4_k_m": {
+      "requests": 36,
+      "errors": 0,
+      "host_gpu_peak_mib": 2443,
+      "concurrency_4": {
+        "requests_per_second": 2.6919,
+        "output_tokens_per_second": 226.5685,
+        "latency_p95_ms": 1541.8597,
+        "ttft_p50_ms": 373.8325
+      }
+    }
+  },
+  "registry_expected_state": {
+    "released": "qwen3-1.7b-qlora-v5",
+    "previous_good": "qwen3-1.7b-gguf-q8-v5-contract-v2",
+    "blocked": "qwen3-1.7b-gguf-q4-v5-contract-v2"
+  }
+}
