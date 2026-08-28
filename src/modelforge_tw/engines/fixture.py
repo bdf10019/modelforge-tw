@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from modelforge_tw.prompts import MINIMAL_PROMPT_VERSION, OPTIMIZED_PROMPT_VERSION
-from modelforge_tw.safety import apply_safety_policy
+from modelforge_tw.safety import SAFETY_POLICY_VERSION, apply_safety_policy
 from modelforge_tw.schemas import (
     EventType,
     InferenceMetadata,
@@ -40,6 +40,7 @@ class FixtureEngine:
         self.quantization = "none"
         self.max_new_tokens: int | None = None
         self.structured_output_contract: str = "fixture-json-v1"
+        self.safety_policy_version: str = SAFETY_POLICY_VERSION
         self.prompt_version = (
             MINIMAL_PROMPT_VERSION if self.variant == "base" else OPTIMIZED_PROMPT_VERSION
         )
@@ -120,6 +121,7 @@ class FixtureEngine:
                 output_tokens=None,
                 max_new_tokens=self.max_new_tokens,
                 structured_output_contract=self.structured_output_contract,
+                safety_policy_version=self.safety_policy_version,
                 evidence_kind="fixture",
             ),
             validation_warnings=warnings,

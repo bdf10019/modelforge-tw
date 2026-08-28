@@ -16,6 +16,8 @@
 - prompt 明確把事件視為不可信資料；server 另做注入 regex，不依賴模型服從。
 - 證據必須逐字存在輸入；否則移除並強制人工複核。
 - critical/high 關鍵風險只可向上升級；動作來自四項 allowlist，沒有設備控制工具。
+- 危險語句的 stop/isolate-and-escalate 優先於缺證據的 collect-evidence 規則；缺證據只能增加人工
+  複核與缺失資訊，不能把既有升級動作降級。
 - 解析失敗、timeout、engine exception 都回 unknown + collect evidence + review required。
 - semaphore、timeout、request ID 驗證、Prometheus outcome 與 readiness 檢查。
 - timeout 後仍保留同步模型的容量槽，直到不可取消的背景推論真正結束，避免資源耗盡。

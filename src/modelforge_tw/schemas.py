@@ -109,6 +109,7 @@ class InferenceMetadata(BaseModel):
     ttft_ms: float | None = Field(default=None, ge=0)
     max_new_tokens: int | None = Field(default=None, ge=1)
     structured_output_contract: str | None = None
+    safety_policy_version: str | None = None
     evidence_kind: Literal["fixture", "measured"]
 
 
@@ -160,7 +161,7 @@ class CaseResult(BaseModel):
 class EvaluationReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: str = "1.1"
+    schema_version: str = "1.2"
     run_id: str
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     engine: str
@@ -171,6 +172,8 @@ class EvaluationReport(BaseModel):
     prompt_version: str
     max_new_tokens: int | None = Field(default=None, ge=1)
     structured_output_contract: str | None = None
+    safety_policy_version: str | None = None
+    evaluation_contract_version: str | None = None
     evidence_kind: Literal["fixture", "measured"]
     dataset_manifest_sha256: str
     release_gate_sha256: str | None = None

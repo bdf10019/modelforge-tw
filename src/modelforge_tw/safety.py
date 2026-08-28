@@ -14,6 +14,8 @@ from modelforge_tw.schemas import (
     TriageRequest,
 )
 
+SAFETY_POLICY_VERSION = "risk-precedence-v2"
+
 INJECTION_PATTERN = re.compile(
     r"忽略(?:前述|以上|所有)?(?:規則|指令)|ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|"
     r"system\s+prompt|改成正常|不要人工複核",
@@ -116,15 +118,25 @@ def apply_safety_policy(
 
     if output.event_type == EventType.UNKNOWN or not grounded_spans:
         update["review_required"] = True
-        update["safe_actions"] = [SafeAction.COLLECT_EVIDENCE]
+        if policy_action is None:
+            update["safe_actions"] = [SafeAction.COLLECT_EVIDENCE]
+        if not output.missing_information:
+            update["missing_information"] = ["可驗證的設備狀態與量測證據"]
         if "INSUFFICIENT_EVIDENCE" not in reason_codes:
             reason_codes.append("INSUFFICIENT_EVIDENCE")
 
+    priority_codes = ("HIGH_SEVERITY", "UNTRUSTED_INSTRUCTION", "INSUFFICIENT_EVIDENCE")
+    if len(reason_codes) > 12:
+        prioritized = [code for code in priority_codes if code in reason_codes]
+        remaining = [code for code in reason_codes if code not in prioritized]
+        reason_codes = (prioritized + remaining)[:12]
     if reason_codes != output.reason_codes:
         update["reason_codes"] = reason_codes
 
     if update:
-        output = output.model_copy(update=update)
+        payload = output.model_dump(mode="json")
+        payload.update(update)
+        output = TriageOutput.model_validate(payload)
     return output, warnings
 
 

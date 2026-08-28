@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import Any, Literal
 
 from modelforge_tw.prompts import messages_for_version
-from modelforge_tw.safety import apply_safety_policy, conservative_fallback, parse_output
+from modelforge_tw.safety import (
+    SAFETY_POLICY_VERSION,
+    apply_safety_policy,
+    conservative_fallback,
+    parse_output,
+)
 from modelforge_tw.schemas import InferenceMetadata, InferenceResult, TriageRequest
 
 
@@ -36,6 +41,7 @@ class TransformersInferenceEngine:
         self.evidence_kind: Literal["fixture", "measured"] = "measured"
         self.max_new_tokens: int | None = max_new_tokens
         self.structured_output_contract: str = "prompt-schema+bounded-repair-v1"
+        self.safety_policy_version: str = SAFETY_POLICY_VERSION
         self._lock = threading.Lock()
         self._torch = torch
         self.tokenizer: Any = AutoTokenizer.from_pretrained(
@@ -153,6 +159,7 @@ class TransformersInferenceEngine:
                 ),
                 max_new_tokens=self.max_new_tokens,
                 structured_output_contract=self.structured_output_contract,
+                safety_policy_version=self.safety_policy_version,
                 evidence_kind="measured",
             ),
             repair_used=repair_used,

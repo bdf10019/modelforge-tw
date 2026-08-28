@@ -7,7 +7,12 @@ from typing import Any, Literal
 import httpx
 
 from modelforge_tw.prompts import messages_for_version
-from modelforge_tw.safety import apply_safety_policy, conservative_fallback, parse_output
+from modelforge_tw.safety import (
+    SAFETY_POLICY_VERSION,
+    apply_safety_policy,
+    conservative_fallback,
+    parse_output,
+)
 from modelforge_tw.schemas import (
     ALLOWED_REASON_CODES,
     InferenceMetadata,
@@ -57,6 +62,7 @@ class OpenAIHTTPInferenceEngine:
         self.max_tokens = max_tokens
         self.max_new_tokens: int | None = max_tokens
         self.structured_output_contract: str = OPENAI_HTTP_CONTRACT_VERSION
+        self.safety_policy_version: str = SAFETY_POLICY_VERSION
         self.evidence_kind: Literal["fixture", "measured"] = "measured"
 
     def ready(self) -> bool:
@@ -177,6 +183,7 @@ class OpenAIHTTPInferenceEngine:
                 ttft_ms=ttft_ms,
                 max_new_tokens=self.max_new_tokens,
                 structured_output_contract=self.structured_output_contract,
+                safety_policy_version=self.safety_policy_version,
                 evidence_kind="measured",
             ),
             repair_used=repair_used,

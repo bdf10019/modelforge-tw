@@ -11,13 +11,20 @@ from modelforge_tw.benchmark import run_benchmark, write_benchmark
 from modelforge_tw.dataset import audit_records, load_splits, sha256_file, write_dataset
 from modelforge_tw.engines import FixtureEngine, OpenAIHTTPInferenceEngine
 from modelforge_tw.engines.openai_http import OPENAI_HTTP_CONTRACT_VERSION
-from modelforge_tw.evaluation import assess_q4_release, compare_reports, evaluate, write_report
+from modelforge_tw.evaluation import (
+    EVALUATION_CONTRACT_VERSION,
+    assess_q4_release,
+    compare_reports,
+    evaluate,
+    write_report,
+)
 from modelforge_tw.prompts import (
     MINIMAL_PROMPT_VERSION,
     OPTIMIZED_PROMPT_V2_VERSION,
     OPTIMIZED_PROMPT_VERSION,
 )
 from modelforge_tw.registry import ArtifactRef, FileRegistry, ModelManifest
+from modelforge_tw.safety import SAFETY_POLICY_VERSION
 from modelforge_tw.schemas import DatasetRecord, EvaluationReport, InferenceResult, TriageRequest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -112,8 +119,10 @@ def _evaluation_fingerprint(args: argparse.Namespace) -> str:
             if path.is_file()
         }
     payload = {
-        "cache_fingerprint_version": "4",
+        "cache_fingerprint_version": "5",
         "openai_http_contract_version": OPENAI_HTTP_CONTRACT_VERSION,
+        "safety_policy_version": SAFETY_POLICY_VERSION,
+        "evaluation_contract_version": EVALUATION_CONTRACT_VERSION,
         "engine": args.engine,
         "base_url": args.base_url,
         "model_id": args.model_id,

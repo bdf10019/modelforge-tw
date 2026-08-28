@@ -11,6 +11,7 @@ class InferenceEngine(Protocol):
     prompt_version: str
     max_new_tokens: int | None
     structured_output_contract: str
+    safety_policy_version: str
     evidence_kind: Literal["fixture", "measured"]
 
     def generate(self, request: TriageRequest) -> InferenceResult: ...
