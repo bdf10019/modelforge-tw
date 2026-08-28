@@ -1,3 +1,5 @@
+import asyncio
+import threading
 import time
 from contextlib import asynccontextmanager
 
@@ -121,6 +123,18 @@ class SlowFailingEngine(FixtureEngine):
         raise RuntimeError("do not expose this internal error")
 
 
+class BlockingEngine(FixtureEngine):
+    def __post_init__(self):
+        super().__post_init__()
+        self.calls = 0
+        self.release = threading.Event()
+
+    def generate(self, request):
+        self.calls += 1
+        self.release.wait(timeout=1)
+        return super().generate(request)
+
+
 async def test_failure_returns_conservative_fallback_without_error_detail():
     settings = Settings(request_timeout_seconds=1)
     app = create_app(settings=settings, engine_factory=lambda: SlowFailingEngine("adapted"))
@@ -131,3 +145,30 @@ async def test_failure_returns_conservative_fallback_without_error_detail():
         assert body["output"]["event_type"] == "unknown"
         assert body["output"]["review_required"] is True
         assert "internal error" not in response.text
+
+
+async def test_timed_out_worker_keeps_concurrency_slot_until_it_finishes():
+    engine = BlockingEngine("adapted")
+    settings = Settings(request_timeout_seconds=0.01, max_concurrency=1)
+    app = create_app(settings=settings, engine_factory=lambda: engine)
+    async with app_client(app) as client:
+        first = await client.post(
+            "/v1/triage", json={"incident_text": "設備持續異音但背景工作尚未結束"}
+        )
+        assert "TIMEOUT_FALLBACK" in first.json()["validation_warnings"]
+
+        second_task = asyncio.create_task(
+            client.post("/v1/triage", json={"incident_text": "第二筆設備事件等待容量釋放"})
+        )
+        await asyncio.sleep(0.03)
+        assert engine.calls == 1
+        assert second_task.done() is False
+
+        engine.release.set()
+        second = await asyncio.wait_for(second_task, timeout=1)
+        assert second.status_code == 200
+        for _ in range(20):
+            if engine.calls == 2:
+                break
+            await asyncio.sleep(0.01)
+        assert engine.calls == 2

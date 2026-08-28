@@ -41,3 +41,5 @@ reason code 使用有限允許清單。此約束在生成前套用；線上 boun
 
 服務不執行設備控制、不讀任意 URL 或用戶指定模型路徑，也預設不記錄事件原文。Kubernetes
 範例把 API 與模型伺服器分開，讓 GPU server 可獨立縮放；`/readyz` 會檢查下游模型健康狀態。
+同步模型推論逾時時會立即回傳保守 fallback，但底層執行緒無法強制取消；該工作真正結束以前仍
+占用 concurrency slot，避免連續 timeout 繞過容量上限並堆積 GPU 工作。

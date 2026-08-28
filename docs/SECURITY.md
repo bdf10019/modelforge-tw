@@ -18,6 +18,7 @@
 - critical/high 關鍵風險只可向上升級；動作來自四項 allowlist，沒有設備控制工具。
 - 解析失敗、timeout、engine exception 都回 unknown + collect evidence + review required。
 - semaphore、timeout、request ID 驗證、Prometheus outcome 與 readiness 檢查。
+- timeout 後仍保留同步模型的容量槽，直到不可取消的背景推論真正結束，避免資源耗盡。
 - 預設 `MODELFORGE_LOG_INPUTS=false`；repository 忽略模型、資料生成物與輸出報告。
 
 ## Secret and privacy checks

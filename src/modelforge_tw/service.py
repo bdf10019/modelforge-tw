@@ -116,45 +116,65 @@ def create_app(
         engine: InferenceEngine = app.state.engine
         started = time.perf_counter()
         metrics.inflight.inc()
+        slot_acquired = False
+        engine_task: asyncio.Task[Any] | None = None
+        release_deferred = False
+
+        def release_after_background_completion(task: asyncio.Task[Any]) -> None:
+            app.state.semaphore.release()
+            if not task.cancelled():
+                task.exception()
+
         try:
-            async with app.state.semaphore:
-                try:
-                    result = await asyncio.wait_for(
-                        asyncio.to_thread(engine.generate, request),
-                        timeout=selected_settings.request_timeout_seconds,
-                    )
-                    outcome = "success"
-                    for warning in result.validation_warnings:
-                        metrics.validation_warnings.labels(code=warning).inc()
-                    return TriageResponse(
-                        request_id=request_id,
-                        output=result.output,
-                        metadata=result.metadata,
-                        validation_warnings=result.validation_warnings,
-                    )
-                except TimeoutError:
-                    outcome = "timeout_fallback"
-                    fallback = conservative_fallback("MODEL_TIMEOUT")
-                except Exception:
-                    outcome = "error_fallback"
-                    fallback = conservative_fallback("MODEL_INFERENCE_ERROR")
+            await app.state.semaphore.acquire()
+            slot_acquired = True
+            engine_task = asyncio.create_task(asyncio.to_thread(engine.generate, request))
+            try:
+                result = await asyncio.wait_for(
+                    asyncio.shield(engine_task),
+                    timeout=selected_settings.request_timeout_seconds,
+                )
+                outcome = "success"
+                for warning in result.validation_warnings:
+                    metrics.validation_warnings.labels(code=warning).inc()
                 return TriageResponse(
                     request_id=request_id,
-                    output=fallback,
-                    metadata=InferenceMetadata(
-                        engine=engine.name,
-                        model_id=engine.model_id,
-                        model_version=engine.model_version,
-                        quantization=engine.quantization,
-                        prompt_version=engine.prompt_version,
-                        elapsed_ms=(time.perf_counter() - started) * 1000,
-                        max_new_tokens=engine.max_new_tokens,
-                        structured_output_contract=engine.structured_output_contract,
-                        evidence_kind=engine.evidence_kind,
-                    ),
-                    validation_warnings=[outcome.upper()],
+                    output=result.output,
+                    metadata=result.metadata,
+                    validation_warnings=result.validation_warnings,
                 )
+            except TimeoutError:
+                outcome = "timeout_fallback"
+                fallback = conservative_fallback("MODEL_TIMEOUT")
+                release_deferred = True
+                engine_task.add_done_callback(release_after_background_completion)
+            except Exception:
+                outcome = "error_fallback"
+                fallback = conservative_fallback("MODEL_INFERENCE_ERROR")
+            return TriageResponse(
+                request_id=request_id,
+                output=fallback,
+                metadata=InferenceMetadata(
+                    engine=engine.name,
+                    model_id=engine.model_id,
+                    model_version=engine.model_version,
+                    quantization=engine.quantization,
+                    prompt_version=engine.prompt_version,
+                    elapsed_ms=(time.perf_counter() - started) * 1000,
+                    max_new_tokens=engine.max_new_tokens,
+                    structured_output_contract=engine.structured_output_contract,
+                    evidence_kind=engine.evidence_kind,
+                ),
+                validation_warnings=[outcome.upper()],
+            )
+        except asyncio.CancelledError:
+            if engine_task is not None and not release_deferred:
+                release_deferred = True
+                engine_task.add_done_callback(release_after_background_completion)
+            raise
         finally:
+            if slot_acquired and not release_deferred:
+                app.state.semaphore.release()
             metrics.inflight.dec()
             elapsed = time.perf_counter() - started
             metrics.requests.labels(
