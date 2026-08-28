@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: modelforge-train
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: trainer
+          image: modelforge-tw-gpu:0.1.0
+          command: ["/bin/sh", "-lc"]
+          args: ["modelforge generate-data && modelforge train --config configs/training.json"]
+          resources:
+            requests:
+              cpu: "2"
+              memory: 8Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "6"
+              memory: 16Gi
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: workspace
+              mountPath: /app/artifacts
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: modelforge-artifacts

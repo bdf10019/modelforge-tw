@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "warmup_requests": 3,
+  "requests_per_level": 30,
+  "concurrency_levels": [1, 2, 4, 8],
+  "max_output_tokens": 256,
+  "fixed_output_tokens_for_latency": 128,
+  "temperature": 0,
+  "seed": 42,
+  "notes": [
+    "Cold load and warm serving runs must be separate.",
+    "TTFT is measured only by a streaming client and never replaced with zero.",
+    "Prompt and output token counts must be retained for every engine."
+  ]
+}

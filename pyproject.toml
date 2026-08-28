@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "modelforge-tw"
+version = "0.1.0"
+description = "Traditional Chinese LLM adaptation, quantization, evaluation, and serving platform"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "ModelForge-TW contributors" }]
+dependencies = [
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "prometheus-client>=0.21,<1",
+  "psutil>=6,<8",
+  "pydantic-settings>=2.7,<3",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.14,<2",
+  "pytest>=8.3,<10",
+  "pytest-asyncio>=0.25,<2",
+  "pytest-cov>=6,<8",
+  "pyyaml>=6,<7",
+  "ruff>=0.9,<1",
+  "types-psutil>=6,<8",
+]
+ml = [
+  "accelerate>=1.2,<2",
+  "bitsandbytes>=0.45,<1",
+  "datasets>=3.2,<5",
+  "peft>=0.14,<1",
+  "safetensors>=0.5,<1",
+  "sentencepiece>=0.2,<1",
+  "transformers>=4.51,<6",
+]
+
+[project.scripts]
+modelforge = "modelforge_tw.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+modelforge_tw = ["web/*.html", "web/*.css", "web/*.js"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = [".venv", "artifacts", "data/generated", "outputs", "tools"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["modelforge_tw"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = true

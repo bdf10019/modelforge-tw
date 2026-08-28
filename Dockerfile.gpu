@@ -1,0 +1,15 @@
+FROM nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04
+ENV DEBIAN_FRONTEND=noninteractive PIP_NO_CACHE_DIR=1
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip python3-venv && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY pyproject.toml README.md LICENSE ./
+COPY src ./src
+COPY configs ./configs
+COPY data ./data
+RUN python3 -m pip install --break-system-packages torch==2.13.0 --index-url https://download.pytorch.org/whl/cu130 && \
+    python3 -m pip install --break-system-packages ".[ml]"
+RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
+USER appuser
+ENV MODELFORGE_ENGINE=transformers MODELFORGE_LOAD_IN_4BIT=true MODELFORGE_LOG_INPUTS=false
+EXPOSE 8000
+ENTRYPOINT ["modelforge", "serve", "--host", "0.0.0.0", "--port", "8000"]

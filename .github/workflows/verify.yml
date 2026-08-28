@@ -1,0 +1,23 @@
+name: verify
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e ".[dev]"
+      - run: modelforge generate-data
+      - run: modelforge audit-data
+      - run: ruff format --check .
+      - run: ruff check .
+      - run: mypy src
+      - run: pytest -q
+      - run: pwsh -NoProfile -File scripts/privacy-check.ps1
+      - run: python -m pip wheel . --no-deps --wheel-dir dist-check

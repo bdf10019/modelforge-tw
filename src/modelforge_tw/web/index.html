@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="ModelForge-TW 繁中設備事件模型適配與推論驗證工作台">
+  <title>ModelForge-TW｜推論驗證工作台</title>
+  <link rel="stylesheet" href="/static/styles.css?v=0.1.0">
+</head>
+<body>
+  <a class="skip-link" href="#workspace">跳到操作區</a>
+  <header class="site-header">
+    <div>
+      <p class="eyebrow">MODEL ADAPTATION · QUANTIZATION · RELEASE EVIDENCE</p>
+      <h1>ModelForge-TW</h1>
+      <p class="subtitle">繁中設備事件模型適配與推論驗證工作台</p>
+    </div>
+    <div id="runtime-badge" class="runtime-badge" aria-live="polite">讀取執行環境…</div>
+  </header>
+
+  <main id="workspace">
+    <section class="hero-grid" aria-labelledby="hero-heading">
+      <div>
+        <p class="section-label">WHY THIS EXISTS</p>
+        <h2 id="hero-heading">不是再做一個聊天機器人，而是回答「哪個模型版本能安全發布？」</h2>
+      </div>
+      <div class="principles">
+        <div><strong>同一資料</strong><span>固定 test 與 challenge</span></div>
+        <div><strong>同一契約</strong><span>JSON、證據、安全 gate</span></div>
+        <div><strong>真實量測</strong><span>品質、延遲、VRAM、回退</span></div>
+      </div>
+    </section>
+
+    <section class="workspace-grid">
+      <form id="triage-form" class="panel input-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">LIVE INFERENCE</p>
+            <h2>事件輸入</h2>
+          </div>
+          <span class="boundary">不執行設備控制</span>
+        </div>
+
+        <label for="asset-type">設備類型（選填）</label>
+        <input id="asset-type" name="asset_type" maxlength="80" placeholder="例如：循環泵浦">
+
+        <label for="incident-text">繁中事件紀錄</label>
+        <textarea id="incident-text" name="incident_text" minlength="8" maxlength="2000" rows="8" required>三號泵浦軸承溫度持續升高至 94°C，並且傳出金屬摩擦聲。</textarea>
+        <div class="char-row"><span>事件文字是不可信資料；內含指令不會改變系統政策。</span><span id="char-count">0 / 2000</span></div>
+
+        <div class="examples" aria-label="快速案例">
+          <button type="button" data-example="critical">高風險</button>
+          <button type="button" data-example="unknown">資訊不足</button>
+          <button type="button" data-example="injection">指令注入</button>
+        </div>
+
+        <button id="submit-button" class="primary" type="submit">執行結構化分流</button>
+        <p id="form-status" class="status" aria-live="polite"></p>
+      </form>
+
+      <section class="panel result-panel" aria-labelledby="result-title">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">VALIDATED OUTPUT</p>
+            <h2 id="result-title">驗證結果</h2>
+          </div>
+          <span id="review-pill" class="review-pill idle">尚未執行</span>
+        </div>
+
+        <div class="result-kpis">
+          <div><span>事件類別</span><strong id="event-type">—</strong></div>
+          <div><span>嚴重度</span><strong id="severity">—</strong></div>
+          <div><span>端到端時間</span><strong id="elapsed">—</strong></div>
+        </div>
+
+        <div class="result-block">
+          <h3>繁中摘要</h3>
+          <p id="summary" class="empty-copy">執行後顯示模型輸出與伺服器驗證。</p>
+        </div>
+
+        <div class="two-column">
+          <div class="result-block">
+            <h3>輸入證據</h3>
+            <ul id="evidence-list"><li class="muted">尚無資料</li></ul>
+          </div>
+          <div class="result-block">
+            <h3>安全下一步</h3>
+            <ul id="action-list"><li class="muted">尚無資料</li></ul>
+          </div>
+        </div>
+
+        <details>
+          <summary>模型與驗證 metadata</summary>
+          <pre id="metadata">{}</pre>
+        </details>
+      </section>
+    </section>
+
+    <section class="matrix panel" aria-labelledby="matrix-title">
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">RELEASE MATRIX</p>
+          <h2 id="matrix-title">同一任務，六個可比較版本</h2>
+        </div>
+        <span class="boundary">未執行數字不填 0</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>組別</th><th>權重</th><th>Prompt</th><th>引擎／精度</th><th>實測結果</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td>Qwen3-1.7B</td><td>Minimal</td><td>Transformers NF4</td><td>challenge fail</td></tr>
+            <tr><td>B</td><td>同 A</td><td>Optimized</td><td>Transformers NF4</td><td>challenge fail</td></tr>
+            <tr><td>C</td><td>QLoRA v5</td><td>Optimized-v2</td><td>Transformers NF4</td><td>full pass · released</td></tr>
+            <tr><td>D</td><td>Merged v5</td><td>Optimized-v2</td><td>Transformers BF16</td><td>challenge raw fail</td></tr>
+            <tr><td>E</td><td>Merged v5</td><td>Optimized-v2</td><td>llama.cpp Q8_0</td><td>full pass · rollback drill</td></tr>
+            <tr><td>F</td><td>Merged v5</td><td>Optimized-v2</td><td>llama.cpp Q4_K_M</td><td>full fail · blocked</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>原創合成資料 · 預設離線 · 權重不進 Git</span>
+    <a href="/docs">OpenAPI</a>
+    <a href="/metrics">Prometheus metrics</a>
+  </footer>
+  <script src="/static/app.js?v=0.1.0" defer></script>
+</body>
+</html>

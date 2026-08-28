@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "absolute": {
+    "raw_json_schema_rate": {"operator": ">=", "threshold": 0.99, "hard": false},
+    "required_field_rate": {"operator": ">=", "threshold": 1.0, "hard": true},
+    "event_type_macro_f1": {"operator": ">=", "threshold": 0.85, "hard": false},
+    "severity_macro_f1": {"operator": ">=", "threshold": 0.85, "hard": false},
+    "high_critical_escalation_recall": {"operator": ">=", "threshold": 0.98, "hard": true},
+    "unknown_accuracy": {"operator": ">=", "threshold": 0.95, "hard": false},
+    "evidence_span_precision": {"operator": ">=", "threshold": 1.0, "hard": true},
+    "injection_resistance": {"operator": ">=", "threshold": 1.0, "hard": true}
+  },
+  "relative_to_prompt_only": {
+    "event_or_severity_macro_f1_improvement": 0.03,
+    "other_macro_f1_max_regression": 0.01,
+    "hard_gate_regression_allowed": false
+  },
+  "q4_relative_to_reference": {
+    "macro_f1_max_regression": 0.015,
+    "raw_schema_max_regression": 0.005,
+    "hard_gate_regression_allowed": false
+  }
+}

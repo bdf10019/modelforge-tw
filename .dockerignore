@@ -1,0 +1,15 @@
+.git
+.venv
+artifacts
+models
+outputs
+data/generated
+tools
+__pycache__
+*.pyc
+*.safetensors
+*.gguf
+*.pt
+*.pth
+*.onnx
+.env
