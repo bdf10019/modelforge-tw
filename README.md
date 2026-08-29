@@ -4,9 +4,9 @@
 QLoRA、合併權重與 GGUF 量化版本，並用實測報告回答品質、延遲、吞吐、VRAM、檔案大小與安全
 發布取捨。
 
-> 專案狀態：公司實務版已完成本機端到端驗證。正式 registry 目前發布 Qwen3-1.7B QLoRA v5
-> （Transformers NF4）；llama.cpp Q8 通過絕對門檻並完成 rollback 演練，Q4_K_M 因完整品質門檻
-> 失敗而封鎖。資料皆為原創合成內容，不包含公司、客戶或私人資料。
+> 專案狀態：公司實務版已完成本機端到端驗證。正式 registry 目前發布完成 policy-v2 attestation
+> 的 Qwen3-1.7B QLoRA v5（Transformers NF4）；llama.cpp Q8 通過絕對門檻並保留為 previous-good，
+> Q4_K_M 因完整品質門檻失敗而封鎖。資料皆為原創合成內容，不包含公司、客戶或私人資料。
 
 ## 核心成果
 
@@ -16,13 +16,13 @@ QLoRA、合併權重與 GGUF 量化版本，並用實測報告回答品質、延
 
 | 版本（224 筆 test + challenge） | raw JSON | event macro-F1 | severity macro-F1 | 安全硬門檻 | mean latency | 發布結果 |
 |---|---:|---:|---:|---:|---:|---|
-| QLoRA v5 / Transformers NF4 | 99.55% | 87.53% | 95.49% | 全過 | 9.432 s | released |
+| QLoRA v5 / Transformers NF4 | 99.55% | 86.24% | 95.35% | 全過 | 8.333 s | released |
 | merged v5 / llama.cpp Q8_0 | 100.00% | 85.16% | 85.34% | 全過 | 1.060 s | 通過；rollback 演練後 retired |
 | merged v5 / llama.cpp Q4_K_M | 100.00% | 74.43% | 91.04% | 全過 | 0.825 s | blocked |
 
 安全硬門檻為必要欄位 100%、high/critical 人工複核召回 100%、證據精度 100% 與注入抵抗
-100%。Q8 的平均延遲是 NF4 路徑的約 11.2%，但 severity macro-F1 描述性差距為 10.15 個百分點，
-因此演練後回滾至較保守的 NF4 v5。Q8 與 Q4 的正式公平比較鎖定相同資料、門檻、prompt、192-token
+100%。Q8 的平均延遲是 NF4 路徑的約 12.7%，但 severity macro-F1 描述性差距為 10.01 個百分點，
+因此保留較保守的 NF4 v5 為正式發布。Q8 與 Q4 的正式公平比較鎖定相同資料、門檻、prompt、192-token
 上限、`json-schema-v2`、`risk-precedence-v2` 與 `release-metrics-v2`；Q4 雖更快，event macro-F1
 相對 Q8 退化 10.73 個百分點，不能發布。
 完整條件與逐階段失敗紀錄見 [評測文件](docs/EVALUATION.md)、[錯誤分析](docs/ERROR_ANALYSIS.md)與

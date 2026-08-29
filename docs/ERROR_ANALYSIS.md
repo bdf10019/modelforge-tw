@@ -27,16 +27,18 @@
 
 ## QLoRA v5 完整集
 
-v5 有 28 筆 event mismatch、12 筆 severity mismatch、1 筆 raw schema invalid。event 主要混淆：
+v5 最新 policy-v2 報告有 31 筆 event mismatch、12 筆 severity mismatch、1 筆 raw schema invalid。
+event 主要混淆：
 
 - thermal→pressure：6 筆。
 - electrical→thermal：4 筆。
 - communication→pressure：3 筆。
 - electrical→communication：3 筆。
-- pressure→process 與 process→pressure：各 3 筆。
+- process→pressure：5 筆；pressure→process：3 筆。
 
-severity 主要為 medium→low 9 筆，以及保守 fallback 導致的 low→unknown 3 筆。即使總體 gate
-通過，event macro-F1 87.53% 只高於 85% 門檻 2.53 個百分點，因此不能宣稱接近完美。
+severity 主要為 medium→low 8 筆、保守 fallback 導致的 low→unknown 3 筆，以及
+medium→unknown 1 筆。即使總體 gate 通過，event macro-F1 86.24% 只高於 85% 門檻 1.24 個
+百分點，因此不能宣稱接近完美。
 
 唯一 raw invalid 出現在提示注入案例。早期 evaluator 錯把 raw 解析率同時當成 required-field rate，
 且 HTTP／Transformers fallback 未重新套用注入政策。修正後，raw invalid 仍誠實計 0，但實際
@@ -57,7 +59,7 @@ merged BF16 challenge 的 raw schema 只有 85.71%，顯示 merge 後行為不�
 ## Q8 與 Q4
 
 最新 Q8 完整集通過，但有 33 筆 event mismatch、37 筆 severity mismatch；severity macro-F1 與
-NF4 的描述性差距為 10.15 個百分點。兩個引擎的生成契約不同，這不是正式相對 gate；仍足以支持
+NF4 的描述性差距為 10.01 個百分點。兩個引擎的生成契約不同，這不是正式相對 gate；仍足以支持
 較保守的發布選擇，因此 Q8 作低延遲 previous-good，不取代 NF4 released 版本。
 
 Q4 完整集有 57 筆 event mismatch、21 筆 severity mismatch；event macro-F1 74.43%、unknown

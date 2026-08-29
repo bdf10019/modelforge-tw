@@ -1,10 +1,10 @@
 # Limitations
 
 - 資料為原創合成與 14 筆人工 challenge，不能代表任何真實工廠分布。
-- NF4 v5 雖通過完整 gate，event macro-F1 87.53% 距門檻不遠；Q8 severity macro-F1 與 NF4 的
-  描述性差距為 10.15 個百分點，Q4 event macro-F1 則未過門檻。
-- NF4 完整報告早於 `safety_policy_version`／`evaluation_contract_version` 欄位，未冒充 policy-v2
-  attestation；目前七項同契約 attestation 僅涵蓋最新 Q8／Q4，NF4 與 Q8 只作描述性比較。
+- NF4 v5 雖通過完整 gate，event macro-F1 86.24% 距門檻不遠；Q8 severity macro-F1 與 NF4 的
+  描述性差距為 10.01 個百分點，Q4 event macro-F1 則未過門檻。
+- NF4、Q8、Q4 最新報告均已鎖定 `risk-precedence-v2` 與 `release-metrics-v2`；但 NF4 與
+  llama.cpp 使用不同的 structured-output contract，因此 NF4→Q8 仍只作跨引擎描述性比較。
 - Transformers adapter 是非串流生成；OpenAI-compatible endpoint 在驗證後分塊回傳，TTFT 不代表
   token-level streaming。
 - 本機 8 GiB GPU 適合 1.7B QLoRA 與 GGUF；vLLM、SGLang、TensorRT-LLM 需要 Linux/WSL 或更大

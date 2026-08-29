@@ -12,7 +12,7 @@ prompt-only、QLoRA、合併權重到 GGUF 量化，以同一封存資料與安�
   跨切分情境洩漏稽核；所有稽核項目為 0 違規。
 - 在 RTX 5060 Laptop 8 GB 上完成 Qwen3-1.7B NF4 QLoRA：僅訓練 8,716,288 個參數
   （0.504%），1 epoch 需 1,467.5 秒，peak allocated VRAM 4.52 GB。
-- 建立 224 筆正式發布 gate；QLoRA v5 達 event macro-F1 87.53%、severity macro-F1 95.49%，
+- 建立 224 筆正式發布 gate；QLoRA v5 policy-v2 達 event macro-F1 86.24%、severity macro-F1 95.35%，
   high/critical 複核召回、unknown、證據精度與注入抵抗皆為 100%。
 - 完成 llama.cpp Q8／Q4 實測：Q8 平均延遲 1.060 秒、四路 2.116 req/s 與 201.9 output tok/s；
   Q4 平均延遲 0.825 秒，但 event macro-F1 74.43%，由自動門檻封鎖。
@@ -26,8 +26,8 @@ prompt-only、QLoRA、合併權重到 GGUF 量化，以同一封存資料與安�
 1. 在 Web UI 選擇「指令注入」，說明輸入為何是不可信資料，以及服務端如何強制人工複核。
 2. 開啟 `docs/EVALUATION.md`，用 Base→Prompt→QLoRA 拆分提示與權重適配的效果，再比較 NF4、
    Q8 與 Q4。
-3. 展示 registry 事件：policy-v2 Q4 gate fail→blocked、Q8 pass→promote、受控 rollback→NF4 v5
-   released。
+3. 展示 registry 事件：policy-v2 Q4 gate fail→blocked、Q8 pass→previous-good、NF4 policy-v2
+   attestation→released。
 
 ## 技術取捨
 

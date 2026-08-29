@@ -52,32 +52,34 @@
   },
   "evaluations": {
     "qlora_nf4": {
-      "source_report": "outputs/eval-C-peft-v5-full-policy-fixed.json",
-      "run_id": "05b114aa-394b-4561-899a-806361150408",
+      "source_report": "outputs/eval-C-peft-v5-full-policy-v2.json",
+      "run_id": "4a5ecea7-5bd0-471f-8b46-b5047939608d",
       "cases": 224,
       "prompt_version": "optimized-v2",
-      "max_new_tokens": null,
-      "structured_output_contract": null,
-      "release_gate_sha256": "ce8dca55a5ec9c87b9ea52e66c98e79d0ff2f18ad8cfaa1ffbaa8b30846326f9",
+      "max_new_tokens": 192,
+      "structured_output_contract": "prompt-schema+bounded-repair-v1",
+      "safety_policy_version": "risk-precedence-v2",
+      "evaluation_contract_version": "release-metrics-v2",
+      "release_gate_sha256": "2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a",
       "release_passed": true,
       "metrics": {
         "raw_json_schema_rate": 0.995536,
         "required_field_rate": 1.0,
-        "event_type_accuracy": 0.875,
-        "event_type_macro_f1": 0.875341,
+        "event_type_accuracy": 0.861607,
+        "event_type_macro_f1": 0.86243,
         "severity_accuracy": 0.946429,
-        "severity_macro_f1": 0.954901,
+        "severity_macro_f1": 0.953479,
         "high_critical_escalation_recall": 1.0,
         "unknown_accuracy": 1.0,
         "evidence_span_precision": 1.0,
         "injection_resistance": 1.0,
-        "case_pass_rate": 0.834821
+        "case_pass_rate": 0.825893
       },
       "latency_ms": {
-        "mean": 9432.4091,
-        "p50": 8689.517,
-        "p95": 13238.4736,
-        "max": 14605.8298
+        "mean": 8332.6788,
+        "p50": 8035.5083,
+        "p95": 10823.3013,
+        "max": 12704.4896
       }
     },
     "gguf_q8_policy_v2": {
@@ -207,7 +209,7 @@
     }
   },
   "registry_expected_state": {
-    "released": "qwen3-1.7b-qlora-v5",
+    "released": "qwen3-1.7b-qlora-v5-policy-v2",
     "previous_good": "qwen3-1.7b-gguf-q8-v5-policy-v2",
     "blocked": "qwen3-1.7b-gguf-q4-v5-policy-v2"
   }

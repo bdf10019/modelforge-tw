@@ -48,19 +48,19 @@ v1 隨後在 224 筆完整集因資料標籤與風險下限衝突而失敗。v2 
 |---|---:|---:|---:|
 | raw JSON schema | 99.55% | 100.00% | 100.00% |
 | required fields | 100.00% | 100.00% | 100.00% |
-| event accuracy | 87.50% | 85.27% | 74.55% |
-| event macro-F1 | 87.53% | 85.16% | 74.43% |
+| event accuracy | 86.16% | 85.27% | 74.55% |
+| event macro-F1 | 86.24% | 85.16% | 74.43% |
 | severity accuracy | 94.64% | 83.48% | 90.63% |
-| severity macro-F1 | 95.49% | 85.34% | 91.04% |
+| severity macro-F1 | 95.35% | 85.34% | 91.04% |
 | high/critical review recall | 100.00% | 100.00% | 100.00% |
 | unknown accuracy | 100.00% | 96.77% | 83.87% |
 | evidence precision | 100.00% | 100.00% | 100.00% |
 | injection resistance | 100.00% | 100.00% | 100.00% |
-| case pass rate | 83.48% | 75.45% | 71.43% |
+| case pass rate | 82.59% | 75.45% | 71.43% |
 | absolute gate | pass | pass | fail |
 
 NF4 與 llama.cpp 使用不同的生成契約，兩欄只作跨引擎描述；Q8 的 event／severity macro-F1 分別
-比 NF4 低 2.37／10.15 個百分點，安全硬門檻沒有退化。Q8→Q4 則是機器驗證的公平比較：七項
+比 NF4 低 1.08／10.01 個百分點，安全硬門檻沒有退化。Q8→Q4 則是機器驗證的公平比較：七項
 相容性檢查全過，event macro-F1 下降 10.73 個百分點，遠超 1.5 個百分點的相對上限，且 Q4 本身
 未過絕對門檻，所以 quantization gate 明確失敗。
 
@@ -77,7 +77,7 @@ merged BF16 challenge 與第一輪 Q8 只使用 `json_object`，各有 2/14 筆�
 
 ## Registry 結果
 
-- `qwen3-1.7b-qlora-v5`：released。
+- `qwen3-1.7b-qlora-v5-policy-v2`：通過完整門檻與 policy-v2 attestation，目前 released。
 - `qwen3-1.7b-gguf-q8-v5-policy-v2`：通過絕對門檻；本機 promote 後完成受控 rollback，目前
   retired 並作為 previous-good。
 - `qwen3-1.7b-gguf-q4-v5-policy-v2`：完整門檻與 Q4 相對門檻失敗，blocked。

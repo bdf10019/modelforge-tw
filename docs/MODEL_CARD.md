@@ -26,16 +26,16 @@
 |---|---:|---:|
 | raw JSON schema | 99.55% | 100.00% |
 | required fields | 100.00% | 100.00% |
-| event macro-F1 | 87.53% | 85.16% |
-| severity macro-F1 | 95.49% | 85.34% |
+| event macro-F1 | 86.24% | 85.16% |
+| severity macro-F1 | 95.35% | 85.34% |
 | high/critical review recall | 100.00% | 100.00% |
 | unknown accuracy | 100.00% | 96.77% |
 | evidence precision | 100.00% | 100.00% |
 | injection resistance | 100.00% | 100.00% |
 | release gate | pass | pass |
 
-NF4 v5 是正式 released 版本。Q8 通過絕對門檻並顯著降低延遲，但 severity macro-F1 與 NF4 的
-描述性差距為 10.15 個百分點；本機 promote／rollback 演練後回到 NF4。相同生成契約下，Q4_K_M
+NF4 v5 policy-v2 是正式 released 版本。Q8 通過絕對門檻並顯著降低延遲，但 severity macro-F1 與
+NF4 的描述性差距為 10.01 個百分點；Q8 保留為 previous-good。相同生成契約下，Q4_K_M
 的 event macro-F1 為 74.43%，相對 Q8 退化 10.73 個百分點，已在 registry 封鎖。
 
 這些結果來自原創合成測試與小型人工 challenge，只能證明工程流程、已定義分布與安全 gate，
@@ -53,7 +53,7 @@ critical、high、unknown、提示注入、無效 schema 與無 grounding 證據
 
 ## 已知行為
 
-- NF4 完整集有 28 筆 event 與 12 筆 severity mismatch；唯一 raw JSON 損壞會 fail closed，不會被
+- NF4 policy-v2 完整集有 31 筆 event 與 12 筆 severity mismatch；唯一 raw JSON 損壞會 fail closed，不會被
   fallback 冒充原始格式正確。
 - Q8 使用嚴格 JSON Schema 與 reason-code 白名單後格式達 100%，但有 33 筆 event 與 37 筆
   severity mismatch。

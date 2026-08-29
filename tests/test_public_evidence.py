@@ -15,8 +15,18 @@ def test_public_evidence_snapshot_is_self_consistent():
     assert evidence["dataset"]["records"] == sum(evidence["dataset"]["splits"].values())
     assert all(value == 0 for value in evidence["dataset"]["audit"].values())
 
+    nf4 = evidence["evaluations"]["qlora_nf4"]
     q8 = evidence["evaluations"]["gguf_q8_policy_v2"]
     q4 = evidence["evaluations"]["gguf_q4_policy_v2"]
+    assert nf4["release_passed"] is True
+    assert nf4["max_new_tokens"] == 192
+    assert nf4["structured_output_contract"] == "prompt-schema+bounded-repair-v1"
+    for field in (
+        "safety_policy_version",
+        "evaluation_contract_version",
+        "release_gate_sha256",
+    ):
+        assert nf4[field] == q8[field]
     for field in (
         "prompt_version",
         "max_new_tokens",
@@ -28,6 +38,11 @@ def test_public_evidence_snapshot_is_self_consistent():
         assert q8[field] == q4[field]
     assert q8["release_passed"] is True
     assert q4["release_passed"] is False
+    assert evidence["registry_expected_state"] == {
+        "released": "qwen3-1.7b-qlora-v5-policy-v2",
+        "previous_good": "qwen3-1.7b-gguf-q8-v5-policy-v2",
+        "blocked": "qwen3-1.7b-gguf-q4-v5-policy-v2",
+    }
 
     comparison = evidence["q8_to_q4_comparison"]
     assert all(comparison["compatibility_checks"].values())
