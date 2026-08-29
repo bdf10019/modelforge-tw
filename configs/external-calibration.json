@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "transform_version": "ai4i-calibration-v1",
+  "transform_version": "ai4i-calibration-v2",
   "source": {
     "dataset": "AI4I 2020 Predictive Maintenance Dataset",
     "landing_page": "https://archive.ics.uci.edu/dataset/601/ai4i",

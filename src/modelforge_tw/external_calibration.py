@@ -20,7 +20,7 @@ from modelforge_tw.schemas import (
     TriageRequest,
 )
 
-TRANSFORM_VERSION = "ai4i-calibration-v1"
+TRANSFORM_VERSION = "ai4i-calibration-v2"
 CalibrationSplit = Literal["external", "external_holdout"]
 EXPECTED_COLUMNS = {
     "UDI",
@@ -149,37 +149,74 @@ def _rank(row: AI4IRow, cohort_name: str, seed: str) -> str:
     return hashlib.sha256(f"{seed}|{cohort_name}|{row.udi}".encode()).hexdigest()
 
 
-def _signal_status(
-    severity: Severity,
-) -> Literal["normal", "warning", "critical", "unknown"]:
-    if severity == Severity.HIGH:
-        return "critical"
-    if severity == Severity.MEDIUM:
+def _signal_status(severity: Severity) -> Literal["normal", "warning", "unknown"]:
+    if severity in (Severity.HIGH, Severity.MEDIUM):
         return "warning"
     if severity == Severity.LOW:
         return "normal"
     return "unknown"
 
 
-def _signals(row: AI4IRow, severity: Severity) -> list[Signal]:
-    status = _signal_status(severity)
-    return [
-        Signal(name="air_temperature", value=row.air_temperature_k, unit="K", status=status),
+def _signals(row: AI4IRow, severity: Severity, event_type: EventType) -> list[Signal]:
+    relevant_status = _signal_status(severity)
+    default_status: Literal["normal", "unknown"] = (
+        "unknown" if severity == Severity.UNKNOWN else "normal"
+    )
+    signals = [
+        Signal(
+            name="air_temperature",
+            value=row.air_temperature_k,
+            unit="K",
+            status=default_status,
+        ),
         Signal(
             name="process_temperature",
             value=row.process_temperature_k,
             unit="K",
-            status=status,
+            status=relevant_status if event_type == EventType.THERMAL else default_status,
         ),
         Signal(
             name="rotational_speed",
             value=row.rotational_speed_rpm,
             unit="rpm",
-            status=status,
+            status=default_status,
         ),
-        Signal(name="torque", value=row.torque_nm, unit="Nm", status=status),
-        Signal(name="tool_wear", value=row.tool_wear_min, unit="min", status=status),
+        Signal(name="torque", value=row.torque_nm, unit="Nm", status=default_status),
+        Signal(
+            name="tool_wear",
+            value=row.tool_wear_min,
+            unit="min",
+            status=(relevant_status if event_type == EventType.MECHANICAL else default_status),
+        ),
     ]
+    if event_type == EventType.THERMAL:
+        signals.append(
+            Signal(
+                name="temperature_delta",
+                value=round(row.temperature_delta_k, 1),
+                unit="K",
+                status=relevant_status,
+            )
+        )
+    elif event_type == EventType.ELECTRICAL:
+        signals.append(
+            Signal(
+                name="calculated_power",
+                value=round(row.power_w),
+                unit="W",
+                status=relevant_status,
+            )
+        )
+    elif event_type == EventType.PROCESS:
+        signals.append(
+            Signal(
+                name="overstrain_ratio",
+                value=round(row.overstrain_ratio, 3),
+                unit="ratio",
+                status=relevant_status,
+            )
+        )
+    return signals
 
 
 def _evidence(row: AI4IRow, cohort: Cohort) -> str:
@@ -196,7 +233,7 @@ def _evidence(row: AI4IRow, cohort: Cohort) -> str:
         label = "磨耗"
     else:
         detail = (
-            f"磨耗扭矩比為 {row.overstrain_ratio * 100:.1f}%"
+            f"過應力指標為 {row.overstrain_ratio * 100:.1f}%"
             f"（{row.tool_wear_min} min × {row.torque_nm:.1f} Nm）"
         )
         label = "過應力"
@@ -239,7 +276,7 @@ def _to_record(
         input=TriageRequest(
             incident_text=text,
             asset_type="數控加工設備",
-            signals=_signals(row, cohort.severity),
+            signals=_signals(row, cohort.severity, cohort.event_type),
         ),
         target=TriageOutput(
             event_type=cohort.event_type,
@@ -271,7 +308,7 @@ def _unknown_record(row: AI4IRow, split: CalibrationSplit) -> DatasetRecord:
         input=TriageRequest(
             incident_text=text,
             asset_type="數控加工設備",
-            signals=_signals(row, Severity.UNKNOWN),
+            signals=_signals(row, Severity.UNKNOWN, EventType.UNKNOWN),
         ),
         target=TriageOutput(
             event_type=EventType.UNKNOWN,

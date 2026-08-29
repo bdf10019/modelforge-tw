@@ -23,6 +23,7 @@ from modelforge_tw.prompts import (
     MINIMAL_PROMPT_VERSION,
     OPTIMIZED_PROMPT_V2_VERSION,
     OPTIMIZED_PROMPT_V3_VERSION,
+    OPTIMIZED_PROMPT_V4_VERSION,
     OPTIMIZED_PROMPT_VERSION,
 )
 from modelforge_tw.registry import ArtifactRef, FileRegistry, ModelManifest
@@ -485,6 +486,7 @@ def build_parser() -> argparse.ArgumentParser:
                 OPTIMIZED_PROMPT_VERSION,
                 OPTIMIZED_PROMPT_V2_VERSION,
                 OPTIMIZED_PROMPT_V3_VERSION,
+                OPTIMIZED_PROMPT_V4_VERSION,
             ],
             default=OPTIMIZED_PROMPT_VERSION,
         )

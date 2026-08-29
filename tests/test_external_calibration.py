@@ -91,7 +91,7 @@ def test_external_calibration_is_frozen_audited_and_separate(tmp_path):
     _write_fixture(source)
     source_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
     config = {
-        "transform_version": "ai4i-calibration-v1",
+        "transform_version": "ai4i-calibration-v2",
         "source": {
             "dataset": "AI4I fixture",
             "landing_page": "https://example.invalid/ai4i",

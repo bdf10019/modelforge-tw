@@ -1,6 +1,7 @@
 from modelforge_tw.prompts import (
     OPTIMIZED_PROMPT_V2_VERSION,
     OPTIMIZED_PROMPT_V3_VERSION,
+    OPTIMIZED_PROMPT_V4_VERSION,
     messages_for_version,
 )
 from modelforge_tw.schemas import TriageRequest
@@ -29,3 +30,14 @@ def test_optimized_v3_contains_external_calibration_rubric_and_output_limits():
     assert "不得只因『失效』二字升為 critical" in system
     assert "evidence_spans 最多 2 項" in system
     assert "safe_actions 只選最主要的 1 項" in system
+
+
+def test_optimized_v4_prioritizes_insufficient_evidence_and_abnormal_signals():
+    messages = messages_for_version(
+        TriageRequest(incident_text="只有溫度與磨耗讀值，缺少基準、門檻、趨勢或異常現象。"),
+        OPTIMIZED_PROMPT_V4_VERSION,
+    )
+    system = messages[0]["content"]
+    assert "第一步先判斷證據是否足夠" in system
+    assert "就必須輸出 unknown" in system
+    assert "status 為 normal 或 unknown 的通用訊號名稱不得改變事件類型" in system
