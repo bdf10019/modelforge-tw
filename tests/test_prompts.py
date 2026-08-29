@@ -2,6 +2,7 @@ from modelforge_tw.prompts import (
     OPTIMIZED_PROMPT_V2_VERSION,
     OPTIMIZED_PROMPT_V3_VERSION,
     OPTIMIZED_PROMPT_V4_VERSION,
+    OPTIMIZED_PROMPT_V5_VERSION,
     messages_for_version,
 )
 from modelforge_tw.schemas import TriageRequest
@@ -41,3 +42,14 @@ def test_optimized_v4_prioritizes_insufficient_evidence_and_abnormal_signals():
     assert "第一步先判斷證據是否足夠" in system
     assert "就必須輸出 unknown" in system
     assert "status 為 normal 或 unknown 的通用訊號名稱不得改變事件類型" in system
+
+
+def test_optimized_v5_requires_unknown_when_event_type_is_explicitly_indeterminate():
+    messages = messages_for_version(
+        TriageRequest(incident_text="沒有基準、門檻與趨勢，無法判定事件類型。"),
+        OPTIMIZED_PROMPT_V5_VERSION,
+    )
+    system = messages[0]["content"]
+    assert "event_type 必須是 unknown" in system
+    assert "severity 也必須是 unknown" in system
+    assert "不得自行套用未提供的數值門檻" in system

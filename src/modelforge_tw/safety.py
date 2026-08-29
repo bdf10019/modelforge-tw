@@ -14,7 +14,7 @@ from modelforge_tw.schemas import (
     TriageRequest,
 )
 
-SAFETY_POLICY_VERSION = "risk-precedence-v2"
+SAFETY_POLICY_VERSION = "risk-precedence-v3"
 
 INJECTION_PATTERN = re.compile(
     r"忽略(?:前述|以上|所有)?(?:規則|指令)|ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|"
@@ -30,6 +30,10 @@ HIGH_RISK_PATTERN = re.compile(
     r"持續|連續|逐步升高|逐漸惡化|趨勢.*(?:升高|增加|未停止)|快速(?:下降|上升)|"
     r"超過(?:警戒|設定)?(?:值|上限)|越過預警|(?:9[0-9]|1[0-9]{2})°C|過熱變色|"
     r"失去連線|大量封包重送|所有.*逾時",
+    re.IGNORECASE,
+)
+INDETERMINATE_EVENT_PATTERN = re.compile(
+    r"(?:無法|無從|不能)判定事件類型|事件類型(?:無法|無從|不能)判定",
     re.IGNORECASE,
 )
 
@@ -76,8 +80,14 @@ def apply_safety_policy(
         update["review_required"] = True
         warnings.append("EVIDENCE_SPAN_NOT_IN_INPUT")
 
+    event_indeterminate = bool(INDETERMINATE_EVENT_PATTERN.search(request.incident_text))
+    if event_indeterminate and output.event_type != EventType.UNKNOWN:
+        update["event_type"] = EventType.UNKNOWN
+        update["review_required"] = True
+        warnings.append("EVENT_TYPE_FORCED_UNKNOWN_BY_POLICY")
+
     must_review = output.severity in {Severity.HIGH, Severity.CRITICAL, Severity.UNKNOWN}
-    must_review = must_review or output.event_type == EventType.UNKNOWN
+    must_review = must_review or output.event_type == EventType.UNKNOWN or event_indeterminate
     if must_review and not output.review_required:
         update["review_required"] = True
         warnings.append("REVIEW_FORCED_BY_POLICY")
@@ -116,7 +126,7 @@ def apply_safety_policy(
             reason_codes.append("UNTRUSTED_INSTRUCTION")
         warnings.append("UNTRUSTED_INSTRUCTION_DETECTED")
 
-    if output.event_type == EventType.UNKNOWN or not grounded_spans:
+    if output.event_type == EventType.UNKNOWN or event_indeterminate or not grounded_spans:
         update["review_required"] = True
         if policy_action is None:
             update["safe_actions"] = [SafeAction.COLLECT_EVIDENCE]

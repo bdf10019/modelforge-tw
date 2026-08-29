@@ -9,6 +9,7 @@ OPTIMIZED_PROMPT_VERSION = "optimized-v1"
 OPTIMIZED_PROMPT_V2_VERSION = "optimized-v2"
 OPTIMIZED_PROMPT_V3_VERSION = "optimized-v3"
 OPTIMIZED_PROMPT_V4_VERSION = "optimized-v4"
+OPTIMIZED_PROMPT_V5_VERSION = "optimized-v5"
 
 
 def _input_payload(request: TriageRequest) -> str:
@@ -111,15 +112,31 @@ def optimized_v3_messages(request: TriageRequest) -> list[dict[str, str]]:
     )
 
 
+def _optimized_v4_guidance() -> str:
+    return (
+        _optimized_v3_guidance()
+        + "判定順序：第一步先判斷證據是否足夠；若 incident_text 明說缺少基準、門檻、趨勢或"
+        "異常現象，就必須輸出 unknown，不得因感測欄位名稱含有溫度、磨耗等名詞而猜測。第二步"
+        "才分類事件，而且只採用 incident_text 的異常描述與 status 為 warning 或 critical 的"
+        "訊號；status 為 normal 或 unknown 的通用訊號名稱不得改變事件類型。\n"
+    )
+
+
 def optimized_v4_messages(request: TriageRequest) -> list[dict[str, str]]:
     return _optimized_messages(
         request,
+        severity_guidance=_optimized_v4_guidance(),
+    )
+
+
+def optimized_v5_messages(request: TriageRequest) -> list[dict[str, str]]:
+    return _optimized_messages(
+        request,
         severity_guidance=(
-            _optimized_v3_guidance()
-            + "判定順序：第一步先判斷證據是否足夠；若 incident_text 明說缺少基準、門檻、趨勢或"
-            "異常現象，就必須輸出 unknown，不得因感測欄位名稱含有溫度、磨耗等名詞而猜測。第二步"
-            "才分類事件，而且只採用 incident_text 的異常描述與 status 為 warning 或 critical 的"
-            "訊號；status 為 normal 或 unknown 的通用訊號名稱不得改變事件類型。\n"
+            _optimized_v4_guidance()
+            + "若 incident_text 明說『無法判定事件類型』，event_type 必須是 unknown；若同時缺少"
+            "基準、門檻與趨勢，severity 也必須是 unknown。不得自行套用未提供的數值門檻，也不得因"
+            "某個數值看似偏高而推翻這項規則。\n"
         ),
     )
 
@@ -151,4 +168,6 @@ def messages_for_version(request: TriageRequest, version: str) -> list[dict[str,
         return optimized_v3_messages(request)
     if version == OPTIMIZED_PROMPT_V4_VERSION:
         return optimized_v4_messages(request)
+    if version == OPTIMIZED_PROMPT_V5_VERSION:
+        return optimized_v5_messages(request)
     raise ValueError(f"unsupported prompt version: {version}")

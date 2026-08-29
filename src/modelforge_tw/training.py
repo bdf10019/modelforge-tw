@@ -41,9 +41,13 @@ class TrainingConfig(BaseModel):
     save_steps: int = Field(default=25, ge=1)
     save_total_limit: int = Field(default=2, ge=1, le=10)
     resume_from_checkpoint: bool = True
-    prompt_version: Literal["optimized-v1", "optimized-v2", "optimized-v3", "optimized-v4"] = (
-        "optimized-v1"
-    )
+    prompt_version: Literal[
+        "optimized-v1",
+        "optimized-v2",
+        "optimized-v3",
+        "optimized-v4",
+        "optimized-v5",
+    ] = "optimized-v1"
 
 
 def load_training_config(path: Path) -> TrainingConfig:

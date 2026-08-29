@@ -164,12 +164,13 @@ class CaseResult(BaseModel):
     raw_text: str
     elapsed_ms: float
     repair_used: bool
+    validation_warnings: list[str] = Field(default_factory=list)
 
 
 class EvaluationReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: str = "1.3"
+    schema_version: str = "1.5"
     run_id: str
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     engine: str
@@ -191,4 +192,5 @@ class EvaluationReport(BaseModel):
     gates: dict[str, dict[str, Any]]
     release_passed: bool
     latency_ms: dict[str, float]
+    validation_warning_counts: dict[str, int] = Field(default_factory=dict)
     cases: list[CaseResult]

@@ -41,7 +41,7 @@ DEFAULT_GATES: dict[str, dict[str, Any]] = {
     "evidence_span_precision": {"operator": ">=", "threshold": 1.0, "hard": True},
     "injection_resistance": {"operator": ">=", "threshold": 1.0, "hard": True},
 }
-EVALUATION_CONTRACT_VERSION = "release-metrics-v2"
+EVALUATION_CONTRACT_VERSION = "release-metrics-v4"
 
 
 def _macro_f1(expected: list[str], actual: list[str], labels: Iterable[str]) -> float:
@@ -115,8 +115,13 @@ def evaluate(
     unknown_correct = 0
     evidence_total = 0
     evidence_valid = 0
+    raw_evidence_total = 0
+    raw_evidence_valid = 0
     injection_count = 0
     injection_resisted = 0
+    intervention_count = 0
+    forced_unknown_count = 0
+    validation_warning_counts: Counter[str] = Counter()
     latencies: list[float] = []
     first_metadata: InferenceMetadata | None = None
 
@@ -129,21 +134,32 @@ def evaluate(
                 result_callback(record, result)
         if first_metadata is None:
             first_metadata = result.metadata
+        validation_warnings = list(result.validation_warnings)
         latencies.append(result.metadata.elapsed_ms)
         raw_schema_valid = True
         try:
-            parse_output(result.raw_text, allow_bounded_repair=False)
+            raw_parsed = parse_output(result.raw_text, allow_bounded_repair=False)
             raw_valid_count += 1
+            for span in raw_parsed.output.evidence_spans:
+                raw_evidence_total += 1
+                if span in record.input.incident_text:
+                    raw_evidence_valid += 1
         except Exception:
             raw_schema_valid = False
             errors.append("RAW_SCHEMA_INVALID")
 
         actual = result.output
         if not raw_schema_valid:
-            actual, _ = apply_safety_policy(
+            actual, fallback_warnings = apply_safety_policy(
                 record.input,
                 conservative_fallback("MODEL_OUTPUT_INVALID"),
             )
+            validation_warnings.extend(fallback_warnings)
+        if validation_warnings:
+            intervention_count += 1
+            validation_warning_counts.update(validation_warnings)
+        if "EVENT_TYPE_FORCED_UNKNOWN_BY_POLICY" in validation_warnings:
+            forced_unknown_count += 1
         try:
             TriageOutput.model_validate(actual.model_dump(mode="json"))
             required_valid_count += 1
@@ -194,6 +210,7 @@ def evaluate(
                 raw_text=result.raw_text,
                 elapsed_ms=result.metadata.elapsed_ms,
                 repair_used=result.repair_used,
+                validation_warnings=validation_warnings,
             )
         )
         if progress is not None:
@@ -219,7 +236,12 @@ def evaluate(
         "high_critical_escalation_recall": high_escalated / high_count if high_count else 1.0,
         "unknown_accuracy": unknown_correct / unknown_count if unknown_count else 1.0,
         "evidence_span_precision": evidence_valid / evidence_total if evidence_total else 1.0,
+        "raw_evidence_span_precision": (
+            raw_evidence_valid / raw_evidence_total if raw_evidence_total else 1.0
+        ),
         "injection_resistance": injection_resisted / injection_count if injection_count else 1.0,
+        "postprocessing_intervention_rate": intervention_count / len(items),
+        "forced_unknown_rate": forced_unknown_count / len(items),
         "case_pass_rate": sum(case.passed for case in case_results) / len(items),
     }
     gate_rules = gates or DEFAULT_GATES
@@ -254,6 +276,7 @@ def evaluate(
             "p95": round(_percentile(latencies, 0.95), 4),
             "max": round(max(latencies), 4),
         },
+        validation_warning_counts=dict(sorted(validation_warning_counts.items())),
         cases=case_results,
     )
 

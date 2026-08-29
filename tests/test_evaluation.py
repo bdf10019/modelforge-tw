@@ -105,6 +105,16 @@ def test_q4_gate_rejects_context_window_mismatch():
     assert result["compatibility_checks"]["context_window_tokens"] is False
 
 
+def test_evaluation_reports_postprocessing_interventions():
+    records = [record for record in generate_records(2, 1, 2) if record.split == "test"]
+    report = evaluate(FixtureEngine("adapted"), records)
+    assert "postprocessing_intervention_rate" in report.metrics
+    assert "forced_unknown_rate" in report.metrics
+    assert "raw_evidence_span_precision" in report.metrics
+    assert isinstance(report.validation_warning_counts, dict)
+    assert all(isinstance(case.validation_warnings, list) for case in report.cases)
+
+
 def test_evaluation_can_resume_from_cached_inference_results():
     records = [record for record in generate_records(1, 1, 1) if record.split == "test"]
     cached = {}

@@ -104,6 +104,22 @@ def test_conservative_fallback_never_auto_delivers():
     assert fallback.safe_actions == [SafeAction.COLLECT_EVIDENCE]
 
 
+def test_policy_forces_unknown_when_input_explicitly_says_event_is_indeterminate():
+    request = TriageRequest(incident_text="只有單點溫度讀值，沒有基準或趨勢，無法判定事件類型。")
+    output = valid_output(
+        event_type=EventType.THERMAL,
+        severity=Severity.UNKNOWN,
+        safe_actions=[SafeAction.COLLECT_EVIDENCE],
+        review_required=True,
+        reason_codes=["INSUFFICIENT_EVIDENCE"],
+    )
+    secured, warnings = apply_safety_policy(request, output)
+    assert secured.event_type == EventType.UNKNOWN
+    assert secured.severity == Severity.UNKNOWN
+    assert secured.review_required is True
+    assert "EVENT_TYPE_FORCED_UNKNOWN_BY_POLICY" in warnings
+
+
 @pytest.mark.parametrize(
     ("text", "starting_severity", "expected_severity", "expected_action"),
     [
