@@ -36,11 +36,11 @@ official Windows binary 無法解析中文 argv 路徑的限制，正式 artifac
 | 版本 | mean | P50 | P95 | max | 品質 gate |
 |---|---:|---:|---:|---:|---|
 | QLoRA v5 / Transformers NF4 | 9.432 s | 8.690 s | 13.238 s | 14.606 s | pass |
-| merged v5 / llama.cpp Q8_0 | 0.975 s | 0.958 s | 1.257 s | 1.543 s | pass |
-| merged v5 / llama.cpp Q4_K_M | 0.829 s | 0.812 s | 1.040 s | 1.210 s | fail |
+| merged v5 / llama.cpp Q8_0 | 1.060 s | 1.012 s | 1.379 s | 1.474 s | pass |
+| merged v5 / llama.cpp Q4_K_M | 0.825 s | 0.811 s | 0.984 s | 1.391 s | fail |
 
-Q8 mean latency 是 NF4 路徑的 10.3%，描述上約 9.67 倍加速。相同契約下，Q4 比 Q8 再降低
-15.0% mean latency，但 event macro-F1 只有 74.43%，所以不能以速度或檔案大小抵銷品質失敗。
+Q8 mean latency 是 NF4 路徑的 11.2%，描述上約 8.90 倍加速。相同契約下，Q4 比 Q8 再降低
+22.2% mean latency，但 event macro-F1 只有 74.43%，所以不能以速度或檔案大小抵銷品質失敗。
 
 ## llama.cpp 併發基準
 

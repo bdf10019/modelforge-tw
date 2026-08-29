@@ -304,7 +304,10 @@ def assess_q4_release(
 ) -> dict[str, Any]:
     compatibility_checks = {
         "dataset_hash": baseline.dataset_manifest_sha256 == candidate.dataset_manifest_sha256,
-        "release_gate_hash": baseline.release_gate_sha256 == candidate.release_gate_sha256,
+        "release_gate_hash": (
+            baseline.release_gate_sha256 is not None
+            and baseline.release_gate_sha256 == candidate.release_gate_sha256
+        ),
         "prompt_version": baseline.prompt_version == candidate.prompt_version,
         "max_new_tokens": (
             baseline.max_new_tokens is not None

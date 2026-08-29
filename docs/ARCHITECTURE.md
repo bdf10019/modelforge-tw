@@ -25,10 +25,11 @@ Web / REST / OpenAI-compatible client
 - `engines/`：相同 protocol 下的 fixture、Transformers 與 OpenAI-compatible HTTP adapter。
 - `evaluation.py`：同資料 hash、release-gate SHA-256 的品質指標與 hard gate；Q4 另檢查相對 Q8
   的 macro-F1、raw schema 與 hard-gate regression。長時間評估逐筆寫入續跑快取；只有資料紀錄
-  SHA-256 與模型、adapter、prompt、解碼設定指紋完全一致時才可沿用。
+  SHA-256 與模型、adapter、prompt、解碼、安全政策、評分契約指紋完全一致時才可沿用。
 - `benchmark.py`：併發、P50/P95/P99、吞吐、RAM／整卡 VRAM 峰值取樣；HTTP streaming 可量
   TTFT，不支援時明確記 `null`。
-- `registry.py`：candidate、promote、previous-good 與 rollback 的原子檔案 registry。
+- `registry.py`：candidate、evaluation attestation、promote、previous-good 與 rollback 的原子檔案
+  registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住生成、安全與評分契約。
 
 OpenAI-compatible HTTP adapter 使用 strict JSON Schema：八個輸出欄位皆 required，分類、動作與
 reason code 使用有限允許清單。此約束在生成前套用；線上 bounded repair 與 fail-closed fallback

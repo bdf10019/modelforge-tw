@@ -80,13 +80,15 @@
         "max": 14605.8298
       }
     },
-    "gguf_q8_fair_v2": {
-      "source_report": "outputs/eval-E4-q8-v5-full-fair.json",
-      "run_id": "d7ba673e-6d12-4fb6-abd2-e00d56b7212b",
+    "gguf_q8_policy_v2": {
+      "source_report": "outputs/eval-E5-q8-v5-policy-v2.json",
+      "run_id": "b9574978-6f58-413d-98d9-de9f970f6554",
       "cases": 224,
       "prompt_version": "optimized-v2",
       "max_new_tokens": 192,
       "structured_output_contract": "json-schema-v2",
+      "safety_policy_version": "risk-precedence-v2",
+      "evaluation_contract_version": "release-metrics-v2",
       "release_gate_sha256": "2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a",
       "release_passed": true,
       "metrics": {
@@ -103,19 +105,21 @@
         "case_pass_rate": 0.754464
       },
       "latency_ms": {
-        "mean": 975.0945,
-        "p50": 957.5822,
-        "p95": 1256.6233,
-        "max": 1543.0881
+        "mean": 1059.9807,
+        "p50": 1012.1981,
+        "p95": 1378.6636,
+        "max": 1473.6874
       }
     },
-    "gguf_q4_fair_v2": {
-      "source_report": "outputs/eval-F2-q4-v5-full-fair.json",
-      "run_id": "efb240d2-330f-4285-b86f-c8ad6ada264c",
+    "gguf_q4_policy_v2": {
+      "source_report": "outputs/eval-F3-q4-v5-policy-v2.json",
+      "run_id": "dc791d3a-5dcc-4d45-9797-c7b4e0b31eb5",
       "cases": 224,
       "prompt_version": "optimized-v2",
       "max_new_tokens": 192,
       "structured_output_contract": "json-schema-v2",
+      "safety_policy_version": "risk-precedence-v2",
+      "evaluation_contract_version": "release-metrics-v2",
       "release_gate_sha256": "2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a",
       "release_passed": false,
       "metrics": {
@@ -132,21 +136,23 @@
         "case_pass_rate": 0.714286
       },
       "latency_ms": {
-        "mean": 829.1387,
-        "p50": 811.5222,
-        "p95": 1040.1274,
-        "max": 1209.6697
+        "mean": 824.9505,
+        "p50": 811.2388,
+        "p95": 983.5349,
+        "max": 1391.0768
       }
     }
   },
   "q8_to_q4_comparison": {
-    "source_report": "outputs/compare-E4-F2-q4-full-fair.json",
+    "source_report": "outputs/compare-E5-F3-q4-policy-v2.json",
     "compatibility_checks": {
       "dataset_hash": true,
       "release_gate_hash": true,
       "prompt_version": true,
       "max_new_tokens": true,
-      "structured_output_contract": true
+      "structured_output_contract": true,
+      "safety_policy_version": true,
+      "evaluation_contract_version": true
     },
     "metric_deltas_candidate_minus_baseline": {
       "event_type_macro_f1": -0.107272,
@@ -202,7 +208,7 @@
   },
   "registry_expected_state": {
     "released": "qwen3-1.7b-qlora-v5",
-    "previous_good": "qwen3-1.7b-gguf-q8-v5-contract-v2",
-    "blocked": "qwen3-1.7b-gguf-q4-v5-contract-v2"
+    "previous_good": "qwen3-1.7b-gguf-q8-v5-policy-v2",
+    "blocked": "qwen3-1.7b-gguf-q4-v5-policy-v2"
   }
 }

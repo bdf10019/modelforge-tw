@@ -37,6 +37,10 @@ class ModelManifest(BaseModel):
     release_gate_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     engine: str
     quantization: str
+    max_new_tokens: int | None = Field(default=None, ge=1)
+    structured_output_contract: str | None = None
+    safety_policy_version: str | None = None
+    evaluation_contract_version: str | None = None
     status: Literal["candidate", "released", "retired", "blocked"] = "candidate"
     evaluation_report: str
     release_passed: bool
@@ -109,10 +113,65 @@ class FileRegistry:
             "prompt_version": manifest.prompt_version == evaluation.prompt_version,
             "release_gate_sha256": (manifest.release_gate_sha256 == evaluation.release_gate_sha256),
             "quantization": manifest.quantization == evaluation.quantization,
+            "max_new_tokens": (
+                manifest.max_new_tokens is None
+                or manifest.max_new_tokens == evaluation.max_new_tokens
+            ),
+            "structured_output_contract": (
+                manifest.structured_output_contract is None
+                or manifest.structured_output_contract == evaluation.structured_output_contract
+            ),
+            "safety_policy_version": (
+                manifest.safety_policy_version is None
+                or manifest.safety_policy_version == evaluation.safety_policy_version
+            ),
+            "evaluation_contract_version": (
+                manifest.evaluation_contract_version is None
+                or manifest.evaluation_contract_version == evaluation.evaluation_contract_version
+            ),
         }
         mismatches = [name for name, matched in checks.items() if not matched]
         if mismatches:
             raise ValueError("evaluation does not match manifest: " + ", ".join(sorted(mismatches)))
+
+    def attest_evaluation(
+        self,
+        manifest_id: str,
+        *,
+        evaluation_report: str,
+        evaluation: EvaluationReport,
+    ) -> RegistryState:
+        self.validate_evaluation(manifest_id, evaluation)
+        required_contract = {
+            "max_new_tokens": evaluation.max_new_tokens,
+            "structured_output_contract": evaluation.structured_output_contract,
+            "safety_policy_version": evaluation.safety_policy_version,
+            "evaluation_contract_version": evaluation.evaluation_contract_version,
+        }
+        missing = [name for name, value in required_contract.items() if value is None]
+        if missing:
+            raise ValueError("evaluation cannot be attested without: " + ", ".join(missing))
+        state = self.load()
+        manifest = state.manifests[manifest_id]
+        if manifest.status == "released" and not evaluation.release_passed:
+            raise ValueError("cannot attest a failed evaluation to the released manifest")
+        state.manifests[manifest_id] = manifest.model_copy(
+            update={
+                **required_contract,
+                "evaluation_report": evaluation_report,
+                "release_passed": evaluation.release_passed,
+            }
+        )
+        state.events.append(
+            {
+                "at": datetime.now(UTC).isoformat(),
+                "action": "evaluation_attested",
+                "manifest_id": manifest_id,
+                "evaluation_report": evaluation_report,
+            }
+        )
+        self._write(state)
+        return state
 
     def add(self, manifest: ModelManifest) -> RegistryState:
         self._validate_id(manifest.manifest_id)

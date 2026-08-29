@@ -15,12 +15,14 @@ def test_public_evidence_snapshot_is_self_consistent():
     assert evidence["dataset"]["records"] == sum(evidence["dataset"]["splits"].values())
     assert all(value == 0 for value in evidence["dataset"]["audit"].values())
 
-    q8 = evidence["evaluations"]["gguf_q8_fair_v2"]
-    q4 = evidence["evaluations"]["gguf_q4_fair_v2"]
+    q8 = evidence["evaluations"]["gguf_q8_policy_v2"]
+    q4 = evidence["evaluations"]["gguf_q4_policy_v2"]
     for field in (
         "prompt_version",
         "max_new_tokens",
         "structured_output_contract",
+        "safety_policy_version",
+        "evaluation_contract_version",
         "release_gate_sha256",
     ):
         assert q8[field] == q4[field]

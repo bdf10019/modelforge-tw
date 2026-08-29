@@ -22,16 +22,17 @@
 | 版本 | report | run ID | max tokens／契約 | gate | input hash |
 |---|---|---|---|---|---|
 | QLoRA v5 NF4 | `outputs/eval-C-peft-v5-full-policy-fixed.json` | `05b114aa-394b-4561-899a-806361150408` | 歷史報告未內嵌 | pass | `01893121075ce7b2436f18407292e44dccc0e6a13b2299c9929af259e58d7f17` |
-| GGUF Q8_0 fair-v2 | `outputs/eval-E4-q8-v5-full-fair.json` | `d7ba673e-6d12-4fb6-abd2-e00d56b7212b` | 192／`json-schema-v2` | pass | 同上 |
-| GGUF Q4_K_M fair-v2 | `outputs/eval-F2-q4-v5-full-fair.json` | `efb240d2-330f-4285-b86f-c8ad6ada264c` | 192／`json-schema-v2` | fail | 同上 |
+| GGUF Q8_0 policy-v2 | `outputs/eval-E5-q8-v5-policy-v2.json` | `b9574978-6f58-413d-98d9-de9f970f6554` | 192／`json-schema-v2` | pass | 同上 |
+| GGUF Q4_K_M policy-v2 | `outputs/eval-F3-q4-v5-policy-v2.json` | `dc791d3a-5dcc-4d45-9797-c7b4e0b31eb5` | 192／`json-schema-v2` | fail | 同上 |
 
 NF4 歷史報告的 release gate SHA-256 為
-`ce8dca55a5ec9c87b9ea52e66c98e79d0ff2f18ad8cfaa1ffbaa8b30846326f9`；fair-v2 的 Q8／Q4 均為
+`ce8dca55a5ec9c87b9ea52e66c98e79d0ff2f18ad8cfaa1ffbaa8b30846326f9`；policy-v2 的 Q8／Q4 均為
 `2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a`。絕對門檻值未改變，後者另把
 量化參照設定改成明確名稱；因此 NF4→Q8 僅作描述性比較，不冒充相同契約的 relative gate。
 
-- `outputs/compare-E4-F2-q4-full-fair.json`：Q8→Q4 完整差異與 Q4 relative gate；資料、gate、prompt、
-  max tokens、structured-output contract 五項相容性檢查皆為 `true`。
+- `outputs/compare-E5-F3-q4-policy-v2.json`：Q8→Q4 完整差異與 Q4 relative gate；資料、gate、prompt、
+  max tokens、structured-output contract、safety policy、evaluation contract 七項相容性檢查皆為
+  `true`。
 
 ## 量化 artifact
 
@@ -48,9 +49,9 @@ NF4 歷史報告的 release gate SHA-256 為
 
 - Q8 benchmark：`outputs/benchmark-q8-v5.json`，36/36 requests、0 error。
 - Q4 benchmark：`outputs/benchmark-q4-v5.json`，36/36 requests、0 error。
-- registry：`outputs/model-registry.json`。事件包含 contract-v2 Q4 blocked、Q8 promoted、NF4
-  rolled_back；最終 `released=qwen3-1.7b-qlora-v5`、
-  `previous_good=qwen3-1.7b-gguf-q8-v5-contract-v2`。
+- registry：`outputs/model-registry.json`。事件包含 policy-v2 Q4 blocked、Q8 promoted、NF4
+  rolled_back 與兩份 policy-v2 evaluation attested；最終 `released=qwen3-1.7b-qlora-v5`、
+  `previous_good=qwen3-1.7b-gguf-q8-v5-policy-v2`。
 
 ## 重現與驗證
 

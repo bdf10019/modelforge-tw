@@ -325,11 +325,27 @@ def command_registry(args: argparse.Namespace) -> int:
             release_gate_sha256=evaluation.release_gate_sha256,
             engine=args.registry_engine,
             quantization=args.registry_quantization,
+            max_new_tokens=evaluation.max_new_tokens,
+            structured_output_contract=evaluation.structured_output_contract,
+            safety_policy_version=evaluation.safety_policy_version,
+            evaluation_contract_version=evaluation.evaluation_contract_version,
             evaluation_report=args.evaluation.resolve().relative_to(PROJECT_ROOT).as_posix(),
             release_passed=evaluation.release_passed,
             artifacts=artifact_refs,
         )
         state = registry.add(manifest)
+    elif args.registry_action == "attest":
+        if not args.manifest_id or not args.evaluation:
+            raise ValueError("registry attest requires manifest id and evaluation")
+        evaluation = EvaluationReport.model_validate_json(
+            args.evaluation.read_text(encoding="utf-8")
+        )
+        attested_report_path = args.evaluation.resolve().relative_to(PROJECT_ROOT).as_posix()
+        state = registry.attest_evaluation(
+            args.manifest_id,
+            evaluation_report=attested_report_path,
+            evaluation=evaluation,
+        )
     elif args.registry_action == "promote":
         if not args.manifest_id:
             raise ValueError("registry promote requires a manifest id")
@@ -504,7 +520,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     registry = subparsers.add_parser("registry")
     registry.add_argument(
-        "registry_action", choices=["show", "add", "promote", "rollback", "block"]
+        "registry_action",
+        choices=["show", "add", "attest", "promote", "rollback", "block"],
     )
     registry.add_argument("manifest_id", nargs="?")
     registry.add_argument(

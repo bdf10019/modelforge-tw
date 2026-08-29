@@ -109,3 +109,41 @@ def test_registry_rechecks_artifact_before_promotion(tmp_path):
     artifact.write_bytes(b"tampered")
     with pytest.raises(ValueError, match="hash changed"):
         registry.promote("v1")
+
+
+def test_registry_attests_and_locks_evaluation_contract(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    registry.add(manifest("v1").model_copy(update={"release_gate_sha256": HASH}))
+    report = EvaluationReport(
+        run_id="attested-run",
+        engine="fixture",
+        model_id="fixture",
+        model_version="1",
+        quantization="none",
+        prompt_version="optimized-v1",
+        max_new_tokens=192,
+        structured_output_contract="json-schema-v2",
+        safety_policy_version="risk-precedence-v2",
+        evaluation_contract_version="release-metrics-v2",
+        evidence_kind="fixture",
+        dataset_manifest_sha256=HASH,
+        release_gate_sha256=HASH,
+        case_count=0,
+        metrics={},
+        gates={},
+        release_passed=True,
+        latency_ms={},
+        cases=[],
+    )
+    state = registry.attest_evaluation(
+        "v1", evaluation_report="outputs/attested.json", evaluation=report
+    )
+    attested = state.manifests["v1"]
+    assert attested.max_new_tokens == 192
+    assert attested.safety_policy_version == "risk-precedence-v2"
+    assert attested.evaluation_contract_version == "release-metrics-v2"
+    assert state.events[-1]["action"] == "evaluation_attested"
+
+    mismatch = report.model_copy(update={"safety_policy_version": "obsolete-policy"})
+    with pytest.raises(ValueError, match="safety_policy_version"):
+        registry.validate_evaluation("v1", mismatch)

@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 from modelforge_tw.dataset import generate_records, read_jsonl
@@ -6,6 +7,7 @@ from modelforge_tw.evaluation import assess_q4_release, compare_reports, evaluat
 from modelforge_tw.safety import conservative_fallback
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+GATE_HASH = hashlib.sha256(b"release-gates").hexdigest()
 
 
 def test_adapted_fixture_improves_event_f1_and_keeps_fixture_label():
@@ -29,10 +31,14 @@ def test_injection_challenge_requires_review():
 def test_q4_gate_rejects_macro_f1_regression():
     records = [record for record in generate_records(6, 2, 4) if record.split == "test"]
     baseline = evaluate(FixtureEngine("adapted"), records).model_copy(
-        update={"max_new_tokens": 128}
+        update={"max_new_tokens": 128, "release_gate_sha256": GATE_HASH}
     )
     candidate = evaluate(FixtureEngine("base"), records).model_copy(
-        update={"max_new_tokens": 128, "prompt_version": baseline.prompt_version}
+        update={
+            "max_new_tokens": 128,
+            "prompt_version": baseline.prompt_version,
+            "release_gate_sha256": GATE_HASH,
+        }
     )
     result = assess_q4_release(
         baseline,
@@ -46,10 +52,10 @@ def test_q4_gate_rejects_macro_f1_regression():
 def test_q4_gate_rejects_inference_contract_mismatch():
     records = [record for record in generate_records(2, 1, 2) if record.split == "test"]
     baseline = evaluate(FixtureEngine("adapted"), records).model_copy(
-        update={"max_new_tokens": 128}
+        update={"max_new_tokens": 128, "release_gate_sha256": GATE_HASH}
     )
     candidate = evaluate(FixtureEngine("adapted"), records).model_copy(
-        update={"max_new_tokens": 256}
+        update={"max_new_tokens": 256, "release_gate_sha256": GATE_HASH}
     )
     result = assess_q4_release(
         baseline,
@@ -59,6 +65,24 @@ def test_q4_gate_rejects_inference_contract_mismatch():
     assert result["passed"] is False
     assert result["reason"] == "comparison_contract_mismatch"
     assert result["compatibility_checks"]["max_new_tokens"] is False
+
+
+def test_q4_gate_rejects_missing_release_gate_hash():
+    records = [record for record in generate_records(2, 1, 2) if record.split == "test"]
+    baseline = evaluate(FixtureEngine("adapted"), records).model_copy(
+        update={"max_new_tokens": 128}
+    )
+    candidate = evaluate(FixtureEngine("adapted"), records).model_copy(
+        update={"max_new_tokens": 128}
+    )
+    result = assess_q4_release(
+        baseline,
+        candidate,
+        {"macro_f1_max_regression": 0.015, "raw_schema_max_regression": 0.005},
+    )
+    assert result["passed"] is False
+    assert result["reason"] == "comparison_contract_mismatch"
+    assert result["compatibility_checks"]["release_gate_hash"] is False
 
 
 def test_evaluation_can_resume_from_cached_inference_results():

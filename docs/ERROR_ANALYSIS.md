@@ -51,7 +51,7 @@ merged BF16 challenge 的 raw schema 只有 85.71%，顯示 merge 後行為不�
 
 最終將所有欄位設為 required，並在新版出站 schema 限制 reason code 白名單。這是解碼前的有限
 語法，不是事後補括號；Q8 full raw schema 從 97.77% 提升為 100%。歷史 E3 run 的 unknown accuracy
-為 100%，最新公平比較 E4 run 為 96.77%；兩者都保留 run ID，不能挑選較高的一輪冒充最新證據。
+為 100%，最新 policy-v2 E5 run 為 96.77%；兩者都保留 run ID，不能挑選較高的一輪冒充最新證據。
 限制只存在新版出站契約，歷史報告仍可讀取。
 
 ## Q8 與 Q4

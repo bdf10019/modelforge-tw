@@ -44,10 +44,10 @@ JSON Schema：八個欄位全部 required，event、severity、safe action 與 r
 
 ## ADR-008：NF4 保持 released，Q8 作低延遲 previous-good
 
-Q8 通過所有絕對門檻，mean latency 從 NF4 的 9.432 秒降至 0.975 秒；event／severity macro-F1 與
+Q8 通過所有絕對門檻，mean latency 從 NF4 的 9.432 秒降至 1.060 秒；event／severity macro-F1 與
 NF4 的描述性差距為 2.37／10.15 個百分點。兩者生成契約不同，因此不用這項差距作正式量化 gate；
 受控 promote／rollback 演練證明 registry 可切換與復原後，最終 released 回到較保守的 NF4 v5，
 Q8 保留為 previous-good。
 
-Q4 雖只有 1.11 GB 且 mean latency 0.829 秒，event macro-F1 相對同契約 Q8 退化 10.73 個百分點並
+Q4 雖只有 1.11 GB 且 mean latency 0.825 秒，event macro-F1 相對同契約 Q8 退化 10.73 個百分點並
 低於絕對門檻，因此 blocked。速度、檔案大小或安全硬門檻不能抵銷主任務品質失敗。

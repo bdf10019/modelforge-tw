@@ -4,8 +4,8 @@
 
 正式門檻使用 210 筆 test + 14 筆 curated challenge，共 224 筆；不以 train 或 validation 計分。
 每份報告保存資料內容 hash、release-gate hash、模型／revision／版本、prompt、量化、最大輸出 token、
-結構化輸出契約、逐案原文、延遲與 `evidence_kind`。長時間執行逐筆寫入續跑快取，只有資料紀錄
-SHA-256、adapter 檔案 hash 與所有推論設定完全一致時才能沿用。
+結構化輸出契約、安全政策版本、評分契約版本、逐案原文、延遲與 `evidence_kind`。長時間執行逐筆
+寫入續跑快取，只有資料紀錄 SHA-256、adapter 檔案 hash 與所有推論設定完全一致時才能沿用。
 
 絕對門檻：
 
@@ -22,8 +22,8 @@ SHA-256、adapter 檔案 hash 與所有推論設定完全一致時才能沿用�
 
 Q4 另要求相對 Q8 的 event／severity macro-F1 退化各不超過 0.015、raw schema 退化不超過
 0.005，且不能新增 hard-gate 失敗。比較前必須先證明資料 hash、gate hash、prompt、最大輸出 token
-與結構化輸出契約完全相同；缺值也視為不相容。安全政策套用後的輸出與模型原始 JSON 分開計分，
-因此保守 fallback 不會掩蓋原始格式錯誤。
+與結構化輸出契約、安全政策版本、評分契約版本完全相同；缺值也視為不相容。安全政策套用後的
+輸出與模型原始 JSON 分開計分，因此保守 fallback 不會掩蓋原始格式錯誤。
 
 ## Base、Prompt 與早期適配
 
@@ -60,7 +60,7 @@ v1 隨後在 224 筆完整集因資料標籤與風險下限衝突而失敗。v2 
 | absolute gate | pass | pass | fail |
 
 NF4 與 llama.cpp 使用不同的生成契約，兩欄只作跨引擎描述；Q8 的 event／severity macro-F1 分別
-比 NF4 低 2.37／10.15 個百分點，安全硬門檻沒有退化。Q8→Q4 則是機器驗證的公平比較：五項
+比 NF4 低 2.37／10.15 個百分點，安全硬門檻沒有退化。Q8→Q4 則是機器驗證的公平比較：七項
 相容性檢查全過，event macro-F1 下降 10.73 個百分點，遠超 1.5 個百分點的相對上限，且 Q4 本身
 未過絕對門檻，所以 quantization gate 明確失敗。
 
@@ -78,9 +78,9 @@ merged BF16 challenge 與第一輪 Q8 只使用 `json_object`，各有 2/14 筆�
 ## Registry 結果
 
 - `qwen3-1.7b-qlora-v5`：released。
-- `qwen3-1.7b-gguf-q8-v5-contract-v2`：通過絕對門檻；本機 promote 後完成受控 rollback，目前
+- `qwen3-1.7b-gguf-q8-v5-policy-v2`：通過絕對門檻；本機 promote 後完成受控 rollback，目前
   retired 並作為 previous-good。
-- `qwen3-1.7b-gguf-q4-v5-contract-v2`：完整門檻與 Q4 相對門檻失敗，blocked。
+- `qwen3-1.7b-gguf-q4-v5-policy-v2`：完整門檻與 Q4 相對門檻失敗，blocked。
 
 所有分數來自原創合成分布與 14 筆人工回歸案例，不能視為真實工廠準確率、設備安全認證或外部
 泛化證據。
