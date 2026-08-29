@@ -108,6 +108,7 @@ class InferenceMetadata(BaseModel):
     generation_tokens_per_second: float | None = Field(default=None, ge=0)
     ttft_ms: float | None = Field(default=None, ge=0)
     max_new_tokens: int | None = Field(default=None, ge=1)
+    context_window_tokens: int | None = Field(default=None, ge=1)
     structured_output_contract: str | None = None
     safety_policy_version: str | None = None
     evidence_kind: Literal["fixture", "measured"]
@@ -136,7 +137,14 @@ class DatasetRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     record_id: str
-    split: Literal["train", "validation", "test", "challenge"]
+    split: Literal[
+        "train",
+        "validation",
+        "test",
+        "challenge",
+        "external",
+        "external_holdout",
+    ]
     scenario_family_id: str
     template_id: str
     asset_family: str
@@ -161,7 +169,7 @@ class CaseResult(BaseModel):
 class EvaluationReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: str = "1.2"
+    schema_version: str = "1.3"
     run_id: str
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     engine: str
@@ -171,6 +179,7 @@ class EvaluationReport(BaseModel):
     quantization: str
     prompt_version: str
     max_new_tokens: int | None = Field(default=None, ge=1)
+    context_window_tokens: int | None = Field(default=None, ge=1)
     structured_output_contract: str | None = None
     safety_policy_version: str | None = None
     evaluation_contract_version: str | None = None

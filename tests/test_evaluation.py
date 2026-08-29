@@ -85,6 +85,26 @@ def test_q4_gate_rejects_missing_release_gate_hash():
     assert result["compatibility_checks"]["release_gate_hash"] is False
 
 
+def test_q4_gate_rejects_context_window_mismatch():
+    records = [record for record in generate_records(2, 1, 2) if record.split == "test"]
+    baseline = evaluate(FixtureEngine("adapted"), records).model_copy(
+        update={
+            "max_new_tokens": 128,
+            "context_window_tokens": 1024,
+            "release_gate_sha256": GATE_HASH,
+        }
+    )
+    candidate = baseline.model_copy(update={"context_window_tokens": 2048})
+    result = assess_q4_release(
+        baseline,
+        candidate,
+        {"macro_f1_max_regression": 0.015, "raw_schema_max_regression": 0.005},
+    )
+    assert result["passed"] is False
+    assert result["reason"] == "comparison_contract_mismatch"
+    assert result["compatibility_checks"]["context_window_tokens"] is False
+
+
 def test_evaluation_can_resume_from_cached_inference_results():
     records = [record for record in generate_records(1, 1, 1) if record.split == "test"]
     cached = {}

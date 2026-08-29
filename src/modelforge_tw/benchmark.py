@@ -204,6 +204,8 @@ def run_benchmark(
         "model_version": first.model_version,
         "quantization": first.quantization,
         "prompt_version": first.prompt_version,
+        "max_new_tokens": first.max_new_tokens,
+        "context_window_tokens": first.context_window_tokens,
         "environment": {
             "platform": platform.platform(),
             "python": platform.python_version(),

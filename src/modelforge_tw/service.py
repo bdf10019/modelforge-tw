@@ -66,6 +66,7 @@ def build_engine(settings: Settings) -> InferenceEngine:
             prompt_version=settings.prompt_version,
             timeout_seconds=settings.request_timeout_seconds,
             max_tokens=settings.max_new_tokens,
+            context_window_tokens=settings.context_window_tokens,
         )
     if settings.engine == "transformers":
         from modelforge_tw.engines.transformers_local import TransformersInferenceEngine

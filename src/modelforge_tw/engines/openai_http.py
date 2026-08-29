@@ -51,6 +51,7 @@ class OpenAIHTTPInferenceEngine:
         prompt_version: str,
         timeout_seconds: float = 60,
         max_tokens: int = 256,
+        context_window_tokens: int = 1024,
     ) -> None:
         self.name = "openai-http"
         self.base_url = base_url.rstrip("/")
@@ -61,6 +62,7 @@ class OpenAIHTTPInferenceEngine:
         self.timeout_seconds = timeout_seconds
         self.max_tokens = max_tokens
         self.max_new_tokens: int | None = max_tokens
+        self.context_window_tokens = context_window_tokens
         self.structured_output_contract: str = OPENAI_HTTP_CONTRACT_VERSION
         self.safety_policy_version: str = SAFETY_POLICY_VERSION
         self.evidence_kind: Literal["fixture", "measured"] = "measured"
@@ -182,6 +184,7 @@ class OpenAIHTTPInferenceEngine:
                 ),
                 ttft_ms=ttft_ms,
                 max_new_tokens=self.max_new_tokens,
+                context_window_tokens=self.context_window_tokens,
                 structured_output_contract=self.structured_output_contract,
                 safety_policy_version=self.safety_policy_version,
                 evidence_kind="measured",

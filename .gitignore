@@ -16,6 +16,8 @@ dist/
 # Reproducible generated data, reports, weights and downloaded runtimes.
 data/generated/*
 !data/generated/.gitkeep
+data/external/raw/*
+data/external/generated/*
 outputs/*
 !outputs/.gitkeep
 artifacts/*

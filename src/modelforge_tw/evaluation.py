@@ -236,6 +236,7 @@ def evaluate(
         quantization=first_metadata.quantization,
         prompt_version=first_metadata.prompt_version,
         max_new_tokens=first_metadata.max_new_tokens,
+        context_window_tokens=first_metadata.context_window_tokens,
         structured_output_contract=first_metadata.structured_output_contract,
         safety_policy_version=first_metadata.safety_policy_version,
         evaluation_contract_version=EVALUATION_CONTRACT_VERSION,
@@ -279,6 +280,9 @@ def compare_reports(baseline: EvaluationReport, candidate: EvaluationReport) -> 
         "release_gate_match": baseline.release_gate_sha256 == candidate.release_gate_sha256,
         "prompt_match": baseline.prompt_version == candidate.prompt_version,
         "max_new_tokens_match": baseline.max_new_tokens == candidate.max_new_tokens,
+        "context_window_tokens_match": (
+            baseline.context_window_tokens == candidate.context_window_tokens
+        ),
         "structured_output_contract_match": (
             baseline.structured_output_contract == candidate.structured_output_contract
         ),
@@ -312,6 +316,9 @@ def assess_q4_release(
         "max_new_tokens": (
             baseline.max_new_tokens is not None
             and baseline.max_new_tokens == candidate.max_new_tokens
+        ),
+        "context_window_tokens": (
+            baseline.context_window_tokens == candidate.context_window_tokens
         ),
         "structured_output_contract": (
             baseline.structured_output_contract is not None

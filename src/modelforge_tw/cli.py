@@ -18,9 +18,11 @@ from modelforge_tw.evaluation import (
     evaluate,
     write_report,
 )
+from modelforge_tw.external_calibration import build_external_calibration
 from modelforge_tw.prompts import (
     MINIMAL_PROMPT_VERSION,
     OPTIMIZED_PROMPT_V2_VERSION,
+    OPTIMIZED_PROMPT_V3_VERSION,
     OPTIMIZED_PROMPT_VERSION,
 )
 from modelforge_tw.registry import ArtifactRef, FileRegistry, ModelManifest
@@ -42,6 +44,7 @@ def _engine_from_args(args: argparse.Namespace):
             prompt_version=args.prompt_version,
             timeout_seconds=args.timeout,
             max_tokens=args.max_new_tokens,
+            context_window_tokens=args.context_window_tokens,
         )
     if args.engine == "transformers":
         from modelforge_tw.engines.transformers_local import TransformersInferenceEngine
@@ -101,6 +104,13 @@ def command_audit_data(args: argparse.Namespace) -> int:
     return 0 if audit["passed"] else 1
 
 
+def command_prepare_external_calibration(args: argparse.Namespace) -> int:
+    config = json.loads(args.config.read_text(encoding="utf-8"))
+    manifest = build_external_calibration(args.source, args.output, config)
+    print(json.dumps(manifest, ensure_ascii=False, indent=2))
+    return 0
+
+
 def _record_sha256(record: DatasetRecord) -> str:
     payload = record.model_dump_json()
     return hashlib.sha256(payload.encode()).hexdigest()
@@ -119,7 +129,7 @@ def _evaluation_fingerprint(args: argparse.Namespace) -> str:
             if path.is_file()
         }
     payload = {
-        "cache_fingerprint_version": "5",
+        "cache_fingerprint_version": "6",
         "openai_http_contract_version": OPENAI_HTTP_CONTRACT_VERSION,
         "safety_policy_version": SAFETY_POLICY_VERSION,
         "evaluation_contract_version": EVALUATION_CONTRACT_VERSION,
@@ -132,6 +142,7 @@ def _evaluation_fingerprint(args: argparse.Namespace) -> str:
         "prompt_version": args.prompt_version,
         "load_in_4bit": args.load_in_4bit,
         "max_new_tokens": args.max_new_tokens,
+        "context_window_tokens": args.context_window_tokens,
         "adapter_files": adapter_files,
     }
     return hashlib.sha256(
@@ -431,6 +442,24 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--splits", nargs="+", default=["train", "validation", "test", "challenge"])
     audit.set_defaults(func=command_audit_data)
 
+    external = subparsers.add_parser("prepare-external-calibration")
+    external.add_argument(
+        "--config",
+        type=Path,
+        default=PROJECT_ROOT / "configs" / "external-calibration.json",
+    )
+    external.add_argument(
+        "--source",
+        type=Path,
+        default=PROJECT_ROOT / "data" / "external" / "raw" / "ai4i2020.csv",
+    )
+    external.add_argument(
+        "--output",
+        type=Path,
+        default=PROJECT_ROOT / "data" / "external" / "generated",
+    )
+    external.set_defaults(func=command_prepare_external_calibration)
+
     def add_engine_args(command: argparse.ArgumentParser) -> None:
         command.add_argument(
             "--engine",
@@ -455,12 +484,14 @@ def build_parser() -> argparse.ArgumentParser:
                 MINIMAL_PROMPT_VERSION,
                 OPTIMIZED_PROMPT_VERSION,
                 OPTIMIZED_PROMPT_V2_VERSION,
+                OPTIMIZED_PROMPT_V3_VERSION,
             ],
             default=OPTIMIZED_PROMPT_VERSION,
         )
         command.add_argument("--adapter", type=Path)
         command.add_argument("--load-in-4bit", action="store_true")
         command.add_argument("--max-new-tokens", type=int, default=256)
+        command.add_argument("--context-window-tokens", type=int, default=1024)
 
     evaluation = subparsers.add_parser("evaluate")
     evaluation.add_argument("--data", type=Path, default=PROJECT_ROOT / "data" / "generated")

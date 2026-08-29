@@ -7,6 +7,7 @@ from modelforge_tw.schemas import TriageOutput, TriageRequest
 MINIMAL_PROMPT_VERSION = "minimal-v1"
 OPTIMIZED_PROMPT_VERSION = "optimized-v1"
 OPTIMIZED_PROMPT_V2_VERSION = "optimized-v2"
+OPTIMIZED_PROMPT_V3_VERSION = "optimized-v3"
 
 
 def _input_payload(request: TriageRequest) -> str:
@@ -86,6 +87,25 @@ def optimized_v2_messages(request: TriageRequest) -> list[dict[str, str]]:
     )
 
 
+def optimized_v3_messages(request: TriageRequest) -> list[dict[str, str]]:
+    return _optimized_messages(
+        request,
+        severity_guidance=(
+            "分類規則：溫度、熱、散熱是 thermal；電流、電壓、電功率是 electrical；"
+            "磨耗、振動、摩擦、軸承、刀具是 mechanical；扭矩、製程週期、過應力或公差是 process；"
+            "壓力或洩漏是 pressure；逾時、封包遺失、心跳或斷線是 communication。若只有讀值而沒有"
+            "基準、門檻、趨勢或異常描述，event_type 與 severity 都使用 unknown。\n"
+            "severity 判定：critical 僅限火花、電弧、焦味、起火、爆炸、人員受傷、大量洩漏或其他"
+            "立即危害；失效旗標觸發或讀值越過警戒值是 high，不得只因『失效』二字升為 critical；"
+            "旗標為 0 且接近預警是 medium；旗標為 0、單次輕微且仍在正常範圍是 low。危害語意優先。\n"
+            "輸出要精簡：summary_zh_tw 不超過 40 個中文字；evidence_spans 最多 2 項，每項只擷取"
+            " incident_text 中最短且具決定性的連續原文，不超過 40 字；"
+            "missing_information 最多 3 項；"
+            "safe_actions 只選最主要的 1 項；reason_codes 只用 schema 允許值且最多 2 項。\n"
+        ),
+    )
+
+
 def training_messages(
     record_input: TriageRequest,
     target: TriageOutput,
@@ -109,4 +129,6 @@ def messages_for_version(request: TriageRequest, version: str) -> list[dict[str,
         return optimized_messages(request)
     if version == OPTIMIZED_PROMPT_V2_VERSION:
         return optimized_v2_messages(request)
+    if version == OPTIMIZED_PROMPT_V3_VERSION:
+        return optimized_v3_messages(request)
     raise ValueError(f"unsupported prompt version: {version}")

@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "transform_version": "ai4i-calibration-v1",
+  "source": {
+    "dataset": "AI4I 2020 Predictive Maintenance Dataset",
+    "landing_page": "https://archive.ics.uci.edu/dataset/601/ai4i",
+    "download_url": "https://archive.ics.uci.edu/static/public/601/ai4i%2B2020%2Bpredictive%2Bmaintenance%2Bdataset.zip",
+    "doi": "10.24432/C5HS5C",
+    "license": "CC-BY-4.0",
+    "kind": "third-party-synthetic",
+    "expected_rows": 10000,
+    "zip_sha256": "f601f14294bcf190f9d720676b7f0aea46a26cde9ab8ebc7b4f8174d9d26b252",
+    "csv_file": "ai4i2020.csv",
+    "csv_sha256": "dc6630cd9b1f0f853922fad78a1b6436570d3f1ec863f1dd5c4340ac56bc8a8e"
+  },
+  "selection": {
+    "seed": "modelforge-tw-ai4i-external-v1",
+    "holdout_seed": "modelforge-tw-ai4i-holdout-v1",
+    "items_per_event_severity": 7,
+    "unknown_items": 14
+  }
+}
