@@ -158,3 +158,13 @@ def test_quantization_report_uses_same_directory_atomic_replacement():
     assert 'Join-Path $outputRoot (".quantization-report."' in script
     assert "Move-Item -Force -LiteralPath $reportTemporary -Destination $reportPath" in script
     assert "Remove-Item -Force -LiteralPath $reportTemporary" in script
+
+
+def test_quantization_revalidates_source_and_records_tool_lineage():
+    script = (PROJECT_ROOT / "scripts" / "quantize.ps1").read_text(encoding="utf-8")
+    assert "$mergeReport.files.PSObject.Properties" in script
+    assert "merge report 來源檔驗證失敗" in script
+    assert "source_merge_report_sha256 = $mergeReportHash" in script
+    assert "source_files = $sourceFiles" in script
+    assert "llama_cpp_commit = $sourceCommit" in script
+    assert "quantizer_sha256 = $quantizerHash" in script

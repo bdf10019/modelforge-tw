@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$MergedModel = "artifacts/qwen3-1.7b-triage-merged",
-    [string]$OutputDirectory = "artifacts/gguf"
+    [string]$OutputDirectory = "artifacts/gguf",
+    [string]$ExpectedLlamaCommit = "ca3d5a3e10d53f7ea672cb9b6178faca3e2807bc"
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,10 +17,42 @@ $outputRoot = Join-Path $projectRoot $OutputDirectory
 $f16 = Join-Path $outputRoot "modelforge-tw-f16.gguf"
 $q8 = Join-Path $outputRoot "modelforge-tw-q8_0.gguf"
 $q4 = Join-Path $outputRoot "modelforge-tw-q4_k_m.gguf"
+$mergeReportPath = Join-Path $mergedPath "merge-report.json"
 
 if (-not (Test-Path -LiteralPath $converter)) { throw "請先執行 scripts\prepare-llama.ps1" }
 if (-not $quantizer) { throw "找不到 llama-quantize.exe" }
 if (-not (Test-Path -LiteralPath $mergedPath)) { throw "找不到 merged model：$mergedPath" }
+if (-not (Test-Path -LiteralPath $mergeReportPath)) { throw "找不到 merge report：$mergeReportPath" }
+
+$mergeReport = Get-Content -LiteralPath $mergeReportPath -Raw | ConvertFrom-Json
+$sourceFiles = @()
+foreach ($property in $mergeReport.files.PSObject.Properties) {
+    $fileName = $property.Name
+    if ([System.IO.Path]::GetFileName($fileName) -ne $fileName) {
+        throw "merge report 包含不安全檔名：$fileName"
+    }
+    $sourceFile = Join-Path $mergedPath $fileName
+    if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) {
+        throw "merge report 來源檔不存在：$fileName"
+    }
+    $item = Get-Item -LiteralPath $sourceFile
+    $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $sourceFile).Hash.ToLowerInvariant()
+    if ($item.Length -ne $property.Value.bytes -or $actualHash -ne $property.Value.sha256) {
+        throw "merge report 來源檔驗證失敗：$fileName"
+    }
+    $sourceFiles += [ordered]@{
+        file = $fileName
+        bytes = $item.Length
+        sha256 = $actualHash
+    }
+}
+if ($sourceFiles.Count -eq 0) { throw "merge report 沒有可驗證的來源檔" }
+$mergeReportHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $mergeReportPath).Hash.ToLowerInvariant()
+$sourceCommit = (& git -C $sourceRoot rev-parse HEAD).Trim().ToLowerInvariant()
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -ne $ExpectedLlamaCommit.ToLowerInvariant()) {
+    throw "llama.cpp source commit 不符"
+}
+$quantizerHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $quantizer.FullName).Hash.ToLowerInvariant()
 New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 
 & $python $converter $mergedPath --outfile $f16 --outtype f16
@@ -63,10 +96,14 @@ $files = @($f16, $q8, $q4) | ForEach-Object {
     [ordered]@{ file = $item.Name; bytes = $item.Length; sha256 = $hash.Hash.ToLowerInvariant() }
 }
 $report = [ordered]@{
-    schema_version = "1.0"
+    schema_version = "1.1"
     evidence_kind = "measured"
     source = $MergedModel
+    source_merge_report_sha256 = $mergeReportHash
+    source_files = $sourceFiles
     llama_cpp_tag = "b10665"
+    llama_cpp_commit = $sourceCommit
+    quantizer_sha256 = $quantizerHash
     files = $files
 }
 $reportPath = Join-Path $outputRoot "quantization-report.json"

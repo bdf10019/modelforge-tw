@@ -58,6 +58,9 @@ Web / REST / OpenAI-compatible client
   推導可重現版本標記。
   Transformers inference metadata／evaluation 內的非空 model revision 同樣只接受 commit hash，且
   registry 必須確認它等於 training manifest 的 base revision；遠端 llama-http 無法證明時保留 `null`。
+- `quantize.ps1`：轉換前依 merge report 重算每個來源檔的大小與 SHA-256，並核對 llama.cpp source
+  commit；新版量化報告保存 merge report hash、來源檔清單、commit 與實際 quantizer executable hash。
+  既有 schema 1.0 實測報告保持唯讀，不以新欄位回填歷史執行。
 - `registry.py`：candidate、evaluation attestation、promote、previous-good 與 rollback 的原子檔案
   registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住評測資料 hash、引擎、
   模型 identity、evidence kind、生成、安全與評分契約。新候選缺少任一 attestation 欄位都不能
