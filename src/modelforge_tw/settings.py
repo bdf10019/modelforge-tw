@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,4 +30,4 @@ class Settings(BaseSettings):
     registry_path: Path = Path("outputs/model-registry.json")
     request_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     max_concurrency: int = Field(default=2, ge=1, le=64)
-    log_inputs: bool = False
+    log_inputs: Literal[False] = False

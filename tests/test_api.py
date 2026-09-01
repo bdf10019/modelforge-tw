@@ -20,6 +20,12 @@ def test_service_defaults_to_attested_safety_policy_v2():
     assert Settings().safety_policy_version == "risk-precedence-v2"
 
 
+def test_service_refuses_input_logging_configuration():
+    with pytest.raises(ValueError):
+        Settings(log_inputs=True)
+    assert Settings(log_inputs=False).log_inputs is False
+
+
 @asynccontextmanager
 async def app_client(app):
     async with app.router.lifespan_context(app):

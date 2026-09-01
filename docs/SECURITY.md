@@ -23,7 +23,8 @@
 - 解析失敗、timeout、engine exception 都回 unknown + collect evidence + review required。
 - semaphore、timeout、request ID 驗證、Prometheus outcome 與 readiness 檢查。
 - timeout 後仍保留同步模型的容量槽，直到不可取消的背景推論真正結束，避免資源耗盡。
-- 預設 `MODELFORGE_LOG_INPUTS=false`；repository 忽略模型、資料生成物與輸出報告。
+- `MODELFORGE_LOG_INPUTS` 唯一合法值為 `false`；誤設 `true` 時服務拒絕啟動，API 不提供事件原文
+  logging。repository 也忽略模型、資料生成物與輸出報告。
 - llama.cpp 每-slot context 預設 2048；本機啟動腳本低於 1536 時 fail fast，避免輸出被靜默截斷。
 - 安全政策不可因程式更新靜默漂移；部署預設鎖定 registry 已 attested 的 v2，實驗 v3 必須顯式選擇。
 

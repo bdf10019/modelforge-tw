@@ -73,3 +73,10 @@ identity，再連同 prompt、量化、max tokens、structured output、安全�
 逐項比對；新候選缺任一欄位就拒絕加入，CLI 也在寫入前核對量化名稱。既有 schema 1.0 manifest
 仍可讀取與維持既有狀態，但缺 identity 時 fail closed，不接受新的 attestation；避免不同資料集或
 fixture 報告在設定看似相同時被錯掛到正式候選。
+
+## ADR-012：服務不提供事件原文 logging 開關
+
+設備事件可能含識別資訊；目前沒有外部稽核後端、retention、遮罩或存取控制，因此「預設關閉但可
+打開」不是完整能力。`MODELFORGE_LOG_INPUTS` 限定只能是 `false`，誤設為 `true` 會在啟動設定
+驗證階段失敗。觀測只保留 request ID、outcome、engine、延遲與 warning code 等非原文指標；若未來
+要加入原文日誌，必須先另行設計資料分類、遮罩、保存期限與權限。
