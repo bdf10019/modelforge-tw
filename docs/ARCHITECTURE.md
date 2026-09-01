@@ -30,7 +30,8 @@ Web / REST / OpenAI-compatible client
 - `external_calibration.py`：驗證第三方來源 SHA-256、固定兩組不重疊抽樣、轉換 AI4I 衍生事件，
   並輸出 calibration／holdout manifest 與 combined leakage audit。
 - `benchmark.py`：併發、P50/P95/P99、吞吐、RAM／整卡 VRAM 峰值取樣；HTTP streaming 可量
-  TTFT，不支援時明確記 `null`。
+  TTFT，不支援時明確記 `null`。新版報告只有在每一筆量測請求都成功時才標為 passed；任一錯誤
+  會保留樣本並讓 CLI 回傳非零狀態，不能把部分或全數失敗的壓測當作成功產物。
 - `training.py`：固定 seed 的 completion-only QLoRA 與 merge；新版報告保存資料／設定／adapter
   hash、Python、Torch、CUDA、cuDNN、GPU capability、實體顯存與完整 ML 依賴版本，避免只鎖
   模型卻漏掉訓練 runtime 漂移。

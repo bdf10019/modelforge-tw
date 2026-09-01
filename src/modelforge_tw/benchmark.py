@@ -15,7 +15,7 @@ from typing import Any
 import psutil
 
 from modelforge_tw.engines.base import InferenceEngine
-from modelforge_tw.schemas import DatasetRecord
+from modelforge_tw.schemas import DatasetRecord, InferenceMetadata
 
 
 def _percentile(values: list[float], percentile: float) -> float:
@@ -100,8 +100,12 @@ def run_benchmark(
 ) -> dict[str, Any]:
     if not records:
         raise ValueError("benchmark requires at least one record")
+    if not concurrency_levels:
+        raise ValueError("benchmark requires at least one concurrency level")
     if requests_per_level < 1 or any(level < 1 for level in concurrency_levels):
         raise ValueError("concurrency and request counts must be positive")
+    if warmup_requests < 0:
+        raise ValueError("warmup request count cannot be negative")
 
     for index in range(warmup_requests):
         engine.generate(records[index % len(records)].input)
@@ -115,6 +119,8 @@ def run_benchmark(
     sampler = _ResourceSampler(process)
     sampler.start()
     levels: list[dict[str, Any]] = []
+    metadata_samples: list[InferenceMetadata] = []
+    metadata_lock = threading.Lock()
 
     try:
         for concurrency in concurrency_levels:
@@ -134,6 +140,9 @@ def run_benchmark(
                 request_started = time.perf_counter()
                 try:
                     result = benchmark_generate(records[index % len(records)].input)
+                    with metadata_lock:
+                        if not metadata_samples:
+                            metadata_samples.append(result.metadata)
                     latency_sink.append((time.perf_counter() - request_started) * 1000)
                     if result.metadata.output_tokens is not None:
                         token_sink.append(result.metadata.output_tokens)
@@ -191,21 +200,28 @@ def run_benchmark(
                 }
             )
 
-        first = engine.generate(records[0].input).metadata
     finally:
         sampler.stop()
     gpu_after = _gpu_snapshot()
+    first = metadata_samples[0] if metadata_samples else None
+    passed = all(
+        level["errors"] == 0 and level["completed"] == level["requests"] for level in levels
+    )
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "created_at": datetime.now(UTC).isoformat(),
-        "evidence_kind": first.evidence_kind,
-        "engine": first.engine,
-        "model_id": first.model_id,
-        "model_version": first.model_version,
-        "quantization": first.quantization,
-        "prompt_version": first.prompt_version,
-        "max_new_tokens": first.max_new_tokens,
-        "context_window_tokens": first.context_window_tokens,
+        "passed": passed,
+        "failure_reason": None if passed else "one_or_more_benchmark_requests_failed",
+        "evidence_kind": first.evidence_kind if first else engine.evidence_kind,
+        "engine": first.engine if first else engine.name,
+        "model_id": first.model_id if first else engine.model_id,
+        "model_version": first.model_version if first else engine.model_version,
+        "quantization": first.quantization if first else engine.quantization,
+        "prompt_version": first.prompt_version if first else engine.prompt_version,
+        "max_new_tokens": first.max_new_tokens if first else engine.max_new_tokens,
+        "context_window_tokens": (
+            first.context_window_tokens if first else getattr(engine, "context_window_tokens", None)
+        ),
         "environment": {
             "platform": platform.platform(),
             "python": platform.python_version(),
@@ -222,6 +238,7 @@ def run_benchmark(
         "warmup_requests": warmup_requests,
         "levels": levels,
         "notes": [
+            "A report passes only when every measured request completes without error.",
             "TTFT requires a streaming adapter and is not represented as zero.",
             "Fixture evidence validates the benchmark pipeline only and is not model performance.",
             "GPU memory is sampled for the whole device, not attributed to one process.",

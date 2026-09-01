@@ -73,6 +73,8 @@ AI4I 外部輸入的 prompt 約 967 tokens；再加 192-token output budget 後�
 
 ## 未執行邊界
 
+- 新版 benchmark schema 1.1 明確保存 `passed` 與 `failure_reason`；只有所有量測請求零錯誤才成功，
+  否則腳本回傳非零狀態。既有 Q8／Q4 報告為 schema 1.0，但公開摘要已核對皆為 36/36、0 error。
 - Transformers adapter 沒有 token-level streaming，因此其 TTFT 不可用，不填入誤導性的 0。
 - Docker／Compose／Kubernetes 因本機沒有 runtime，只做靜態設定、YAML 解析與程式測試。
 - vLLM、SGLang、ONNX Runtime、TensorRT-LLM 未在本機執行，不列效能數字。

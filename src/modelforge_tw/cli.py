@@ -313,7 +313,7 @@ def command_benchmark(args: argparse.Namespace) -> int:
     )
     write_benchmark(report, args.output)
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0
+    return 0 if report["passed"] else 2
 
 
 def command_demo(_: argparse.Namespace) -> int:
