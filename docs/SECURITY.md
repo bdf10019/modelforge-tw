@@ -32,8 +32,9 @@
 
 `scripts/privacy-check.ps1` 排除大型生成物後掃描常見 key、Bearer token、密碼賦值與使用者私人路徑。
 完整驗收另執行 `pip check`、wheel 建置與 Web UI 封裝驗證；`pip check` 只驗依賴一致性，不等同
-第三方套件 CVE 掃描。正式提交前同時檢查 Git staged diff。不要把 `.env`、模型權重、客戶事件
-或任何 token 放入 Git。
+第三方套件 CVE 掃描。wheel 會無依賴安裝到一次性暫存目錄，再確認套件來源、FastAPI app 與公開
+路由，最後只清理已驗證位於系統暫存根目錄下的資料夾。正式提交前同時檢查 Git staged diff。
+不要把 `.env`、模型權重、客戶事件或任何 token 放入 Git。
 
 ## Residual risk
 
