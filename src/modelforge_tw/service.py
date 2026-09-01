@@ -604,6 +604,7 @@ def create_app(
                 validation_warnings=[outcome.upper()],
             )
         except asyncio.CancelledError:
+            outcome = "client_cancelled"
             if engine_task is not None and not release_deferred:
                 release_deferred = True
                 engine_task.add_done_callback(release_after_background_completion)

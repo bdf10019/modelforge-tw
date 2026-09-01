@@ -49,6 +49,8 @@
 - 等待容量另有獨立 queue timeout；超時回 503／`Retry-After` 並記錄非原文 outcome，防止卡住的
   模型讓未執行請求在服務內無限累積。每 replica 的等待區另有可設定筆數上限，滿載立即拒絕；
   兩者仍不是跨 replica 的完整 rate limiter。
+- Client 取消排隊會釋放 queue 計數；若同步引擎已開始，仍保留 slot 到背景工作完成，避免斷線或取消
+  被用來繞過 concurrency 上限。兩種情況都記錄 `client_cancelled`，不記事件原文。
 - 關閉流程先撤除 readiness，追蹤並在有界寬限期內排空 timeout 後仍執行的模型工作；同步執行緒
   無法安全強制取消，超過應用寬限後由較長的容器終止期限提供最後邊界。
 - CLI 與 registry 對設定、manifest、評測與訓練 JSON 採 16 MiB byte 上限並要求合法 UTF-8；

@@ -923,3 +923,79 @@ async def test_full_inference_queue_rejects_without_waiting_for_timeout():
         assert "modelforge_queued_requests 1.0" in metrics
         engine.release.set()
         assert (await asyncio.wait_for(queued, timeout=1)).status_code == 200
+
+
+async def test_cancelled_queued_request_releases_queue_reservation():
+    engine = BlockingEngine("adapted")
+    settings = Settings(
+        request_timeout_seconds=0.01,
+        queue_timeout_seconds=1,
+        max_concurrency=1,
+        max_queue_depth=1,
+    )
+    app = create_app(settings=settings, engine_factory=lambda: engine)
+    async with app_client(app) as client:
+        first = await client.post(
+            "/v1/triage", json={"incident_text": "第一筆背景推論占用唯一執行容量"}
+        )
+        assert "TIMEOUT_FALLBACK" in first.json()["validation_warnings"]
+        queued = asyncio.create_task(
+            client.post("/v1/triage", json={"incident_text": "等待中的請求將由呼叫端取消"})
+        )
+        for _ in range(20):
+            if app.state.queued_requests == 1:
+                break
+            await asyncio.sleep(0.01)
+        assert app.state.queued_requests == 1
+
+        queued.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await queued
+
+        assert app.state.queued_requests == 0
+        metrics = (await client.get("/metrics")).text
+        assert "modelforge_queued_requests 0.0" in metrics
+        assert 'outcome="client_cancelled"' in metrics
+        engine.release.set()
+
+
+async def test_cancelled_active_request_retains_slot_until_engine_finishes():
+    engine = BlockingEngine("adapted")
+    settings = Settings(
+        request_timeout_seconds=1,
+        queue_timeout_seconds=0.05,
+        max_concurrency=1,
+        max_queue_depth=0,
+    )
+    app = create_app(settings=settings, engine_factory=lambda: engine)
+    async with app_client(app) as client:
+        active = asyncio.create_task(
+            client.post("/v1/triage", json={"incident_text": "執行中的請求將由呼叫端取消"})
+        )
+        for _ in range(20):
+            if engine.calls == 1:
+                break
+            await asyncio.sleep(0.01)
+        assert engine.calls == 1
+
+        active.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await active
+
+        rejected = await client.post(
+            "/v1/triage", json={"incident_text": "背景引擎未結束前不能繞過容量限制"}
+        )
+        assert rejected.status_code == 503
+        assert engine.calls == 1
+        metrics = (await client.get("/metrics")).text
+        assert 'modelforge_active_engine_jobs{engine="fixture-adapted"} 1.0' in metrics
+        assert 'outcome="client_cancelled"' in metrics
+
+        background_tasks = tuple(app.state.engine_tasks)
+        engine.release.set()
+        await asyncio.wait_for(asyncio.gather(*background_tasks), timeout=1)
+        await asyncio.sleep(0)
+        recovered = await client.post(
+            "/v1/triage", json={"incident_text": "背景引擎結束後容量必須恢復可用"}
+        )
+        assert recovered.status_code == 200
