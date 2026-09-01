@@ -43,12 +43,13 @@ Web / REST / OpenAI-compatible client
   registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住評測資料 hash、引擎、
   模型 identity、evidence kind、生成、安全與評分契約。新候選缺少任一 attestation 欄位都不能
   加入；舊 manifest 缺少 identity 時只能讀取或沿用既有狀態，不能拿新版報告重新 attestation。
-  評測報告與 artifact 只接受 canonical POSIX-style 相對路徑，絕對路徑、反斜線及 `..` 穿越會在
-  讀取或寫入 registry 時拒絕；新版 attestation 也保存評測報告本身的 SHA-256。新 promote 會重新
-  要求完整 attestation 且只接受 measured evidence，並重新雜湊、解析評測報告、逐項比對 manifest
-  identity／release 結果及模型 artifact，確認路徑未逃出 project root。候選加入與重新 attestation
-  時也執行同一內容驗證；fixture 可驗證機制但不能成為正式發布。rollback
-  同樣採此規則；唯一相容例外是 schema 1.0 中六個新版 identity／報告雜湊欄位全部不存在、
+  評測／訓練報告與 artifact 只接受 canonical POSIX-style 相對路徑，絕對路徑、反斜線及 `..`
+  穿越會在讀取或寫入 registry 時拒絕；新版 attestation 也保存兩份報告本身的 SHA-256。新 promote
+  會重新要求完整 attestation 且只接受 measured evidence，並重新雜湊、解析評測與訓練報告、
+  逐項比對 manifest identity／release 結果及模型 artifact，確認路徑未逃出 project root。
+  候選加入也執行同一內容驗證，重新 evaluation attestation 時則立即核對新報告；fixture 可驗證
+  機制但不能成為正式發布。rollback
+  同樣採此規則；唯一相容例外是 schema 1.0 中八個新版 identity／報告雜湊欄位全部不存在、
   且早已被指定為 previous-good 的既有狀態，避免安全升級反而切斷已驗證的舊回退路徑；
   部分遷移的資料不放行。
 

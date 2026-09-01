@@ -428,6 +428,8 @@ def command_registry(args: argparse.Namespace) -> int:
             evaluation_evidence_kind=evaluation.evidence_kind,
             evaluation_report=args.evaluation.resolve().relative_to(PROJECT_ROOT).as_posix(),
             evaluation_report_sha256=sha256_file(args.evaluation),
+            training_report=args.training_report.resolve().relative_to(PROJECT_ROOT).as_posix(),
+            training_report_sha256=sha256_file(args.training_report),
             release_passed=evaluation.release_passed,
             artifacts=artifact_refs,
         )

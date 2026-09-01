@@ -1,5 +1,7 @@
 import hashlib
+import json
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import pytest
 
@@ -10,8 +12,18 @@ from modelforge_tw.schemas import (
     EvaluationReport,
     TriageOutput,
 )
+from modelforge_tw.training import TrainingConfig
 
 HASH = hashlib.sha256(b"fixture").hexdigest()
+TRAINING_CONFIG = TrainingConfig(
+    model_id="fixture",
+    model_revision=HASH,
+    data_dir="data/generated",
+    prompt_version="optimized-v1",
+).model_dump(mode="json")
+TRAINING_CONFIG_HASH = hashlib.sha256(
+    json.dumps(TRAINING_CONFIG, sort_keys=True, separators=(",", ":")).encode()
+).hexdigest()
 
 
 def valid_evaluation_report(**updates) -> EvaluationReport:
@@ -70,15 +82,36 @@ def valid_evaluation_report(**updates) -> EvaluationReport:
     return EvaluationReport.model_validate({**report.model_dump(mode="json"), **updates})
 
 
+def write_training_report(root: Path) -> Path:
+    path = root / "outputs" / "training.json"
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.1",
+                "evidence_kind": "measured",
+                "model_id": "fixture",
+                "model_revision": HASH,
+                "resolved_model_revision": HASH,
+                "config": TRAINING_CONFIG,
+                "training_config_sha256": TRAINING_CONFIG_HASH,
+                "dataset_manifest_sha256": HASH,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
 def manifest(manifest_id: str, passed: bool = True) -> ModelManifest:
     return ModelManifest(
         manifest_id=manifest_id,
         base_model="fixture",
-        base_revision="fixture",
+        base_revision=HASH,
         license="MIT",
         prompt_version="optimized-v1",
         dataset_manifest_sha256=HASH,
-        training_config_sha256=HASH,
+        training_config_sha256=TRAINING_CONFIG_HASH,
         release_gate_sha256=HASH,
         engine="fixture",
         quantization="none",
@@ -93,6 +126,8 @@ def manifest(manifest_id: str, passed: bool = True) -> ModelManifest:
         evaluation_evidence_kind="measured",
         evaluation_report="outputs/evaluation.json",
         evaluation_report_sha256=HASH,
+        training_report="outputs/training.json",
+        training_report_sha256=HASH,
         release_passed=passed,
         artifacts=[
             ArtifactRef(
@@ -308,6 +343,8 @@ def test_registry_allows_only_fully_legacy_previous_good_on_schema_1_rollback(tm
         "evaluation_model_version": None,
         "evaluation_evidence_kind": None,
         "evaluation_report_sha256": None,
+        "training_report": None,
+        "training_report_sha256": None,
     }
     state.schema_version = "1.0"
     state.manifests["v1"] = state.manifests["v1"].model_copy(update=legacy_updates)
@@ -329,12 +366,14 @@ def test_registry_rechecks_artifact_before_promotion(tmp_path):
     evaluation_report = tmp_path / "outputs" / "evaluation.json"
     evaluation_report.parent.mkdir()
     evaluation_report.write_text(valid_evaluation_report().model_dump_json(), encoding="utf-8")
+    training_report = write_training_report(tmp_path)
     artifact = tmp_path / "model.gguf"
     artifact.write_bytes(b"original")
     digest = hashlib.sha256(b"original").hexdigest()
     candidate = manifest("v1").model_copy(
         update={
             "evaluation_report_sha256": hashlib.sha256(evaluation_report.read_bytes()).hexdigest(),
+            "training_report_sha256": hashlib.sha256(training_report.read_bytes()).hexdigest(),
             "artifacts": [
                 ArtifactRef(
                     kind="gguf",
@@ -356,12 +395,14 @@ def test_registry_rechecks_evaluation_report_before_promotion(tmp_path):
     artifact = tmp_path / "artifacts" / "model.gguf"
     artifact.parent.mkdir()
     artifact.write_bytes(b"fixture")
+    training_report = write_training_report(tmp_path)
     report_path = tmp_path / "evaluation.json"
     report_path.write_text(valid_evaluation_report().model_dump_json(), encoding="utf-8")
     candidate = manifest("v1").model_copy(
         update={
             "evaluation_report": "evaluation.json",
             "evaluation_report_sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
+            "training_report_sha256": hashlib.sha256(training_report.read_bytes()).hexdigest(),
         }
     )
     registry = FileRegistry(tmp_path / "registry.json", artifact_root=tmp_path)
@@ -387,6 +428,25 @@ def test_registry_rejects_hash_valid_report_with_wrong_identity(tmp_path):
     registry = FileRegistry(tmp_path / "registry.json", artifact_root=tmp_path)
 
     with pytest.raises(ValueError, match="evaluation_model_id"):
+        registry.add(candidate)
+    assert not registry.path.exists()
+
+
+def test_registry_rejects_hash_valid_training_report_with_wrong_identity(tmp_path):
+    evaluation_path = tmp_path / "evaluation.json"
+    evaluation_path.write_text(valid_evaluation_report().model_dump_json(), encoding="utf-8")
+    training_path = write_training_report(tmp_path)
+    candidate = manifest("v1").model_copy(
+        update={
+            "base_model": "different-base-model",
+            "evaluation_report": "evaluation.json",
+            "evaluation_report_sha256": hashlib.sha256(evaluation_path.read_bytes()).hexdigest(),
+            "training_report_sha256": hashlib.sha256(training_path.read_bytes()).hexdigest(),
+        }
+    )
+    registry = FileRegistry(tmp_path / "registry.json", artifact_root=tmp_path)
+
+    with pytest.raises(ValueError, match="base_model"):
         registry.add(candidate)
     assert not registry.path.exists()
 

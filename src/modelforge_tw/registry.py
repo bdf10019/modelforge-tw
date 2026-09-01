@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from modelforge_tw.io_utils import atomic_write_text, exclusive_file_lock
 from modelforge_tw.schemas import EvaluationReport
+from modelforge_tw.training import TrainingReportAttestation
 
 SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
 
@@ -71,20 +72,22 @@ class ModelManifest(BaseModel):
     status: Literal["candidate", "released", "retired", "blocked"] = "candidate"
     evaluation_report: str
     evaluation_report_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    training_report: str | None = None
+    training_report_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     release_passed: bool
     artifacts: list[ArtifactRef] = Field(default_factory=list)
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
-    @field_validator("evaluation_report")
+    @field_validator("evaluation_report", "training_report")
     @classmethod
-    def evaluation_report_is_safe(cls, value: str) -> str:
-        return _validate_portable_relative_path(value)
+    def report_path_is_safe(cls, value: str | None) -> str | None:
+        return _validate_portable_relative_path(value) if value is not None else None
 
 
 class RegistryState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: str = "1.2"
+    schema_version: str = "1.3"
     released: str | None = None
     previous_good: str | None = None
     manifests: dict[str, ModelManifest] = Field(default_factory=dict)
@@ -136,6 +139,7 @@ class FileRegistry:
     @classmethod
     def _require_releasable_evidence(cls, manifest: ModelManifest) -> None:
         cls._require_evaluation_attestation(manifest)
+        cls._require_training_attestation(manifest)
         if manifest.evaluation_evidence_kind != "measured":
             raise ValueError("only measured evaluation evidence can be released")
         if not manifest.artifacts:
@@ -150,10 +154,25 @@ class FileRegistry:
             manifest.evaluation_model_version,
             manifest.evaluation_evidence_kind,
             manifest.evaluation_report_sha256,
+            manifest.training_report,
+            manifest.training_report_sha256,
         )
         if state.schema_version == "1.0" and all(value is None for value in legacy_identity):
             return
         cls._require_releasable_evidence(manifest)
+
+    @staticmethod
+    def _require_training_attestation(manifest: ModelManifest) -> None:
+        missing = [
+            name
+            for name, value in {
+                "training_report": manifest.training_report,
+                "training_report_sha256": manifest.training_report_sha256,
+            }.items()
+            if value is None
+        ]
+        if missing:
+            raise ValueError("manifest lacks training attestation: " + ", ".join(missing))
 
     def _verify_artifacts(self, manifest: ModelManifest) -> None:
         if self.artifact_root is None:
@@ -195,6 +214,41 @@ class FileRegistry:
         self._validate_evaluation_against_manifest(manifest, evaluation)
         if manifest.release_passed != evaluation.release_passed:
             raise ValueError("evaluation release result does not match manifest")
+
+    def _verify_training_report(self, manifest: ModelManifest) -> None:
+        if (
+            self.artifact_root is None
+            or manifest.training_report is None
+            or manifest.training_report_sha256 is None
+        ):
+            return
+        path = (self.artifact_root / manifest.training_report).resolve()
+        try:
+            path.relative_to(self.artifact_root)
+        except ValueError as error:
+            raise ValueError("training report escapes the project root") from error
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        digest = sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        if digest.hexdigest() != manifest.training_report_sha256:
+            raise ValueError("registered training report hash changed")
+        training = TrainingReportAttestation.model_validate_json(path.read_text(encoding="utf-8"))
+        checks = {
+            "base_model": manifest.base_model == training.model_id,
+            "base_revision": manifest.base_revision == training.resolved_model_revision,
+            "dataset_manifest_sha256": (
+                manifest.dataset_manifest_sha256 == training.dataset_manifest_sha256
+            ),
+            "training_config_sha256": (
+                manifest.training_config_sha256 == training.training_config_sha256
+            ),
+        }
+        mismatches = [name for name, matched in checks.items() if not matched]
+        if mismatches:
+            raise ValueError("training report does not match manifest: " + ", ".join(mismatches))
 
     @classmethod
     def _validate_evaluation_against_manifest(
@@ -315,10 +369,12 @@ class FileRegistry:
     def _add_unlocked(self, manifest: ModelManifest) -> RegistryState:
         self._validate_id(manifest.manifest_id)
         self._require_evaluation_attestation(manifest)
+        self._require_training_attestation(manifest)
         state = self.load()
         if manifest.manifest_id in state.manifests:
             raise ValueError(f"manifest already exists: {manifest.manifest_id}")
         self._verify_evaluation_report(manifest)
+        self._verify_training_report(manifest)
         self._verify_artifacts(manifest)
         state.manifests[manifest.manifest_id] = manifest
         state.events.append(
@@ -345,6 +401,7 @@ class FileRegistry:
         if not candidate.release_passed or candidate.status == "blocked":
             raise ValueError("candidate did not pass its release gates")
         self._verify_evaluation_report(candidate)
+        self._verify_training_report(candidate)
         self._verify_artifacts(candidate)
         if state.released and state.released != manifest_id:
             current = state.manifests[state.released]
@@ -377,6 +434,7 @@ class FileRegistry:
         if not target_manifest.release_passed:
             raise ValueError("previous-good manifest no longer satisfies release metadata")
         self._verify_evaluation_report(target_manifest)
+        self._verify_training_report(target_manifest)
         self._verify_artifacts(target_manifest)
         if current:
             state.manifests[current] = state.manifests[current].model_copy(

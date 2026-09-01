@@ -101,6 +101,8 @@ def test_registry_cli_add_locks_complete_evaluation_identity(tmp_path, monkeypat
     assert saved.release_gate_sha256 == HASH
     assert saved.max_new_tokens == 192
     assert saved.safety_policy_version == "risk-precedence-v2"
+    assert saved.training_report == "training.json"
+    assert saved.training_report_sha256 == hashlib.sha256(training_path.read_bytes()).hexdigest()
 
 
 def test_registry_cli_rejects_quantization_mismatch_before_writing(tmp_path, monkeypatch):
