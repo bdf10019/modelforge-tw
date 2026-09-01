@@ -40,13 +40,10 @@ class ChatCompletionRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_triage_user_message(self) -> ChatCompletionRequest:
-        user_messages = [
-            message.content.strip() for message in self.messages if message.role == "user"
-        ]
-        if not user_messages:
-            raise ValueError("at least one user message is required")
-        if not 8 <= len(user_messages[-1]) <= 2000:
-            raise ValueError("the last user message must contain 8 to 2000 characters")
+        if len(self.messages) != 1 or self.messages[0].role != "user":
+            raise ValueError("exactly one user message is supported")
+        if not 8 <= len(self.messages[0].content.strip()) <= 2000:
+            raise ValueError("the user message must contain 8 to 2000 characters")
         return self
 
 
@@ -250,8 +247,7 @@ def create_app(
                 status_code=400,
                 detail=f"max_tokens must be at least {deployed_max_tokens} for this schema",
             )
-        user_messages = [message.content for message in payload.messages if message.role == "user"]
-        triage_request = TriageRequest(incident_text=user_messages[-1])
+        triage_request = TriageRequest(incident_text=payload.messages[0].content)
         request_id = resolve_request_id(request.headers.get("X-Request-ID"))
         result = await infer(triage_request, request_id)
         content = json.dumps(result.output.model_dump(mode="json"), ensure_ascii=False)

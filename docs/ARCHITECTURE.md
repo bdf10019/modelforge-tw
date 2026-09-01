@@ -42,10 +42,11 @@ OpenAI-compatible HTTP adapter 使用 strict JSON Schema：八個輸出欄位皆
 reason code 使用有限允許清單。此約束在生成前套用；線上 bounded repair 與 fail-closed fallback
 仍保留，但 raw 評測不把修補後結果算成原始格式成功。
 
-對外 `/v1/chat/completions` 是刻意縮小的 OpenAI-compatible 子集：接受 `model`、`messages`、
-`temperature=0`、`max_tokens` 與 `stream`。未知欄位、未部署模型、非零 temperature，以及小於部署
-結構化輸出預算的 `max_tokens` 都明確拒絕，避免表面接受卻忽略參數。串流在完整 schema 與安全
-驗證後送出，並不宣稱是 Transformers token-level streaming。
+對外 `/v1/chat/completions` 是刻意縮小的 OpenAI-compatible 子集：接受 `model`、恰好一筆
+`user` message、`temperature=0`、`max_tokens` 與 `stream`。多輪或 system／assistant／tool 訊息、
+未知欄位、未部署模型、非零 temperature，以及小於部署結構化輸出預算的 `max_tokens` 都明確
+拒絕，避免表面接受卻忽略參數。串流在完整 schema 與安全驗證後送出，並不宣稱是 Transformers
+token-level streaming。
 
 服務不執行設備控制、不讀任意 URL 或用戶指定模型路徑，也預設不記錄事件原文。Kubernetes
 範例把 API 與模型伺服器分開，讓 GPU server 可獨立縮放；`/readyz` 會檢查下游模型健康狀態。
