@@ -14,7 +14,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from modelforge_tw.dataset import load_splits, sha256_file
-from modelforge_tw.io_utils import atomic_write_text
+from modelforge_tw.io_utils import atomic_write_text, read_utf8_text_limited
 from modelforge_tw.prompts import messages_for_version, training_messages
 
 TRAINING_DEPENDENCIES = (
@@ -93,7 +93,7 @@ class TrainingReportAttestation(BaseModel):
 
 
 def load_training_config(path: Path) -> TrainingConfig:
-    return TrainingConfig.model_validate_json(path.read_text(encoding="utf-8"))
+    return TrainingConfig.model_validate_json(read_utf8_text_limited(path))
 
 
 def _stable_hash(payload: dict[str, Any]) -> str:
@@ -329,7 +329,7 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
     config_hash = _stable_hash(config_payload)
     manifest_path = config.data_dir / "manifest.json"
     dataset_manifest = (
-        json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else None
+        json.loads(read_utf8_text_limited(manifest_path)) if manifest_path.exists() else None
     )
     report = {
         "schema_version": "1.1",

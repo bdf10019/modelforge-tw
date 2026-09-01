@@ -9,7 +9,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from modelforge_tw.io_utils import atomic_write_text, exclusive_file_lock
+from modelforge_tw.io_utils import (
+    atomic_write_text,
+    exclusive_file_lock,
+    read_utf8_text_limited,
+)
 from modelforge_tw.schemas import EvaluationReport
 from modelforge_tw.training import TrainingReportAttestation
 
@@ -129,7 +133,7 @@ class FileRegistry:
     def load(self) -> RegistryState:
         if not self.path.exists():
             return RegistryState()
-        return RegistryState.model_validate_json(self.path.read_text(encoding="utf-8"))
+        return RegistryState.model_validate_json(read_utf8_text_limited(self.path))
 
     def _write(self, state: RegistryState) -> None:
         atomic_write_text(
@@ -236,7 +240,7 @@ class FileRegistry:
                 digest.update(chunk)
         if digest.hexdigest() != manifest.evaluation_report_sha256:
             raise ValueError("registered evaluation report hash changed")
-        evaluation = EvaluationReport.model_validate_json(path.read_text(encoding="utf-8"))
+        evaluation = EvaluationReport.model_validate_json(read_utf8_text_limited(path))
         self._validate_evaluation_against_manifest(manifest, evaluation)
         if manifest.release_passed != evaluation.release_passed:
             raise ValueError("evaluation release result does not match manifest")
@@ -261,7 +265,7 @@ class FileRegistry:
                 digest.update(chunk)
         if digest.hexdigest() != manifest.training_report_sha256:
             raise ValueError("registered training report hash changed")
-        training = TrainingReportAttestation.model_validate_json(path.read_text(encoding="utf-8"))
+        training = TrainingReportAttestation.model_validate_json(read_utf8_text_limited(path))
         checks = {
             "base_model": manifest.base_model == training.model_id,
             "base_revision": manifest.base_revision == training.resolved_model_revision,

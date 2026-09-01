@@ -5,7 +5,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from modelforge_tw.io_utils import atomic_write_text, exclusive_file_lock
+from modelforge_tw.io_utils import (
+    atomic_write_text,
+    exclusive_file_lock,
+    read_utf8_text_limited,
+)
 
 
 def test_atomic_write_replaces_complete_content_without_temp_files(tmp_path):
@@ -59,3 +63,22 @@ def test_exclusive_file_lock_rejects_negative_timeout(tmp_path):
     with pytest.raises(ValueError, match="cannot be negative"):
         with exclusive_file_lock(tmp_path / ".registry.lock", timeout_seconds=-1):
             pass
+
+
+def test_limited_text_reader_counts_bytes_and_accepts_exact_boundary(tmp_path):
+    target = tmp_path / "control.json"
+    target.write_bytes("台".encode())
+
+    assert read_utf8_text_limited(target, max_bytes=3) == "台"
+    with pytest.raises(ValueError, match="2-byte limit"):
+        read_utf8_text_limited(target, max_bytes=2)
+
+
+def test_limited_text_reader_rejects_invalid_utf8_and_invalid_limit(tmp_path):
+    target = tmp_path / "control.json"
+    target.write_bytes(b"\xff")
+
+    with pytest.raises(ValueError, match="not valid UTF-8"):
+        read_utf8_text_limited(target)
+    with pytest.raises(ValueError, match="must be positive"):
+        read_utf8_text_limited(target, max_bytes=0)

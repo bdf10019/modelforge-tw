@@ -19,7 +19,7 @@ from modelforge_tw.evaluation import (
     write_report,
 )
 from modelforge_tw.external_calibration import build_external_calibration
-from modelforge_tw.io_utils import atomic_write_text
+from modelforge_tw.io_utils import atomic_write_text, read_utf8_text_limited
 from modelforge_tw.prompts import (
     MINIMAL_PROMPT_VERSION,
     OPTIMIZED_PROMPT_V2_VERSION,
@@ -114,7 +114,7 @@ def command_audit_data(args: argparse.Namespace) -> int:
 
 
 def command_prepare_external_calibration(args: argparse.Namespace) -> int:
-    config = json.loads(args.config.read_text(encoding="utf-8"))
+    config = json.loads(read_utf8_text_limited(args.config))
     manifest = build_external_calibration(args.source, args.output, config)
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
     return 0
@@ -230,7 +230,7 @@ def command_evaluate(args: argparse.Namespace) -> int:
         if completed == total or completed % 5 == 0:
             print(f"evaluation progress: {completed}/{total}", file=sys.stderr, flush=True)
 
-    gate_config = json.loads(args.gates.read_text(encoding="utf-8"))
+    gate_config = json.loads(read_utf8_text_limited(args.gates))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     cache_writer = (
         None if args.no_resume_cache else cache_path.open("a", encoding="utf-8", newline="\n")
@@ -278,11 +278,11 @@ def command_evaluate(args: argparse.Namespace) -> int:
 
 
 def command_compare(args: argparse.Namespace) -> int:
-    baseline = EvaluationReport.model_validate_json(args.baseline.read_text(encoding="utf-8"))
-    candidate = EvaluationReport.model_validate_json(args.candidate.read_text(encoding="utf-8"))
+    baseline = EvaluationReport.model_validate_json(read_utf8_text_limited(args.baseline))
+    candidate = EvaluationReport.model_validate_json(read_utf8_text_limited(args.candidate))
     comparison = compare_reports(baseline, candidate)
     if args.profile == "q4":
-        gate_config = json.loads(args.gates.read_text(encoding="utf-8"))
+        gate_config = json.loads(read_utf8_text_limited(args.gates))
         comparison["quantization_gate"] = assess_q4_release(
             baseline,
             candidate,
@@ -336,11 +336,9 @@ def command_registry(args: argparse.Namespace) -> int:
     elif args.registry_action == "add":
         if not args.manifest_id or not args.evaluation or not args.training_report:
             raise ValueError("registry add requires manifest id, evaluation, and training report")
-        evaluation = EvaluationReport.model_validate_json(
-            args.evaluation.read_text(encoding="utf-8")
-        )
+        evaluation = EvaluationReport.model_validate_json(read_utf8_text_limited(args.evaluation))
         training = TrainingReportAttestation.model_validate_json(
-            args.training_report.read_text(encoding="utf-8")
+            read_utf8_text_limited(args.training_report)
         )
         training_config = TrainingConfig.model_validate(training.config)
         if training_config.prompt_version != evaluation.prompt_version:
@@ -365,7 +363,7 @@ def command_registry(args: argparse.Namespace) -> int:
                 "training data directory must remain inside the project root"
             ) from error
         dataset_manifest_path = data_dir / "manifest.json"
-        dataset_manifest = json.loads(dataset_manifest_path.read_text(encoding="utf-8"))
+        dataset_manifest = json.loads(read_utf8_text_limited(dataset_manifest_path))
         if dataset_manifest.get("dataset_manifest_sha256") != training.dataset_manifest_sha256:
             raise ValueError("training report does not match the local dataset manifest")
         if args.registry_quantization != evaluation.quantization:
@@ -437,9 +435,7 @@ def command_registry(args: argparse.Namespace) -> int:
     elif args.registry_action == "attest":
         if not args.manifest_id or not args.evaluation:
             raise ValueError("registry attest requires manifest id and evaluation")
-        evaluation = EvaluationReport.model_validate_json(
-            args.evaluation.read_text(encoding="utf-8")
-        )
+        evaluation = EvaluationReport.model_validate_json(read_utf8_text_limited(args.evaluation))
         attested_report_path = args.evaluation.resolve().relative_to(PROJECT_ROOT).as_posix()
         state = registry.attest_evaluation(
             args.manifest_id,
@@ -461,7 +457,7 @@ def command_registry(args: argparse.Namespace) -> int:
         release_passed: bool | None = None
         if args.evaluation:
             evaluation = EvaluationReport.model_validate_json(
-                args.evaluation.read_text(encoding="utf-8")
+                read_utf8_text_limited(args.evaluation)
             )
             registry.validate_evaluation(args.manifest_id, evaluation)
             evaluation_report = args.evaluation.resolve().relative_to(PROJECT_ROOT).as_posix()

@@ -9,6 +9,8 @@ from pathlib import Path
 from time import monotonic, sleep
 from typing import BinaryIO, Protocol, cast
 
+MAX_CONTROL_FILE_BYTES = 16 * 1024 * 1024
+
 
 class _FcntlModule(Protocol):
     LOCK_EX: int
@@ -86,3 +88,21 @@ def atomic_write_text(
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def read_utf8_text_limited(
+    path: Path,
+    *,
+    max_bytes: int = MAX_CONTROL_FILE_BYTES,
+) -> str:
+    """Read a control-plane text file without allowing unbounded allocation."""
+    if max_bytes <= 0:
+        raise ValueError("file size limit must be positive")
+    with path.open("rb") as handle:
+        content = handle.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise ValueError(f"file exceeds {max_bytes}-byte limit: {path.name}")
+    try:
+        return content.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError(f"file is not valid UTF-8: {path.name}") from error
