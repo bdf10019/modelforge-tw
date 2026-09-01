@@ -1,16 +1,28 @@
 from __future__ import annotations
 
 import json
+from typing import Literal
 
 from modelforge_tw.schemas import TriageOutput, TriageRequest
 
-MINIMAL_PROMPT_VERSION = "minimal-v1"
-OPTIMIZED_PROMPT_VERSION = "optimized-v1"
-OPTIMIZED_PROMPT_V2_VERSION = "optimized-v2"
-OPTIMIZED_PROMPT_V3_VERSION = "optimized-v3"
-OPTIMIZED_PROMPT_V4_VERSION = "optimized-v4"
-OPTIMIZED_PROMPT_V5_VERSION = "optimized-v5"
-OPTIMIZED_PROMPT_V6_VERSION = "optimized-v6"
+OptimizedPromptVersion = Literal[
+    "optimized-v1",
+    "optimized-v2",
+    "optimized-v3",
+    "optimized-v4",
+    "optimized-v5",
+    "optimized-v6",
+]
+PromptVersion = Literal["minimal-v1"] | OptimizedPromptVersion
+
+MINIMAL_PROMPT_VERSION: PromptVersion = "minimal-v1"
+OPTIMIZED_PROMPT_VERSION: OptimizedPromptVersion = "optimized-v1"
+OPTIMIZED_PROMPT_V2_VERSION: OptimizedPromptVersion = "optimized-v2"
+OPTIMIZED_PROMPT_V3_VERSION: OptimizedPromptVersion = "optimized-v3"
+OPTIMIZED_PROMPT_V4_VERSION: OptimizedPromptVersion = "optimized-v4"
+OPTIMIZED_PROMPT_V5_VERSION: OptimizedPromptVersion = "optimized-v5"
+OPTIMIZED_PROMPT_V6_VERSION: OptimizedPromptVersion = "optimized-v6"
+DEFAULT_PROMPT_VERSION: OptimizedPromptVersion = OPTIMIZED_PROMPT_V2_VERSION
 
 
 def _input_payload(request: TriageRequest) -> str:
@@ -163,7 +175,7 @@ def training_messages(
     record_input: TriageRequest,
     target: TriageOutput,
     *,
-    prompt_version: str = OPTIMIZED_PROMPT_VERSION,
+    prompt_version: PromptVersion = DEFAULT_PROMPT_VERSION,
 ) -> list[dict[str, str]]:
     messages = messages_for_version(record_input, prompt_version)
     messages.append(
@@ -175,7 +187,7 @@ def training_messages(
     return messages
 
 
-def messages_for_version(request: TriageRequest, version: str) -> list[dict[str, str]]:
+def messages_for_version(request: TriageRequest, version: PromptVersion) -> list[dict[str, str]]:
     if version == MINIMAL_PROMPT_VERSION:
         return minimal_messages(request)
     if version == OPTIMIZED_PROMPT_VERSION:

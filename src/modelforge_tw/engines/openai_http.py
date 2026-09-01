@@ -8,7 +8,8 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from modelforge_tw.prompts import messages_for_version
+from modelforge_tw.model_identity import DEFAULT_MAX_NEW_TOKENS
+from modelforge_tw.prompts import PromptVersion, messages_for_version
 from modelforge_tw.safety import (
     SAFETY_POLICY_VERSION,
     SafetyPolicyVersion,
@@ -111,9 +112,9 @@ class OpenAIHTTPInferenceEngine:
         model_id: str,
         model_version: str,
         quantization: str,
-        prompt_version: str,
+        prompt_version: PromptVersion,
         timeout_seconds: float = 60,
-        max_tokens: int = 256,
+        max_tokens: int = DEFAULT_MAX_NEW_TOKENS,
         context_window_tokens: int = 2048,
         max_response_bytes: int = DEFAULT_MAX_MODEL_RESPONSE_BYTES,
         safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,

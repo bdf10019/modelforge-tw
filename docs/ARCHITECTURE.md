@@ -41,6 +41,8 @@ Web / REST / OpenAI-compatible client
   正式發布另要求至少一個已雜湊模型 artifact，不能發布只有 metadata 的空候選。
   訓練、評測、合併、載入探針與 Transformers 服務共用同一個已驗證 base-model commit 預設；
   revision 必須是 40–64 位 lowercase commit hash，`main`／tag 會在匯入大型 ML runtime 前 fail fast。
+  未指定時的實測評估與訓練也統一使用現行 attestation 的 `optimized-v2`／192-token 生成契約；歷史
+  A/B 實驗的 v1 標記只保留在既有證據與顯式選擇中。
 - `registry.py`：candidate、evaluation attestation、promote、previous-good 與 rollback 的原子檔案
   registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住評測資料 hash、引擎、
   模型 identity、evidence kind、生成、安全與評分契約。新候選缺少任一 attestation 欄位都不能

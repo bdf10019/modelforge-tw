@@ -25,6 +25,10 @@ def test_service_rejects_floating_model_revision():
 
 def test_service_defaults_to_attested_safety_policy_v2():
     assert Settings().safety_policy_version == "risk-precedence-v2"
+    assert Settings().prompt_version == "optimized-v2"
+    assert Settings().max_new_tokens == 192
+    with pytest.raises(ValueError, match="prompt_version"):
+        Settings(prompt_version="unknown-v1")
 
 
 def test_registry_deployment_binding_is_optional():

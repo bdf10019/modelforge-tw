@@ -86,6 +86,18 @@ def test_model_response_limit_rejects_unsafe_configuration():
         make_engine(max_response_bytes=4194305)
 
 
+def test_model_server_defaults_to_attested_generation_budget():
+    engine = OpenAIHTTPInferenceEngine(
+        base_url="http://model.test",
+        model_id="model-q8",
+        model_version="v5",
+        quantization="q8_0",
+        prompt_version="optimized-v2",
+    )
+
+    assert engine.max_tokens == 192
+
+
 def test_ready_is_fail_closed_for_status_and_connection_errors(monkeypatch):
     engine = make_engine()
 

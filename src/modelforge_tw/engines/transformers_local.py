@@ -7,9 +7,10 @@ from typing import Any, Literal
 
 from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_REVISION,
+    DEFAULT_MAX_NEW_TOKENS,
     validate_immutable_model_revision,
 )
-from modelforge_tw.prompts import messages_for_version
+from modelforge_tw.prompts import DEFAULT_PROMPT_VERSION, PromptVersion, messages_for_version
 from modelforge_tw.safety import (
     SAFETY_POLICY_VERSION,
     SafetyPolicyVersion,
@@ -28,11 +29,11 @@ class TransformersInferenceEngine:
         *,
         model_id: str,
         adapter_path: str | None,
-        prompt_version: str,
+        prompt_version: PromptVersion,
         model_revision: str = DEFAULT_BASE_MODEL_REVISION,
         load_in_4bit: bool = False,
         model_version: str = "unversioned",
-        max_new_tokens: int = 256,
+        max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
         safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,
     ) -> None:
         validate_immutable_model_revision(model_revision)
@@ -197,7 +198,7 @@ def model_load_probe(
         model_id=model_id,
         model_revision=model_revision,
         adapter_path=None,
-        prompt_version="optimized-v1",
+        prompt_version=DEFAULT_PROMPT_VERSION,
         load_in_4bit=load_in_4bit,
     )
     load_seconds = time.perf_counter() - started

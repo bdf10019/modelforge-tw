@@ -1,5 +1,6 @@
 from typing import Literal, Protocol
 
+from modelforge_tw.prompts import PromptVersion
 from modelforge_tw.safety import SafetyPolicyVersion
 from modelforge_tw.schemas import InferenceResult, TriageRequest
 
@@ -9,7 +10,7 @@ class InferenceEngine(Protocol):
     model_id: str
     model_version: str
     quantization: str
-    prompt_version: str
+    prompt_version: PromptVersion
     max_new_tokens: int | None
     structured_output_contract: str
     safety_policy_version: SafetyPolicyVersion

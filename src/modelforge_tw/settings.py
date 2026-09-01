@@ -4,7 +4,12 @@ from typing import Literal
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from modelforge_tw.model_identity import DEFAULT_BASE_MODEL_ID, DEFAULT_BASE_MODEL_REVISION
+from modelforge_tw.model_identity import (
+    DEFAULT_BASE_MODEL_ID,
+    DEFAULT_BASE_MODEL_REVISION,
+    DEFAULT_MAX_NEW_TOKENS,
+)
+from modelforge_tw.prompts import DEFAULT_PROMPT_VERSION, PromptVersion
 from modelforge_tw.safety import SAFETY_POLICY_VERSION, SafetyPolicyVersion
 
 
@@ -21,10 +26,10 @@ class Settings(BaseSettings):
     model_revision: str = Field(default=DEFAULT_BASE_MODEL_REVISION, pattern=r"^[a-f0-9]{40,64}$")
     model_version: str = "qwen3-1.7b-qlora-v5"
     quantization: str = "bnb-nf4"
-    prompt_version: str = "optimized-v2"
+    prompt_version: PromptVersion = DEFAULT_PROMPT_VERSION
     adapter_path: str | None = None
     load_in_4bit: bool = True
-    max_new_tokens: int = Field(default=192, ge=32, le=512)
+    max_new_tokens: int = Field(default=DEFAULT_MAX_NEW_TOKENS, ge=32, le=512)
     context_window_tokens: int = Field(default=2048, ge=1536, le=131072)
     safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION
     llama_base_url: str = "http://127.0.0.1:8081"

@@ -20,7 +20,12 @@ from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_REVISION,
     validate_immutable_model_revision,
 )
-from modelforge_tw.prompts import messages_for_version, training_messages
+from modelforge_tw.prompts import (
+    DEFAULT_PROMPT_VERSION,
+    OptimizedPromptVersion,
+    messages_for_version,
+    training_messages,
+)
 
 TRAINING_DEPENDENCIES = (
     "accelerate",
@@ -61,14 +66,7 @@ class TrainingConfig(BaseModel):
     save_steps: int = Field(default=25, ge=1)
     save_total_limit: int = Field(default=2, ge=1, le=10)
     resume_from_checkpoint: bool = True
-    prompt_version: Literal[
-        "optimized-v1",
-        "optimized-v2",
-        "optimized-v3",
-        "optimized-v4",
-        "optimized-v5",
-        "optimized-v6",
-    ] = "optimized-v1"
+    prompt_version: OptimizedPromptVersion = DEFAULT_PROMPT_VERSION
 
 
 class TrainingReportAttestation(BaseModel):

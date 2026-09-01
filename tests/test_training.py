@@ -6,7 +6,8 @@ from modelforge_tw.engines.transformers_local import (
     TransformersInferenceEngine,
     model_load_probe,
 )
-from modelforge_tw.model_identity import DEFAULT_BASE_MODEL_REVISION
+from modelforge_tw.model_identity import DEFAULT_BASE_MODEL_REVISION, DEFAULT_MAX_NEW_TOKENS
+from modelforge_tw.prompts import DEFAULT_PROMPT_VERSION
 from modelforge_tw.training import (
     TRAINING_DEPENDENCIES,
     TrainingConfig,
@@ -32,13 +33,18 @@ def test_model_workflows_default_to_one_immutable_base_revision(tmp_path):
 
     assert TrainingConfig().model_revision == DEFAULT_BASE_MODEL_REVISION
     assert evaluate.model_revision == DEFAULT_BASE_MODEL_REVISION
+    assert evaluate.prompt_version == DEFAULT_PROMPT_VERSION
+    assert evaluate.max_new_tokens == DEFAULT_MAX_NEW_TOKENS
     assert merge.model_revision == DEFAULT_BASE_MODEL_REVISION
     assert probe.model_revision == DEFAULT_BASE_MODEL_REVISION
+    assert TrainingConfig().prompt_version == DEFAULT_PROMPT_VERSION
 
 
 def test_training_config_rejects_floating_model_revision():
     with pytest.raises(ValidationError, match="model_revision"):
         TrainingConfig(model_revision="main")
+    with pytest.raises(ValidationError, match="prompt_version"):
+        TrainingConfig(prompt_version="minimal-v1")
 
 
 def test_cli_rejects_floating_model_revision():

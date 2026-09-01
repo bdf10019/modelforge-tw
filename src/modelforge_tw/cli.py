@@ -28,9 +28,11 @@ from modelforge_tw.io_utils import (
 from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_ID,
     DEFAULT_BASE_MODEL_REVISION,
+    DEFAULT_MAX_NEW_TOKENS,
     validate_immutable_model_revision,
 )
 from modelforge_tw.prompts import (
+    DEFAULT_PROMPT_VERSION,
     MINIMAL_PROMPT_VERSION,
     OPTIMIZED_PROMPT_V2_VERSION,
     OPTIMIZED_PROMPT_V3_VERSION,
@@ -606,11 +608,11 @@ def build_parser() -> argparse.ArgumentParser:
                 OPTIMIZED_PROMPT_V5_VERSION,
                 OPTIMIZED_PROMPT_V6_VERSION,
             ],
-            default=OPTIMIZED_PROMPT_VERSION,
+            default=DEFAULT_PROMPT_VERSION,
         )
         command.add_argument("--adapter", type=Path)
         command.add_argument("--load-in-4bit", action="store_true")
-        command.add_argument("--max-new-tokens", type=int, default=256)
+        command.add_argument("--max-new-tokens", type=int, default=DEFAULT_MAX_NEW_TOKENS)
         command.add_argument("--context-window-tokens", type=int, default=2048)
         command.add_argument("--max-model-response-bytes", type=int, default=262144)
         command.add_argument(
