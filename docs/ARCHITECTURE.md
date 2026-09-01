@@ -40,7 +40,10 @@ Web / REST / OpenAI-compatible client
   模型 identity、evidence kind、生成、安全與評分契約。新候選缺少任一 attestation 欄位都不能
   加入；舊 manifest 缺少 identity 時只能讀取或沿用既有狀態，不能拿新版報告重新 attestation。
   評測報告與 artifact 只接受 canonical POSIX-style 相對路徑，絕對路徑、反斜線及 `..` 穿越會在
-  讀取或寫入 registry 時拒絕；promote／rollback 仍會解析實體路徑並再次確認未逃出 artifact root。
+  讀取或寫入 registry 時拒絕；新 promote 會重新要求完整 attestation 且只接受 measured evidence，
+  並解析實體路徑再次確認未逃出 artifact root。fixture 可驗證機制但不能成為正式發布。rollback
+  同樣採此規則；唯一相容例外是 schema 1.0 中五個新版 identity 欄位全部不存在、且早已被指定為
+  previous-good 的既有狀態，避免安全升級反而切斷已驗證的舊回退路徑；部分遷移的資料不放行。
 
 OpenAI-compatible HTTP adapter 使用 strict JSON Schema：八個輸出欄位皆 required，分類、動作與
 reason code 使用有限允許清單。此約束在生成前套用；線上 bounded repair 與 fail-closed fallback

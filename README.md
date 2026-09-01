@@ -52,7 +52,7 @@ modelforge serve
 ```
 
 開啟 `http://127.0.0.1:8000`；OpenAPI 位於 `http://127.0.0.1:8000/docs`。fixture 僅驗證資料、
-API、安全 gate、評測與 registry 流程，其數字不代表 LLM 品質。
+API、安全 gate、評測與 registry 機制，其數字不代表 LLM 品質，也不能被 registry 正式發布。
 
 ## 真實模型流程
 

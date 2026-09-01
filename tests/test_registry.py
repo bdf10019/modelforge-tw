@@ -28,7 +28,7 @@ def manifest(manifest_id: str, passed: bool = True) -> ModelManifest:
         evaluation_engine="fixture",
         evaluation_model_id="fixture",
         evaluation_model_version="1",
-        evaluation_evidence_kind="fixture",
+        evaluation_evidence_kind="measured",
         evaluation_report="outputs/evaluation.json",
         release_passed=passed,
     )
@@ -123,7 +123,7 @@ def test_registry_rejects_mismatched_evaluation_metadata(tmp_path):
         model_version="1",
         quantization="q4_k_m",
         prompt_version="optimized-v1",
-        evidence_kind="fixture",
+        evidence_kind="measured",
         dataset_manifest_sha256=HASH,
         release_gate_sha256=HASH,
         case_count=0,
@@ -147,7 +147,7 @@ def test_registry_rejects_evaluation_from_a_different_dataset(tmp_path):
         model_version="1",
         quantization="none",
         prompt_version="optimized-v1",
-        evidence_kind="fixture",
+        evidence_kind="measured",
         dataset_manifest_sha256=hashlib.sha256(b"different-dataset").hexdigest(),
         case_count=0,
         metrics={},
@@ -173,6 +173,63 @@ def test_registry_rejects_new_manifest_without_evaluation_attestation(tmp_path):
     )
     with pytest.raises(ValueError, match="manifest lacks evaluation attestation"):
         registry.add(incomplete)
+
+
+def test_registry_never_promotes_fixture_evidence(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    fixture_candidate = manifest("fixture-only").model_copy(
+        update={"evaluation_evidence_kind": "fixture"}
+    )
+    registry.add(fixture_candidate)
+
+    with pytest.raises(ValueError, match="only measured evaluation evidence"):
+        registry.promote("fixture-only")
+
+    state = registry.load()
+    assert state.released is None
+    assert state.manifests["fixture-only"].status == "candidate"
+
+
+def test_registry_rechecks_attestation_before_promotion(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    state = registry.add(manifest("v1"))
+    state.manifests["v1"] = state.manifests["v1"].model_copy(
+        update={"evaluation_model_version": None}
+    )
+    registry.path.write_text(state.model_dump_json(indent=2), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="manifest lacks evaluation attestation"):
+        registry.promote("v1")
+    assert registry.load().released is None
+
+
+def test_registry_allows_only_fully_legacy_previous_good_on_schema_1_rollback(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    registry.add(manifest("v1"))
+    registry.promote("v1")
+    registry.add(manifest("v2"))
+    state = registry.promote("v2")
+    legacy_updates = {
+        "evaluation_dataset_sha256": None,
+        "evaluation_engine": None,
+        "evaluation_model_id": None,
+        "evaluation_model_version": None,
+        "evaluation_evidence_kind": None,
+    }
+    state.schema_version = "1.0"
+    state.manifests["v1"] = state.manifests["v1"].model_copy(update=legacy_updates)
+    registry.path.write_text(state.model_dump_json(indent=2), encoding="utf-8")
+
+    rolled_back = registry.rollback()
+    assert rolled_back.released == "v1"
+
+    partial_state = rolled_back.model_copy(update={"schema_version": "1.0"}, deep=True)
+    partial_state.manifests["v2"] = partial_state.manifests["v2"].model_copy(
+        update={**legacy_updates, "evaluation_engine": "fixture"}
+    )
+    registry.path.write_text(partial_state.model_dump_json(indent=2), encoding="utf-8")
+    with pytest.raises(ValueError, match="manifest lacks evaluation attestation"):
+        registry.rollback()
 
 
 def test_registry_rechecks_artifact_before_promotion(tmp_path):
@@ -212,7 +269,7 @@ def test_registry_attests_and_locks_evaluation_contract(tmp_path):
         structured_output_contract="json-schema-v2",
         safety_policy_version="risk-precedence-v2",
         evaluation_contract_version="release-metrics-v2",
-        evidence_kind="fixture",
+        evidence_kind="measured",
         dataset_manifest_sha256=HASH,
         release_gate_sha256=HASH,
         case_count=0,

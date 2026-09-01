@@ -133,6 +133,25 @@ class FileRegistry:
         if missing:
             raise ValueError("manifest lacks evaluation attestation: " + ", ".join(sorted(missing)))
 
+    @classmethod
+    def _require_releasable_evidence(cls, manifest: ModelManifest) -> None:
+        cls._require_evaluation_attestation(manifest)
+        if manifest.evaluation_evidence_kind != "measured":
+            raise ValueError("only measured evaluation evidence can be released")
+
+    @classmethod
+    def _require_rollback_evidence(cls, state: RegistryState, manifest: ModelManifest) -> None:
+        legacy_identity = (
+            manifest.evaluation_dataset_sha256,
+            manifest.evaluation_engine,
+            manifest.evaluation_model_id,
+            manifest.evaluation_model_version,
+            manifest.evaluation_evidence_kind,
+        )
+        if state.schema_version == "1.0" and all(value is None for value in legacy_identity):
+            return
+        cls._require_releasable_evidence(manifest)
+
     def _verify_artifacts(self, manifest: ModelManifest) -> None:
         if self.artifact_root is None:
             return
@@ -259,6 +278,7 @@ class FileRegistry:
         if manifest_id not in state.manifests:
             raise KeyError(f"manifest not found: {manifest_id}")
         candidate = state.manifests[manifest_id]
+        self._require_releasable_evidence(candidate)
         if not candidate.release_passed or candidate.status == "blocked":
             raise ValueError("candidate did not pass its release gates")
         self._verify_artifacts(candidate)
@@ -285,6 +305,7 @@ class FileRegistry:
         target = state.previous_good
         current = state.released
         target_manifest = state.manifests[target]
+        self._require_rollback_evidence(state, target_manifest)
         if not target_manifest.release_passed:
             raise ValueError("previous-good manifest no longer satisfies release metadata")
         self._verify_artifacts(target_manifest)
