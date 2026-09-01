@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+import modelforge_tw.io_utils as io_utils
 from modelforge_tw.io_utils import (
     atomic_write_text,
     exclusive_file_lock,
@@ -21,6 +22,17 @@ def test_atomic_write_replaces_complete_content_without_temp_files(tmp_path):
 
     assert target.read_text(encoding="utf-8") == "new\n"
     assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_atomic_write_requests_parent_directory_sync_after_replace(tmp_path, monkeypatch):
+    target = tmp_path / "report.json"
+    synced = []
+    monkeypatch.setattr(io_utils, "_fsync_parent_directory", synced.append)
+
+    atomic_write_text(target, "durable\n")
+
+    assert synced == [target]
+    assert target.read_text(encoding="utf-8") == "durable\n"
 
 
 def test_atomic_write_preserves_previous_file_when_replace_fails(tmp_path, monkeypatch):

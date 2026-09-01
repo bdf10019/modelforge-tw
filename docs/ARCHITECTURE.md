@@ -64,6 +64,8 @@ Web / REST / OpenAI-compatible client
 的唯一暫存檔，完成後再原子替換；Python 路徑會先 flush + fsync。中斷或 replace 失敗會保留上一份
 完整檔案並清掉暫存檔。Registry 的 read-modify-write 另外持有跨程序單寫者檔案鎖，避免並行的
 候選加入、attestation、promote、block 或 rollback 互相覆蓋；等候逾時會失敗而非冒險寫入。
+POSIX 在 replace 後另 fsync 父目錄，讓新 directory entry 也進入耐久邊界；Windows 沒有使用
+Python 不可攜的目錄 handle 技巧，仍採同目錄暫存檔加原子 replace。
 
 所有引擎的解析後 schema 都要求八個輸出欄位，並限制分類、動作與 reason code 為有限允許清單；
 OpenAI-compatible HTTP adapter 另用 strict JSON Schema 在生成前套用相同約束。線上 bounded repair

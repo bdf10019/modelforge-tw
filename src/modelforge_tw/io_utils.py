@@ -93,8 +93,20 @@ def atomic_write_text(
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
+        _fsync_parent_directory(path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def _fsync_parent_directory(path: Path) -> None:
+    if os.name == "nt":
+        return
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    descriptor = os.open(path.parent, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def read_utf8_text_limited(
