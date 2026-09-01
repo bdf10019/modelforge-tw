@@ -57,6 +57,45 @@ def test_registry_rejects_failed_or_unsafe_candidate(tmp_path):
         registry.add(manifest("../escape"))
 
 
+@pytest.mark.parametrize(
+    "unsafe_path",
+    [
+        "../evaluation.json",
+        "outputs/../evaluation.json",
+        "/tmp/evaluation.json",
+        "C:/outside/evaluation.json",
+        "outputs\\evaluation.json",
+    ],
+)
+def test_registry_rejects_unsafe_report_paths(unsafe_path: str):
+    manifest_data = manifest("unsafe-path").model_dump()
+    manifest_data["evaluation_report"] = unsafe_path
+    with pytest.raises(ValueError, match="canonical portable relative path"):
+        ModelManifest.model_validate(manifest_data)
+
+
+@pytest.mark.parametrize(
+    "unsafe_path",
+    ["../model.gguf", "/tmp/model.gguf", "C:/outside/model.gguf", "models\\model.gguf"],
+)
+def test_registry_rejects_unsafe_artifact_paths(unsafe_path: str):
+    with pytest.raises(ValueError, match="canonical portable relative path"):
+        ArtifactRef(kind="gguf", relative_path=unsafe_path, sha256=HASH, bytes=0)
+
+
+def test_registry_block_rejects_unsafe_report_path_without_mutation(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    registry.add(manifest("v1"))
+
+    with pytest.raises(ValueError, match="canonical portable relative path"):
+        registry.block("v1", evaluation_report="../outside.json", release_passed=False)
+
+    state = registry.load()
+    assert state.manifests["v1"].status == "candidate"
+    assert state.manifests["v1"].release_passed is True
+    assert state.events[-1]["action"] == "candidate_added"
+
+
 def test_registry_can_block_a_released_candidate(tmp_path):
     registry = FileRegistry(tmp_path / "registry.json")
     registry.add(manifest("v1"))
@@ -183,6 +222,10 @@ def test_registry_attests_and_locks_evaluation_contract(tmp_path):
         latency_ms={},
         cases=[],
     )
+    with pytest.raises(ValueError, match="canonical portable relative path"):
+        registry.attest_evaluation("v1", evaluation_report="../outside.json", evaluation=report)
+    assert registry.load().manifests["v1"].evaluation_report == "outputs/evaluation.json"
+
     state = registry.attest_evaluation(
         "v1", evaluation_report="outputs/attested.json", evaluation=report
     )

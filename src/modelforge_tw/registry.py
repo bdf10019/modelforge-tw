@@ -5,14 +5,31 @@ import os
 import re
 from datetime import UTC, datetime
 from hashlib import sha256
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from modelforge_tw.schemas import EvaluationReport
 
 SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
+
+
+def _validate_portable_relative_path(value: str) -> str:
+    parts = value.split("/")
+    windows_path = PureWindowsPath(value)
+    if (
+        not value
+        or value != value.strip()
+        or "\\" in value
+        or any(ord(character) < 32 for character in value)
+        or PurePosixPath(value).is_absolute()
+        or windows_path.is_absolute()
+        or bool(windows_path.drive)
+        or any(part in {"", ".", ".."} for part in parts)
+    ):
+        raise ValueError("path must be a canonical portable relative path")
+    return value
 
 
 class ArtifactRef(BaseModel):
@@ -22,6 +39,11 @@ class ArtifactRef(BaseModel):
     relative_path: str
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     bytes: int = Field(ge=0)
+
+    @field_validator("relative_path")
+    @classmethod
+    def relative_path_is_safe(cls, value: str) -> str:
+        return _validate_portable_relative_path(value)
 
 
 class ModelManifest(BaseModel):
@@ -51,6 +73,11 @@ class ModelManifest(BaseModel):
     release_passed: bool
     artifacts: list[ArtifactRef] = Field(default_factory=list)
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+    @field_validator("evaluation_report")
+    @classmethod
+    def evaluation_report_is_safe(cls, value: str) -> str:
+        return _validate_portable_relative_path(value)
 
 
 class RegistryState(BaseModel):
@@ -176,6 +203,7 @@ class FileRegistry:
         evaluation_report: str,
         evaluation: EvaluationReport,
     ) -> RegistryState:
+        evaluation_report = _validate_portable_relative_path(evaluation_report)
         self.validate_evaluation(manifest_id, evaluation)
         required_contract = {
             "max_new_tokens": evaluation.max_new_tokens,
@@ -285,6 +313,8 @@ class FileRegistry:
         release_passed: bool | None = None,
     ) -> RegistryState:
         self._validate_id(manifest_id)
+        if evaluation_report is not None:
+            evaluation_report = _validate_portable_relative_path(evaluation_report)
         state = self.load()
         if manifest_id not in state.manifests:
             raise KeyError(f"manifest not found: {manifest_id}")
