@@ -5,6 +5,10 @@ import time
 from pathlib import Path
 from typing import Any, Literal
 
+from modelforge_tw.model_identity import (
+    DEFAULT_BASE_MODEL_REVISION,
+    validate_immutable_model_revision,
+)
 from modelforge_tw.prompts import messages_for_version
 from modelforge_tw.safety import (
     SAFETY_POLICY_VERSION,
@@ -25,12 +29,13 @@ class TransformersInferenceEngine:
         model_id: str,
         adapter_path: str | None,
         prompt_version: str,
-        model_revision: str = "main",
+        model_revision: str = DEFAULT_BASE_MODEL_REVISION,
         load_in_4bit: bool = False,
         model_version: str = "unversioned",
         max_new_tokens: int = 256,
         safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,
     ) -> None:
+        validate_immutable_model_revision(model_revision)
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
@@ -177,13 +182,20 @@ class TransformersInferenceEngine:
         )
 
 
-def model_load_probe(model_id: str, *, load_in_4bit: bool) -> dict[str, Any]:
+def model_load_probe(
+    model_id: str,
+    *,
+    model_revision: str = DEFAULT_BASE_MODEL_REVISION,
+    load_in_4bit: bool,
+) -> dict[str, Any]:
+    validate_immutable_model_revision(model_revision)
     import torch
 
     before = torch.cuda.memory_allocated() if torch.cuda.is_available() else 0
     started = time.perf_counter()
     engine = TransformersInferenceEngine(
         model_id=model_id,
+        model_revision=model_revision,
         adapter_path=None,
         prompt_version="optimized-v1",
         load_in_4bit=load_in_4bit,
@@ -192,6 +204,7 @@ def model_load_probe(model_id: str, *, load_in_4bit: bool) -> dict[str, Any]:
     after = torch.cuda.memory_allocated() if torch.cuda.is_available() else 0
     return {
         "model_id": model_id,
+        "model_revision": model_revision,
         "quantization": engine.quantization,
         "load_seconds": round(load_seconds, 4),
         "cuda_available": torch.cuda.is_available(),

@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from modelforge_tw.model_identity import DEFAULT_BASE_MODEL_ID, DEFAULT_BASE_MODEL_REVISION
 from modelforge_tw.safety import SAFETY_POLICY_VERSION, SafetyPolicyVersion
 
 
@@ -16,8 +17,8 @@ class Settings(BaseSettings):
     )
 
     engine: str = "fixture"
-    model_id: str = "Qwen/Qwen3-1.7B"
-    model_revision: str = "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
+    model_id: str = DEFAULT_BASE_MODEL_ID
+    model_revision: str = Field(default=DEFAULT_BASE_MODEL_REVISION, pattern=r"^[a-f0-9]{40,64}$")
     model_version: str = "qwen3-1.7b-qlora-v5"
     quantization: str = "bnb-nf4"
     prompt_version: str = "optimized-v2"

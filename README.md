@@ -75,6 +75,9 @@ API、安全 gate、評測與 registry 機制，其數字不代表 LLM 品質，
 
 ## 真實模型流程
 
+所有 base-model 操作預設鎖定同一個已驗證的 Hugging Face commit；CLI 不接受 `main` 或浮動 tag。
+`probe-model` 也有明確 `--model-revision`，因此下載探針、訓練、評測、merge 與服務不會各自漂移。
+
 ```powershell
 .\scripts\bootstrap.ps1 -Profile ml -DownloadModel
 .\scripts\train.ps1

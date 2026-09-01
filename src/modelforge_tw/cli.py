@@ -25,6 +25,11 @@ from modelforge_tw.io_utils import (
     iter_utf8_lines_limited,
     read_utf8_text_limited,
 )
+from modelforge_tw.model_identity import (
+    DEFAULT_BASE_MODEL_ID,
+    DEFAULT_BASE_MODEL_REVISION,
+    validate_immutable_model_revision,
+)
 from modelforge_tw.prompts import (
     MINIMAL_PROMPT_VERSION,
     OPTIMIZED_PROMPT_V2_VERSION,
@@ -515,7 +520,11 @@ def command_merge(args: argparse.Namespace) -> int:
 def command_probe_model(args: argparse.Namespace) -> int:
     from modelforge_tw.engines.transformers_local import model_load_probe
 
-    report = model_load_probe(args.model_id, load_in_4bit=args.load_in_4bit)
+    report = model_load_probe(
+        args.model_id,
+        model_revision=args.model_revision,
+        load_in_4bit=args.load_in_4bit,
+    )
     atomic_write_text(
         args.output,
         json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -577,8 +586,12 @@ def build_parser() -> argparse.ArgumentParser:
             default="fixture-adapted",
         )
         command.add_argument("--base-url", default="http://127.0.0.1:8081")
-        command.add_argument("--model-id", default="Qwen3-1.7B")
-        command.add_argument("--model-revision", default="main")
+        command.add_argument("--model-id", default=DEFAULT_BASE_MODEL_ID)
+        command.add_argument(
+            "--model-revision",
+            type=validate_immutable_model_revision,
+            default=DEFAULT_BASE_MODEL_REVISION,
+        )
         command.add_argument("--model-version", default="unversioned")
         command.add_argument("--quantization", default="unknown")
         command.add_argument("--timeout", type=float, default=60)
@@ -684,14 +697,23 @@ def build_parser() -> argparse.ArgumentParser:
     train.set_defaults(func=command_train)
 
     merge = subparsers.add_parser("merge")
-    merge.add_argument("--model-id", default="Qwen/Qwen3-1.7B")
-    merge.add_argument("--model-revision", default="main")
+    merge.add_argument("--model-id", default=DEFAULT_BASE_MODEL_ID)
+    merge.add_argument(
+        "--model-revision",
+        type=validate_immutable_model_revision,
+        default=DEFAULT_BASE_MODEL_REVISION,
+    )
     merge.add_argument("--adapter", type=Path, required=True)
     merge.add_argument("--output", type=Path, required=True)
     merge.set_defaults(func=command_merge)
 
     probe = subparsers.add_parser("probe-model")
-    probe.add_argument("--model-id", default="Qwen/Qwen3-1.7B")
+    probe.add_argument("--model-id", default=DEFAULT_BASE_MODEL_ID)
+    probe.add_argument(
+        "--model-revision",
+        type=validate_immutable_model_revision,
+        default=DEFAULT_BASE_MODEL_REVISION,
+    )
     probe.add_argument("--load-in-4bit", action="store_true")
     probe.add_argument(
         "--output", type=Path, default=PROJECT_ROOT / "outputs" / "model-load-probe.json"

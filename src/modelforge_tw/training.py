@@ -15,6 +15,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from modelforge_tw.dataset import load_splits, sha256_file
 from modelforge_tw.io_utils import atomic_write_text, read_utf8_text_limited
+from modelforge_tw.model_identity import (
+    DEFAULT_BASE_MODEL_ID,
+    DEFAULT_BASE_MODEL_REVISION,
+    validate_immutable_model_revision,
+)
 from modelforge_tw.prompts import messages_for_version, training_messages
 
 TRAINING_DEPENDENCIES = (
@@ -31,8 +36,11 @@ TRAINING_DEPENDENCIES = (
 class TrainingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    model_id: str = "Qwen/Qwen3-1.7B"
-    model_revision: str = "main"
+    model_id: str = DEFAULT_BASE_MODEL_ID
+    model_revision: str = Field(
+        default=DEFAULT_BASE_MODEL_REVISION,
+        pattern=r"^[a-f0-9]{40,64}$",
+    )
     output_dir: Path = Path("artifacts/qwen3-1.7b-triage-lora")
     data_dir: Path = Path("data/generated")
     seed: int = 42
@@ -71,7 +79,7 @@ class TrainingReportAttestation(BaseModel):
     schema_version: Literal["1.0", "1.1"]
     evidence_kind: Literal["measured"]
     model_id: str = Field(min_length=1, max_length=256)
-    model_revision: str = Field(min_length=1, max_length=256)
+    model_revision: str = Field(pattern=r"^[a-f0-9]{40,64}$")
     resolved_model_revision: str = Field(pattern=r"^[a-f0-9]{40,64}$")
     config: dict[str, Any]
     training_config_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -377,8 +385,13 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
 
 
 def merge_adapter(
-    *, model_id: str, adapter_path: Path, output_dir: Path, model_revision: str = "main"
+    *,
+    model_id: str,
+    adapter_path: Path,
+    output_dir: Path,
+    model_revision: str = DEFAULT_BASE_MODEL_REVISION,
 ) -> dict[str, Any]:
+    validate_immutable_model_revision(model_revision)
     import torch
     from peft import PeftModel
     from transformers import AutoModelForCausalLM, AutoTokenizer
