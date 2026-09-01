@@ -43,6 +43,60 @@ def test_all_deployment_yaml_is_syntactically_valid():
         assert documents and all(document is not None for document in documents)
 
 
+def test_compose_baseline_is_non_privileged_and_does_not_log_inputs():
+    compose = yaml.safe_load((PROJECT_ROOT / "compose.yaml").read_text("utf-8"))
+    api = compose["services"]["api"]
+    assert api["environment"]["MODELFORGE_LOG_INPUTS"] == "false"
+    assert api["read_only"] is True
+    assert "/tmp" in api["tmpfs"]
+    assert "no-new-privileges:true" in api["security_opt"]
+    assert api["ports"] == ["8000:8000"]
+
+
+def test_kubernetes_runtime_security_and_probe_contracts():
+    documents = list(
+        yaml.safe_load_all((PROJECT_ROOT / "infra" / "k8s" / "app.yaml").read_text("utf-8"))
+    )
+    deployments = {
+        item["metadata"]["name"]: item for item in documents if item["kind"] == "Deployment"
+    }
+    model = deployments["llama-server"]["spec"]["template"]["spec"]["containers"][0]
+    api_pod = deployments["modelforge-api"]["spec"]["template"]["spec"]
+    api = api_pod["containers"][0]
+
+    assert model["readinessProbe"]["httpGet"]["path"] == "/health"
+    assert model["livenessProbe"]["httpGet"]["path"] == "/health"
+    assert model["securityContext"]["allowPrivilegeEscalation"] is False
+    assert model["securityContext"]["readOnlyRootFilesystem"] is True
+    assert model["securityContext"]["capabilities"]["drop"] == ["ALL"]
+    assert api_pod["securityContext"]["runAsNonRoot"] is True
+    assert api["readinessProbe"]["httpGet"]["path"] == "/readyz"
+    assert api["livenessProbe"]["httpGet"]["path"] == "/healthz"
+    assert api["securityContext"]["allowPrivilegeEscalation"] is False
+    assert api["securityContext"]["readOnlyRootFilesystem"] is True
+    assert api["securityContext"]["capabilities"]["drop"] == ["ALL"]
+
+
+def test_training_job_is_fail_closed_and_requests_one_gpu():
+    job = yaml.safe_load((PROJECT_ROOT / "infra" / "k8s" / "training-job.yaml").read_text("utf-8"))
+    pod = job["spec"]["template"]["spec"]
+    trainer = pod["containers"][0]
+    assert job["spec"]["backoffLimit"] == 0
+    assert pod["restartPolicy"] == "Never"
+    assert trainer["resources"]["requests"]["nvidia.com/gpu"] == "1"
+    assert trainer["resources"]["limits"]["nvidia.com/gpu"] == "1"
+    assert "configs/training.json" in trainer["args"][0]
+
+
+def test_container_files_run_as_non_root_and_disable_input_logging():
+    cpu = (PROJECT_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    gpu = (PROJECT_ROOT / "Dockerfile.gpu").read_text(encoding="utf-8")
+    for dockerfile in (cpu, gpu):
+        assert "USER appuser" in dockerfile
+        assert "MODELFORGE_LOG_INPUTS=false" in dockerfile
+        assert '"modelforge", "serve"' in dockerfile
+
+
 def test_local_llama_launcher_has_measured_context_capacity_guard():
     script = (PROJECT_ROOT / "scripts" / "serve-gguf.ps1").read_text(encoding="utf-8")
     assert "[int]$ContextSize = 8192" in script

@@ -29,3 +29,7 @@ kubectl apply --dry-run=server -f infra/k8s/training-job.yaml
 起始值。baseline 使用 8192 total context／4 parallel slots，API 宣告每 slot 2048；這是外部校準
 發現 1024-token slot 截斷後的修正。正式環境仍必須依實際節點、prompt 長度、context size、
 parallel slots 與壓測結果調整。
+
+沒有容器／叢集 runtime 時，repository 測試只驗證 YAML、image／port／probe 對應、非 root、
+read-only root filesystem、capability drop、GPU request/limit 與 training fail-closed 設定；這些是
+靜態部署契約，不等同 image build、admission、排程、GPU device plugin 或線上流量實測。
