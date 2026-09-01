@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from modelforge_tw.engines import FixtureEngine
+from modelforge_tw.registry import ArtifactRef, FileRegistry, ModelManifest
 from modelforge_tw.service import create_app
 from modelforge_tw.settings import Settings
 
@@ -18,6 +19,10 @@ def test_settings_reject_context_capacity_below_measured_minimum():
 
 def test_service_defaults_to_attested_safety_policy_v2():
     assert Settings().safety_policy_version == "risk-precedence-v2"
+
+
+def test_registry_deployment_binding_is_optional():
+    assert Settings(registry_deployment_role="").registry_deployment_role is None
 
 
 def test_service_refuses_input_logging_configuration():
@@ -54,6 +59,48 @@ async def app_client(app):
             yield client
 
 
+def write_runtime_registry(path, engine):
+    digest = "a" * 64
+    registry = FileRegistry(path)
+    registry.add(
+        ModelManifest(
+            manifest_id="measured-v1",
+            base_model="base-model",
+            base_revision=digest,
+            license="MIT",
+            prompt_version=engine.prompt_version,
+            dataset_manifest_sha256=digest,
+            training_config_sha256=digest,
+            release_gate_sha256=digest,
+            engine="model-server-build",
+            quantization=engine.quantization,
+            max_new_tokens=engine.max_new_tokens,
+            structured_output_contract=engine.structured_output_contract,
+            safety_policy_version=engine.safety_policy_version,
+            evaluation_contract_version="release-metrics-v2",
+            evaluation_dataset_sha256=digest,
+            evaluation_engine=engine.name,
+            evaluation_model_id=engine.model_id,
+            evaluation_model_version=engine.model_version,
+            evaluation_evidence_kind="measured",
+            evaluation_report="outputs/evaluation.json",
+            evaluation_report_sha256=digest,
+            training_report="outputs/training.json",
+            training_report_sha256=digest,
+            release_passed=True,
+            artifacts=[
+                ArtifactRef(
+                    kind="gguf",
+                    relative_path="artifacts/model.gguf",
+                    sha256=digest,
+                    bytes=1,
+                )
+            ],
+        )
+    )
+    registry.promote("measured-v1")
+
+
 async def test_triage_health_metrics_and_no_input_echo():
     app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
     async with app_client(app) as client:
@@ -75,6 +122,57 @@ async def test_triage_health_metrics_and_no_input_echo():
         assert "incident_text" not in body
         metrics = await client.get("/metrics")
         assert "modelforge_requests_total" in metrics.text
+
+
+async def test_service_can_bind_runtime_identity_to_released_registry(tmp_path):
+    engine = FixtureEngine("adapted")
+    engine.name = "openai-http"
+    engine.model_id = "deployed-model"
+    engine.model_version = "measured-v1"
+    engine.quantization = "q8_0"
+    engine.max_new_tokens = 192
+    engine.structured_output_contract = "json-schema-v2"
+    engine.evidence_kind = "measured"
+    registry_path = tmp_path / "registry.json"
+    write_runtime_registry(registry_path, engine)
+    app = create_app(
+        settings=Settings(
+            registry_path=registry_path,
+            registry_deployment_role="released",
+        ),
+        engine_factory=lambda: engine,
+    )
+
+    async with app_client(app) as client:
+        config = (await client.get("/api/config")).json()
+
+    assert config["registry_deployment_role"] == "released"
+    assert config["registry_manifest_id"] == "measured-v1"
+
+
+async def test_service_fails_startup_when_runtime_drifted_from_registry(tmp_path):
+    attested_engine = FixtureEngine("adapted")
+    attested_engine.name = "openai-http"
+    attested_engine.model_id = "deployed-model"
+    attested_engine.model_version = "measured-v1"
+    attested_engine.quantization = "q8_0"
+    attested_engine.max_new_tokens = 192
+    attested_engine.structured_output_contract = "json-schema-v2"
+    attested_engine.evidence_kind = "measured"
+    registry_path = tmp_path / "registry.json"
+    write_runtime_registry(registry_path, attested_engine)
+    attested_engine.quantization = "q4_k_m"
+    app = create_app(
+        settings=Settings(
+            registry_path=registry_path,
+            registry_deployment_role="released",
+        ),
+        engine_factory=lambda: attested_engine,
+    )
+
+    with pytest.raises(ValueError, match="quantization"):
+        async with app.router.lifespan_context(app):
+            pass
 
 
 async def test_demo_page_uses_restrictive_browser_security_headers():

@@ -20,6 +20,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from modelforge_tw.engines import FixtureEngine, InferenceEngine, OpenAIHTTPInferenceEngine
 from modelforge_tw.metrics import ServiceMetrics
+from modelforge_tw.registry import FileRegistry
 from modelforge_tw.safety import conservative_fallback
 from modelforge_tw.schemas import InferenceMetadata, TriageRequest, TriageResponse
 from modelforge_tw.settings import Settings
@@ -252,6 +253,36 @@ def build_engine(settings: Settings) -> InferenceEngine:
     raise ValueError(f"unsupported engine: {settings.engine}")
 
 
+def validate_registry_deployment(
+    settings: Settings,
+    engine: InferenceEngine,
+) -> str | None:
+    role = settings.registry_deployment_role
+    if role is None:
+        return None
+    manifest = FileRegistry(settings.registry_path).resolve_deployment(role)
+    checks = {
+        "evidence_kind": (
+            engine.evidence_kind == "measured"
+            and manifest.evaluation_evidence_kind == engine.evidence_kind
+        ),
+        "engine": manifest.evaluation_engine == engine.name,
+        "model_id": manifest.evaluation_model_id == engine.model_id,
+        "model_version": manifest.evaluation_model_version == engine.model_version,
+        "quantization": manifest.quantization == engine.quantization,
+        "prompt_version": manifest.prompt_version == engine.prompt_version,
+        "max_new_tokens": manifest.max_new_tokens == engine.max_new_tokens,
+        "structured_output_contract": (
+            manifest.structured_output_contract == engine.structured_output_contract
+        ),
+        "safety_policy_version": manifest.safety_policy_version == engine.safety_policy_version,
+    }
+    mismatches = sorted(name for name, matched in checks.items() if not matched)
+    if mismatches:
+        raise ValueError("runtime does not match registry deployment: " + ", ".join(mismatches))
+    return manifest.manifest_id
+
+
 def create_app(
     *,
     settings: Settings | None = None,
@@ -263,7 +294,9 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        app.state.engine = engine_factory() if engine_factory else build_engine(selected_settings)
+        engine = engine_factory() if engine_factory else build_engine(selected_settings)
+        app.state.registry_manifest_id = validate_registry_deployment(selected_settings, engine)
+        app.state.engine = engine
         app.state.semaphore = asyncio.Semaphore(selected_settings.max_concurrency)
         engine_tasks.clear()
         app.state.engine_tasks = engine_tasks
@@ -456,6 +489,8 @@ def create_app(
             "shutdown_grace_seconds": selected_settings.shutdown_grace_seconds,
             "max_request_body_bytes": selected_settings.max_request_body_bytes,
             "authentication_required": selected_settings.api_key is not None,
+            "registry_deployment_role": selected_settings.registry_deployment_role,
+            "registry_manifest_id": app.state.registry_manifest_id,
             "input_logging": selected_settings.log_inputs,
         }
 

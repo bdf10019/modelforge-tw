@@ -43,6 +43,8 @@
   logging。repository 也忽略模型、資料生成物與輸出報告。
 - llama.cpp 每-slot context 預設 2048；本機啟動腳本低於 1536 時 fail fast，避免輸出被靜默截斷。
 - 安全政策不可因程式更新靜默漂移；部署預設鎖定 registry 已 attested 的 v2，實驗 v3 必須顯式選擇。
+- 掛載新版 registry 後可設定 `MODELFORGE_REGISTRY_DEPLOYMENT_ROLE`，將 runtime metadata 綁定
+  `released` 或 `previous-good`；缺少完整 measured attestation 或任一契約欄位不符即拒絕啟動。
 
 ## Secret and privacy checks
 

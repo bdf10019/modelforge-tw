@@ -53,6 +53,8 @@ Web / REST / OpenAI-compatible client
   且早已被指定為 previous-good 的既有狀態，避免安全升級反而切斷已驗證的舊回退路徑；
   部分遷移的資料不放行。Registry 載入時另驗證 manifest key／ID、唯一 released status、released
   pointer、通過結果與 retired previous-good pointer 一致；人工改壞的狀態不能進入後續操作。
+  線上服務可選擇綁定 `released` 或 `previous-good` 指標；啟用後會在啟動時逐欄比對實際引擎的
+  measured identity、模型版本、量化、prompt、生成上限、輸出契約與安全政策，漂移即拒絕啟動。
 
 資料 split／manifest、評測、比較、benchmark、訓練、merge、量化與 registry JSON 都先寫入同目錄
 的唯一暫存檔，完成後再原子替換；Python 路徑會先 flush + fsync。中斷或 replace 失敗會保留上一份

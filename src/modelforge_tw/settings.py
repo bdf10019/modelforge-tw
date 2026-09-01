@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION
     llama_base_url: str = "http://127.0.0.1:8081"
     registry_path: Path = Path("outputs/model-registry.json")
+    registry_deployment_role: Literal["released", "previous-good"] | None = None
     request_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     queue_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
     shutdown_grace_seconds: float = Field(default=35.0, ge=0, le=300)
@@ -39,6 +40,11 @@ class Settings(BaseSettings):
     @field_validator("api_key", mode="before")
     @classmethod
     def empty_api_key_disables_authentication(cls, value: object) -> object:
+        return None if value == "" else value
+
+    @field_validator("registry_deployment_role", mode="before")
+    @classmethod
+    def empty_registry_role_disables_binding(cls, value: object) -> object:
         return None if value == "" else value
 
     @field_validator("api_key")

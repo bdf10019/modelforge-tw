@@ -14,6 +14,7 @@ from modelforge_tw.schemas import EvaluationReport
 from modelforge_tw.training import TrainingReportAttestation
 
 SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
+DeploymentRole = Literal["released", "previous-good"]
 
 
 def _validate_portable_relative_path(value: str) -> str:
@@ -323,6 +324,22 @@ class FileRegistry:
             raise KeyError(f"manifest not found: {manifest_id}")
         manifest = state.manifests[manifest_id]
         self._validate_evaluation_against_manifest(manifest, evaluation)
+
+    def resolve_deployment(self, role: DeploymentRole) -> ModelManifest:
+        if role not in {"released", "previous-good"}:
+            raise ValueError("deployment role must be released or previous-good")
+        state = self.load()
+        manifest_id = state.released if role == "released" else state.previous_good
+        if manifest_id is None:
+            raise ValueError(f"registry has no {role} deployment target")
+        manifest = state.manifests[manifest_id]
+        self._require_releasable_evidence(manifest)
+        if not manifest.release_passed:
+            raise ValueError("deployment target did not pass its release gates")
+        self._verify_evaluation_report(manifest)
+        self._verify_training_report(manifest)
+        self._verify_artifacts(manifest)
+        return manifest
 
     def attest_evaluation(
         self,

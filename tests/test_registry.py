@@ -155,6 +155,25 @@ def test_registry_promote_and_rollback(tmp_path):
     assert state.previous_good == "v2"
 
 
+def test_registry_resolves_only_attested_release_roles(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    registry.add(manifest("v1"))
+    registry.promote("v1")
+    registry.add(manifest("v2"))
+    registry.promote("v2")
+
+    assert registry.resolve_deployment("released").manifest_id == "v2"
+    assert registry.resolve_deployment("previous-good").manifest_id == "v1"
+
+
+def test_registry_cannot_resolve_missing_deployment_role(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    with pytest.raises(ValueError, match="no released deployment target"):
+        registry.resolve_deployment("released")
+    with pytest.raises(ValueError, match="deployment role"):
+        registry.resolve_deployment("candidate")  # type: ignore[arg-type]
+
+
 def test_registry_preserves_parallel_candidate_additions(tmp_path):
     registry = FileRegistry(tmp_path / "registry.json")
     candidates = [manifest(f"parallel-{index}") for index in range(8)]
