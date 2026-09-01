@@ -10,9 +10,9 @@ from modelforge_tw.schemas import TriageRequest
 ORIGINAL_HTTPX_CLIENT = httpx.Client
 
 
-def make_engine() -> OpenAIHTTPInferenceEngine:
+def make_engine(base_url: str = "http://model.test/") -> OpenAIHTTPInferenceEngine:
     return OpenAIHTTPInferenceEngine(
-        base_url="http://model.test/",
+        base_url=base_url,
         model_id="model-q8",
         model_version="v5",
         quantization="q8_0",
@@ -41,11 +41,31 @@ def valid_output_json() -> str:
 
 def install_transport(monkeypatch, handler) -> None:
     transport = httpx.MockTransport(handler)
+
+    def direct_client(**kwargs):
+        assert kwargs["trust_env"] is False
+        return ORIGINAL_HTTPX_CLIENT(transport=transport, **kwargs)
+
     monkeypatch.setattr(
         openai_http.httpx,
         "Client",
-        lambda **kwargs: ORIGINAL_HTTPX_CLIENT(transport=transport, **kwargs),
+        direct_client,
     )
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "file:///models/server",
+        "http://user:password@model.test",
+        "http://model.test?target=other",
+        "http://model.test/#fragment",
+        "http://model.test:invalid-port",
+    ],
+)
+def test_model_server_base_url_rejects_ambiguous_or_credentialed_values(base_url):
+    with pytest.raises(ValueError, match="base URL"):
+        make_engine(base_url)
 
 
 def test_ready_is_fail_closed_for_status_and_connection_errors(monkeypatch):

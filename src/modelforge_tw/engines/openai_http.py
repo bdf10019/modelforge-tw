@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Iterator
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -47,7 +49,7 @@ def _read_bounded_response(response: httpx.Response, max_bytes: int) -> bytes:
     return bytes(body)
 
 
-def _iter_bounded_response_lines(response: httpx.Response, max_bytes: int):
+def _iter_bounded_response_lines(response: httpx.Response, max_bytes: int) -> Iterator[bytes]:
     _validate_declared_response_size(response, max_bytes)
     total = 0
     buffer = bytearray()
@@ -79,6 +81,28 @@ def _structured_response_format() -> dict[str, Any]:
     }
 
 
+def _validated_base_url(value: str) -> str:
+    try:
+        parsed = urlsplit(value)
+        _ = parsed.port
+    except ValueError as error:
+        raise ValueError("model server base URL is invalid") from error
+    if (
+        value != value.strip()
+        or any(ord(character) < 32 for character in value)
+        or parsed.scheme.lower() not in {"http", "https"}
+        or parsed.hostname is None
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError(
+            "model server base URL must be HTTP(S) without credentials, query, or fragment"
+        )
+    return value.rstrip("/")
+
+
 class OpenAIHTTPInferenceEngine:
     def __init__(
         self,
@@ -95,7 +119,7 @@ class OpenAIHTTPInferenceEngine:
         safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,
     ) -> None:
         self.name = "openai-http"
-        self.base_url = base_url.rstrip("/")
+        self.base_url = _validated_base_url(base_url)
         self.model_id = model_id
         self.model_version = model_version
         self.quantization = quantization
@@ -113,7 +137,7 @@ class OpenAIHTTPInferenceEngine:
 
     def ready(self) -> bool:
         try:
-            with httpx.Client(timeout=min(self.timeout_seconds, 3.0)) as client:
+            with httpx.Client(timeout=min(self.timeout_seconds, 3.0), trust_env=False) as client:
                 with client.stream("GET", f"{self.base_url}/health") as response:
                     return response.status_code == 200
         except httpx.HTTPError:
@@ -131,7 +155,7 @@ class OpenAIHTTPInferenceEngine:
             "response_format": _structured_response_format(),
         }
         started = time.perf_counter()
-        with httpx.Client(timeout=self.timeout_seconds) as client:
+        with httpx.Client(timeout=self.timeout_seconds, trust_env=False) as client:
             with client.stream(
                 "POST", f"{self.base_url}/v1/chat/completions", json=payload
             ) as response:
@@ -162,7 +186,7 @@ class OpenAIHTTPInferenceEngine:
         first_content_ms: float | None = None
         parts: list[str] = []
         usage: dict[str, Any] = {}
-        with httpx.Client(timeout=self.timeout_seconds) as client:
+        with httpx.Client(timeout=self.timeout_seconds, trust_env=False) as client:
             with client.stream(
                 "POST", f"{self.base_url}/v1/chat/completions", json=payload
             ) as response:
