@@ -89,14 +89,56 @@ class ModelManifest(BaseModel):
         return _validate_portable_relative_path(value) if value is not None else None
 
 
+class RegistryEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    at: datetime
+    action: Literal[
+        "candidate_added",
+        "evaluation_attested",
+        "promoted",
+        "rolled_back",
+        "blocked",
+    ]
+    manifest_id: str = Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
+    evaluation_report: str | None = None
+    evaluation_report_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    previous_event_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    event_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+    @field_validator("at")
+    @classmethod
+    def timestamp_has_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("registry event timestamp must include a timezone")
+        return value
+
+    @field_validator("evaluation_report")
+    @classmethod
+    def event_report_path_is_safe(cls, value: str | None) -> str | None:
+        return _validate_portable_relative_path(value) if value is not None else None
+
+    @model_validator(mode="after")
+    def report_hash_requires_report(self) -> RegistryEvent:
+        if self.evaluation_report_sha256 is not None and self.evaluation_report is None:
+            raise ValueError("event evaluation report SHA-256 requires a report path")
+        return self
+
+
+def _registry_event_sha256(event: RegistryEvent) -> str:
+    payload = event.model_dump(mode="json", exclude={"event_sha256"})
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return sha256(encoded).hexdigest()
+
+
 class RegistryState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["1.0", "1.1", "1.2", "1.3"] = "1.3"
+    schema_version: Literal["1.0", "1.1", "1.2", "1.3", "1.4"] = "1.4"
     released: str | None = None
     previous_good: str | None = None
     manifests: dict[str, ModelManifest] = Field(default_factory=dict)
-    events: list[dict[str, str]] = Field(default_factory=list)
+    events: list[RegistryEvent] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_state_consistency(self) -> RegistryState:
@@ -121,6 +163,27 @@ class RegistryState(BaseModel):
             previous = self.manifests.get(self.previous_good)
             if previous is None or previous.status != "retired":
                 raise ValueError("previous-good pointer must reference a retired manifest")
+
+        missing_event_manifests = sorted(
+            {event.manifest_id for event in self.events} - self.manifests.keys()
+        )
+        if missing_event_manifests:
+            raise ValueError("registry events reference missing manifests")
+
+        for previous_event, current_event in zip(self.events, self.events[1:], strict=False):
+            if current_event.at < previous_event.at:
+                raise ValueError("registry event timestamps are not chronological")
+
+        if self.schema_version == "1.4":
+            previous_digest: str | None = None
+            for event in self.events:
+                if event.previous_event_sha256 != previous_digest:
+                    raise ValueError("registry event chain has a broken previous hash")
+                if event.event_sha256 is None or event.event_sha256 != _registry_event_sha256(
+                    event
+                ):
+                    raise ValueError("registry event chain hash does not match event contents")
+                previous_digest = event.event_sha256
         return self
 
 
@@ -136,11 +199,56 @@ class FileRegistry:
         return RegistryState.model_validate_json(read_utf8_text_limited(self.path))
 
     def _write(self, state: RegistryState) -> None:
+        state = RegistryState.model_validate(state.model_dump(mode="json"))
         atomic_write_text(
             self.path,
             json.dumps(state.model_dump(mode="json"), ensure_ascii=False, indent=2, sort_keys=True)
             + "\n",
         )
+
+    @staticmethod
+    def _append_event(
+        state: RegistryState,
+        *,
+        action: Literal[
+            "candidate_added",
+            "evaluation_attested",
+            "promoted",
+            "rolled_back",
+            "blocked",
+        ],
+        manifest_id: str,
+        evaluation_report: str | None = None,
+        evaluation_report_sha256: str | None = None,
+    ) -> None:
+        previous_digest: str | None = None
+        chained_events: list[RegistryEvent] = []
+        if state.schema_version != "1.4":
+            for existing in state.events:
+                event = existing.model_copy(
+                    update={
+                        "previous_event_sha256": previous_digest,
+                        "event_sha256": None,
+                    }
+                )
+                event = event.model_copy(update={"event_sha256": _registry_event_sha256(event)})
+                chained_events.append(event)
+                previous_digest = event.event_sha256
+            state.events = chained_events
+            state.schema_version = "1.4"
+        elif state.events:
+            previous_digest = state.events[-1].event_sha256
+
+        event = RegistryEvent(
+            at=datetime.now(UTC),
+            action=action,
+            manifest_id=manifest_id,
+            evaluation_report=evaluation_report,
+            evaluation_report_sha256=evaluation_report_sha256,
+            previous_event_sha256=previous_digest,
+        )
+        event = event.model_copy(update={"event_sha256": _registry_event_sha256(event)})
+        state.events.append(event)
 
     @staticmethod
     def _validate_id(manifest_id: str) -> None:
@@ -396,14 +504,12 @@ class FileRegistry:
         )
         self._verify_evaluation_report(updated_manifest)
         state.manifests[manifest_id] = updated_manifest
-        state.events.append(
-            {
-                "at": datetime.now(UTC).isoformat(),
-                "action": "evaluation_attested",
-                "manifest_id": manifest_id,
-                "evaluation_report": evaluation_report,
-                "evaluation_report_sha256": evaluation_report_sha256,
-            }
+        self._append_event(
+            state,
+            action="evaluation_attested",
+            manifest_id=manifest_id,
+            evaluation_report=evaluation_report,
+            evaluation_report_sha256=evaluation_report_sha256,
         )
         self._write(state)
         return state
@@ -423,12 +529,10 @@ class FileRegistry:
         self._verify_training_report(manifest)
         self._verify_artifacts(manifest)
         state.manifests[manifest.manifest_id] = manifest
-        state.events.append(
-            {
-                "at": datetime.now(UTC).isoformat(),
-                "action": "candidate_added",
-                "manifest_id": manifest.manifest_id,
-            }
+        self._append_event(
+            state,
+            action="candidate_added",
+            manifest_id=manifest.manifest_id,
         )
         self._write(state)
         return state
@@ -455,12 +559,10 @@ class FileRegistry:
             state.previous_good = state.released
         state.manifests[manifest_id] = candidate.model_copy(update={"status": "released"})
         state.released = manifest_id
-        state.events.append(
-            {
-                "at": datetime.now(UTC).isoformat(),
-                "action": "promoted",
-                "manifest_id": manifest_id,
-            }
+        self._append_event(
+            state,
+            action="promoted",
+            manifest_id=manifest_id,
         )
         self._write(state)
         return state
@@ -489,12 +591,10 @@ class FileRegistry:
         state.manifests[target] = target_manifest.model_copy(update={"status": "released"})
         state.released = target
         state.previous_good = current
-        state.events.append(
-            {
-                "at": datetime.now(UTC).isoformat(),
-                "action": "rolled_back",
-                "manifest_id": target,
-            }
+        self._append_event(
+            state,
+            action="rolled_back",
+            manifest_id=target,
         )
         self._write(state)
         return state
@@ -549,18 +649,12 @@ class FileRegistry:
             state.released = None
         if state.previous_good == manifest_id:
             state.previous_good = None
-        state.events.append(
-            {
-                "at": datetime.now(UTC).isoformat(),
-                "action": "blocked",
-                "manifest_id": manifest_id,
-                **({"evaluation_report": evaluation_report} if evaluation_report else {}),
-                **(
-                    {"evaluation_report_sha256": evaluation_report_sha256}
-                    if evaluation_report_sha256
-                    else {}
-                ),
-            }
+        self._append_event(
+            state,
+            action="blocked",
+            manifest_id=manifest_id,
+            evaluation_report=evaluation_report,
+            evaluation_report_sha256=evaluation_report_sha256,
         )
         self._write(state)
         return state

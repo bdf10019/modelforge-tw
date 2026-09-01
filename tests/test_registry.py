@@ -186,6 +186,43 @@ def test_registry_preserves_parallel_candidate_additions(tmp_path):
     }
 
 
+def test_registry_event_chain_detects_content_tampering(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    state = registry.add(manifest("v1"))
+    assert state.schema_version == "1.4"
+    assert state.events[0].event_sha256 is not None
+
+    payload = json.loads(registry.path.read_text(encoding="utf-8"))
+    payload["events"][0]["action"] = "blocked"
+    registry.path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="chain hash"):
+        registry.load()
+
+
+def test_registry_mutation_seals_legacy_events_into_hash_chain(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    legacy = RegistryState(
+        schema_version="1.0",
+        manifests={"v1": manifest("v1")},
+        events=[
+            {
+                "at": "2026-01-01T00:00:00+00:00",
+                "action": "candidate_added",
+                "manifest_id": "v1",
+            }
+        ],
+    )
+    registry.path.write_text(legacy.model_dump_json(), encoding="utf-8")
+
+    state = registry.add(manifest("v2"))
+
+    assert state.schema_version == "1.4"
+    assert len(state.events) == 2
+    assert all(event.event_sha256 is not None for event in state.events)
+    assert state.events[1].previous_event_sha256 == state.events[0].event_sha256
+
+
 def test_registry_state_rejects_inconsistent_release_pointers_and_ids():
     candidate = manifest("v1")
     with pytest.raises(ValidationError, match="released pointer"):
@@ -281,7 +318,7 @@ def test_registry_block_rejects_unsafe_report_path_without_mutation(tmp_path):
     state = registry.load()
     assert state.manifests["v1"].status == "candidate"
     assert state.manifests["v1"].release_passed is True
-    assert state.events[-1]["action"] == "candidate_added"
+    assert state.events[-1].action == "candidate_added"
 
 
 def test_registry_can_block_a_released_candidate(tmp_path):
@@ -557,7 +594,7 @@ def test_registry_attests_and_locks_evaluation_contract(tmp_path):
     assert attested.safety_policy_version == "risk-precedence-v2"
     assert attested.evaluation_contract_version == "release-metrics-v2"
     assert attested.evaluation_report_sha256 == HASH
-    assert state.events[-1]["action"] == "evaluation_attested"
+    assert state.events[-1].action == "evaluation_attested"
 
     mismatch = report.model_copy(update={"safety_policy_version": "obsolete-policy"})
     with pytest.raises(ValueError, match="safety_policy_version"):
