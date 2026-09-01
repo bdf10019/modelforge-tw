@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from modelforge_tw.contracts import PromptVersion, SafetyPolicyVersion
 from modelforge_tw.model_identity import (
     validate_immutable_model_revision,
     validate_model_version,
@@ -175,7 +176,7 @@ class InferenceMetadata(BaseModel):
     model_version: str
     model_revision: str | None = None
     quantization: str
-    prompt_version: str
+    prompt_version: PromptVersion
     elapsed_ms: float = Field(ge=0)
     prompt_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
@@ -184,7 +185,7 @@ class InferenceMetadata(BaseModel):
     max_new_tokens: int | None = Field(default=None, ge=1)
     context_window_tokens: int | None = Field(default=None, ge=1)
     structured_output_contract: str | None = None
-    safety_policy_version: str | None = None
+    safety_policy_version: SafetyPolicyVersion | None = None
     evidence_kind: Literal["fixture", "measured"]
 
     @field_validator("model_version")
@@ -267,11 +268,11 @@ class EvaluationReport(BaseModel):
     model_version: str
     model_revision: str | None = None
     quantization: str
-    prompt_version: str
+    prompt_version: PromptVersion
     max_new_tokens: int | None = Field(default=None, ge=1)
     context_window_tokens: int | None = Field(default=None, ge=1)
     structured_output_contract: str | None = None
-    safety_policy_version: str | None = None
+    safety_policy_version: SafetyPolicyVersion | None = None
     evaluation_contract_version: str | None = None
     evidence_kind: Literal["fixture", "measured"]
     dataset_manifest_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")

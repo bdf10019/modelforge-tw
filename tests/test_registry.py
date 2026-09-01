@@ -367,6 +367,14 @@ def test_model_manifest_rejects_unknown_quantization():
         ModelManifest.model_validate(payload)
 
 
+def test_model_manifest_rejects_unknown_contract_versions():
+    payload = manifest("v1").model_dump(mode="json")
+    with pytest.raises(ValidationError, match="prompt_version"):
+        ModelManifest.model_validate({**payload, "prompt_version": "optimized-v99"})
+    with pytest.raises(ValidationError, match="safety_policy_version"):
+        ModelManifest.model_validate({**payload, "safety_policy_version": "policy-typo"})
+
+
 def test_registry_state_rejects_inconsistent_release_pointers_and_ids():
     candidate = manifest("v1")
     with pytest.raises(ValidationError, match="released pointer"):

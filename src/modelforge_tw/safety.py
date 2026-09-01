@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from typing import Literal
 
 from pydantic import ValidationError
 
+from modelforge_tw.contracts import SafetyPolicyVersion
 from modelforge_tw.schemas import (
     EventType,
     ReasonCode,
@@ -16,7 +16,6 @@ from modelforge_tw.schemas import (
     TriageRequest,
 )
 
-SafetyPolicyVersion = Literal["risk-precedence-v2", "risk-precedence-v3"]
 SAFETY_POLICY_VERSION: SafetyPolicyVersion = "risk-precedence-v2"
 EXPERIMENTAL_SAFETY_POLICY_VERSION: SafetyPolicyVersion = "risk-precedence-v3"
 SUPPORTED_SAFETY_POLICY_VERSIONS = (

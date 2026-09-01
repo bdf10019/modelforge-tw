@@ -12,13 +12,49 @@ from modelforge_tw.safety import (
 )
 from modelforge_tw.schemas import (
     ALLOWED_REASON_CODES,
+    EvaluationReport,
     EventType,
+    InferenceMetadata,
     SafeAction,
     Severity,
     Signal,
     TriageOutput,
     TriageRequest,
 )
+
+
+def test_runtime_evidence_rejects_unknown_contract_versions():
+    metadata = {
+        "engine": "fixture",
+        "model_id": "fixture",
+        "model_version": "fixture-v1",
+        "quantization": "none",
+        "prompt_version": "optimized-v2",
+        "elapsed_ms": 0,
+        "safety_policy_version": "risk-precedence-v2",
+        "evidence_kind": "fixture",
+    }
+    with pytest.raises(ValidationError, match="prompt_version"):
+        InferenceMetadata.model_validate({**metadata, "prompt_version": "optimized-v99"})
+    with pytest.raises(ValidationError, match="safety_policy_version"):
+        InferenceMetadata.model_validate({**metadata, "safety_policy_version": "policy-typo"})
+
+    report = {
+        **metadata,
+        "schema_version": "1.5",
+        "run_id": "contract-validation",
+        "dataset_manifest_sha256": "a" * 64,
+        "case_count": 0,
+        "metrics": {},
+        "gates": {},
+        "release_passed": False,
+        "latency_ms": {},
+        "cases": [],
+    }
+    with pytest.raises(ValidationError, match="prompt_version"):
+        EvaluationReport.model_validate({**report, "prompt_version": "optimized-v99"})
+    with pytest.raises(ValidationError, match="safety_policy_version"):
+        EvaluationReport.model_validate({**report, "safety_policy_version": "policy-typo"})
 
 
 def valid_output(**updates):

@@ -45,6 +45,8 @@ Web / REST / OpenAI-compatible client
   同一比較，不能只因 requested／resolved 各自長得像 hash 就接受。
   未指定時的實測評估與訓練也統一使用現行 attestation 的 `optimized-v2`／192-token 生成契約；歷史
   A/B 實驗的 v1 標記只保留在既有證據與顯式選擇中。
+  Prompt 與 safety policy 的已實作版本由單一型別契約列舉；推論 metadata、evaluation report 與
+  model manifest 都拒絕未知／拼錯版本，避免無實作的標籤被誤認為可重現證據。
   Transformers／llama-http 評測另強制提供安全格式的 `--model-version`；保留值 `unversioned` 不能
   進入引擎、評測報告或 registry。llama-http 也必須明確提供量化格式，`unknown` 不能進入 measured
   evidence；Transformers 則依實際 NF4／BF16 載入方式設定。載入 probe 由 immutable base commit

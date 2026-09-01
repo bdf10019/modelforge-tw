@@ -9,6 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from modelforge_tw.contracts import PromptVersion, SafetyPolicyVersion
 from modelforge_tw.io_utils import (
     atomic_write_text,
     exclusive_file_lock,
@@ -60,7 +61,7 @@ class ModelManifest(BaseModel):
     base_model: str = Field(min_length=1, max_length=256)
     base_revision: str = Field(pattern=r"^[a-f0-9]{40,64}$")
     license: str = Field(min_length=1, max_length=128)
-    prompt_version: str = Field(min_length=1, max_length=128)
+    prompt_version: PromptVersion
     dataset_manifest_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     training_config_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     release_gate_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
@@ -68,7 +69,7 @@ class ModelManifest(BaseModel):
     quantization: str
     max_new_tokens: int | None = Field(default=None, ge=1)
     structured_output_contract: str | None = None
-    safety_policy_version: str | None = None
+    safety_policy_version: SafetyPolicyVersion | None = None
     evaluation_contract_version: str | None = None
     evaluation_dataset_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     evaluation_engine: str | None = None

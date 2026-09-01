@@ -1,19 +1,9 @@
 from __future__ import annotations
 
 import json
-from typing import Literal
 
+from modelforge_tw.contracts import OptimizedPromptVersion, PromptVersion
 from modelforge_tw.schemas import TriageOutput, TriageRequest
-
-OptimizedPromptVersion = Literal[
-    "optimized-v1",
-    "optimized-v2",
-    "optimized-v3",
-    "optimized-v4",
-    "optimized-v5",
-    "optimized-v6",
-]
-PromptVersion = Literal["minimal-v1"] | OptimizedPromptVersion
 
 MINIMAL_PROMPT_VERSION: PromptVersion = "minimal-v1"
 OPTIMIZED_PROMPT_VERSION: OptimizedPromptVersion = "optimized-v1"

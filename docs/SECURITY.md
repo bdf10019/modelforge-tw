@@ -67,6 +67,8 @@
   report 或 registry。Transformers 量化則由實際 `load_in_4bit` 選項產生，不信任外部標籤。
 - 評測中的非空 model revision 必須是 immutable commit，registry 會把它和 training base revision
   逐值比對；遠端模型 API 未揭露可驗證 commit 時保存 `null`，不以版本字串假裝來源證明。
+- Prompt 與 safety policy 版本是封閉且共用的實作清單；runtime metadata、評測報告與 registry
+  manifest 只接受已支援值，不讓拼字錯誤或未實作政策進入發布契約。
 - 資料與續跑快取 JSONL 的單行上限為 1 MiB；正式資料超限或非 UTF-8 時 fail closed，快取則只
   丟棄損壞行並重新產生受影響案例，不讓一行殘片破壞後續可恢復結果。
 - `MODELFORGE_LOG_INPUTS` 唯一合法值為 `false`；誤設 `true` 時服務拒絕啟動，API 不提供事件原文
