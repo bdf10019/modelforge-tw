@@ -84,9 +84,7 @@ def test_external_evidence_snapshot_preserves_holdout_and_rejection_decision():
         "evidence_kind": "measured",
     }
     assert all(
-        run[field] == value
-        for run in runs.values()
-        for field, value in contract_fields.items()
+        run[field] == value for run in runs.values() for field, value in contract_fields.items()
     )
     internal_v2 = runs["internal_q8_prompt_v2_policy_v3"]
     external_v2 = runs["external_calibration_q8_prompt_v2"]
@@ -106,3 +104,13 @@ def test_external_evidence_snapshot_preserves_holdout_and_rejection_decision():
         warning_total / holdout_v5["cases"], abs=1e-6
     )
     assert external["decision"] == ("holdout_passed_but_prompt_v5_rejected_for_internal_regression")
+
+
+def test_interview_walkthrough_preserves_claim_boundaries():
+    walkthrough = (PROJECT_ROOT / "docs" / "INTERVIEW_WALKTHROUGH.md").read_text(encoding="utf-8")
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    assert "INTERVIEW_WALKTHROUGH.md" in readme
+    assert "evidence_kind=fixture" in walkthrough
+    assert "16.33%" in walkthrough
+    assert "內部 224 筆時 event F1 降到 69.72%" in walkthrough
+    assert "不宣稱叢集部署實績" in walkthrough

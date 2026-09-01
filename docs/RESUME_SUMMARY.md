@@ -25,6 +25,8 @@ prompt-only、QLoRA、合併權重到 GGUF 量化，以同一封存資料與安�
 
 ## 面試時先展示
 
+完整的分鐘級流程與常見追問見 [`INTERVIEW_WALKTHROUGH.md`](INTERVIEW_WALKTHROUGH.md)。
+
 1. 在 Web UI 選擇「指令注入」，說明輸入為何是不可信資料，以及服務端如何強制人工複核。
 2. 開啟 `docs/EVALUATION.md`，用 Base→Prompt→QLoRA 拆分提示與權重適配的效果，再比較 NF4、
    Q8 與 Q4。

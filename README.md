@@ -34,6 +34,9 @@ row-disjoint holdout 得到 98/98 系統通過，卻讓內部 event F1 降至 69
 案例需要安全層介入，因此 v5 被拒絕、registry 不變。完整方法與誠實邊界見
 [外部校準報告](docs/EXTERNAL_CALIBRATION.md)。
 
+若以求職面試為目的，可直接依照 [10 分鐘展示走查](docs/INTERVIEW_WALKTHROUGH.md) 操作；它把
+現場 demo、量化取捨、外部回歸與誠實邊界排成一條可在有限時間內驗證的故事線。
+
 ## 快速驗證
 
 需求：Python 3.11、PowerShell 7。fixture 模式完全離線且不下載模型。
