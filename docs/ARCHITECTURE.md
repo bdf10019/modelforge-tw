@@ -28,7 +28,8 @@ Web / REST / OpenAI-compatible client
   SHA-256 與模型、adapter、prompt、解碼、安全政策、評分契約指紋完全一致時才可沿用；評分器
   也拒絕重複 record ID，並檢查每筆結果的模型與推論契約 metadata 一致後才寫入快取及計分。
   報告 schema 另核對 SHA-256 格式、有限範圍 metric、case count／唯一 ID、gate value／判定與
-  release 總結果；零案例 measured report 或缺少必要 gate 不得宣稱通過。
+  release 總結果；也會由 cases 重算 accuracy、macro-F1、case pass rate 與完整延遲摘要，並要求
+  passed/errors 一致。零案例 measured report、缺少 actual output 或必要 gate 都不得宣稱通過。
 - `external_calibration.py`：驗證第三方來源 SHA-256、固定兩組不重疊抽樣、轉換 AI4I 衍生事件，
   並輸出 calibration／holdout manifest 與 combined leakage audit。
 - `benchmark.py`：併發、P50/P95/P99、吞吐、RAM／整卡 VRAM 峰值取樣；HTTP streaming 可量

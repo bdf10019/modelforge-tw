@@ -39,6 +39,13 @@ def valid_evaluation_report(**updates) -> EvaluationReport:
         reason_codes=["UNKNOWN_EVENT"],
     )
     metrics = {name: 1.0 for name in REQUIRED_RELEASE_GATE_NAMES}
+    metrics.update(
+        {
+            "case_pass_rate": 1.0,
+            "event_type_accuracy": 1.0,
+            "severity_accuracy": 1.0,
+        }
+    )
     report = EvaluationReport(
         run_id="registry-report",
         engine="fixture",
@@ -66,7 +73,7 @@ def valid_evaluation_report(**updates) -> EvaluationReport:
             for name in REQUIRED_RELEASE_GATE_NAMES
         },
         release_passed=True,
-        latency_ms={"mean": 1.0},
+        latency_ms={"min": 1.0, "mean": 1.0, "p50": 1.0, "p95": 1.0, "max": 1.0},
         cases=[
             CaseResult(
                 record_id="registry-case",

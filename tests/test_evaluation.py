@@ -179,6 +179,26 @@ def test_evaluation_report_rejects_non_finite_metrics():
         EvaluationReport.model_validate(payload)
 
 
+def test_evaluation_report_rejects_tampered_case_derived_evidence():
+    record = next(record for record in generate_records(1, 1, 1) if record.split == "test")
+    original = evaluate(FixtureEngine("adapted"), [record]).model_dump(mode="json")
+
+    payload = {**original, "cases": [dict(original["cases"][0])]}
+    payload["cases"][0]["passed"] = not payload["cases"][0]["passed"]
+    with pytest.raises(ValidationError, match="passed result"):
+        EvaluationReport.model_validate(payload)
+
+    payload = {**original, "metrics": dict(original["metrics"])}
+    payload["metrics"]["event_type_accuracy"] = 1.0 - payload["metrics"]["event_type_accuracy"]
+    with pytest.raises(ValidationError, match="metric does not match cases"):
+        EvaluationReport.model_validate(payload)
+
+    payload = {**original, "latency_ms": dict(original["latency_ms"])}
+    payload["latency_ms"]["mean"] += 1
+    with pytest.raises(ValidationError, match="latency_ms"):
+        EvaluationReport.model_validate(payload)
+
+
 def test_evaluation_rejects_mixed_inference_identity_before_caching():
     records = [record for record in generate_records(1, 1, 1) if record.split == "test"][:2]
 

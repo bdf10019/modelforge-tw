@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
@@ -86,6 +87,30 @@ SignalValue = (
 RateValue = Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)]
 NonnegativeFiniteFloat = Annotated[float, Field(ge=0, allow_inf_nan=False)]
 NonnegativeInteger = Annotated[int, Field(ge=0)]
+
+
+def _macro_f1(expected: list[str], actual: list[str], labels: Iterable[str]) -> float:
+    scores: list[float] = []
+    for label in labels:
+        tp = sum(e == label and a == label for e, a in zip(expected, actual, strict=True))
+        fp = sum(e != label and a == label for e, a in zip(expected, actual, strict=True))
+        fn = sum(e == label and a != label for e, a in zip(expected, actual, strict=True))
+        precision = tp / (tp + fp) if tp + fp else 0.0
+        recall = tp / (tp + fn) if tp + fn else 0.0
+        scores.append(2 * precision * recall / (precision + recall) if precision + recall else 0.0)
+    return sum(scores) / len(scores) if scores else 0.0
+
+
+def _percentile(values: list[float], percentile: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    rank = (len(ordered) - 1) * percentile
+    low = int(rank)
+    high = min(low + 1, len(ordered) - 1)
+    return ordered[low] + (ordered[high] - ordered[low]) * (rank - low)
+
+
 REQUIRED_RELEASE_GATE_NAMES = frozenset(
     {
         "raw_json_schema_rate",
@@ -257,9 +282,15 @@ class CaseResult(BaseModel):
     expected: TriageOutput
     actual: TriageOutput | None
     raw_text: str
-    elapsed_ms: float
+    elapsed_ms: NonnegativeFiniteFloat
     repair_used: bool
     validation_warnings: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_pass_result(self) -> CaseResult:
+        if self.passed != (not self.errors):
+            raise ValueError("case passed result does not match errors")
+        return self
 
 
 class EvaluationReport(BaseModel):
@@ -313,6 +344,61 @@ class EvaluationReport(BaseModel):
         if len(record_ids) != len(set(record_ids)):
             raise ValueError("evaluation case record IDs must be unique")
 
+        if self.cases:
+            elapsed = [case.elapsed_ms for case in self.cases]
+            expected_latency = {
+                "min": round(min(elapsed), 4),
+                "mean": round(sum(elapsed) / len(elapsed), 4),
+                "p50": round(_percentile(elapsed, 0.50), 4),
+                "p95": round(_percentile(elapsed, 0.95), 4),
+                "max": round(max(elapsed), 4),
+            }
+            if set(self.latency_ms) != set(expected_latency) or any(
+                abs(self.latency_ms[name] - value) > 0.0001
+                for name, value in expected_latency.items()
+            ):
+                raise ValueError("latency_ms does not match evaluation cases")
+
+            derived_metrics = {
+                "case_pass_rate": sum(case.passed for case in self.cases) / len(self.cases),
+            }
+            if all(case.actual is not None for case in self.cases):
+                expected_events = [case.expected.event_type.value for case in self.cases]
+                actual_events = [case.actual.event_type.value for case in self.cases if case.actual]
+                expected_severities = [case.expected.severity.value for case in self.cases]
+                actual_severities = [
+                    case.actual.severity.value for case in self.cases if case.actual
+                ]
+                derived_metrics.update(
+                    {
+                        "event_type_accuracy": sum(
+                            expected == actual
+                            for expected, actual in zip(expected_events, actual_events, strict=True)
+                        )
+                        / len(self.cases),
+                        "event_type_macro_f1": _macro_f1(
+                            expected_events,
+                            actual_events,
+                            sorted(set(expected_events) | set(actual_events)),
+                        ),
+                        "severity_accuracy": sum(
+                            expected == actual
+                            for expected, actual in zip(
+                                expected_severities, actual_severities, strict=True
+                            )
+                        )
+                        / len(self.cases),
+                        "severity_macro_f1": _macro_f1(
+                            expected_severities,
+                            actual_severities,
+                            sorted(set(expected_severities) | set(actual_severities)),
+                        ),
+                    }
+                )
+            for name, value in derived_metrics.items():
+                if name not in self.metrics or abs(self.metrics[name] - round(value, 6)) > 0.000001:
+                    raise ValueError(f"evaluation metric does not match cases: {name}")
+
         for name, gate in self.gates.items():
             required_fields = {"value", "operator", "threshold", "hard", "passed"}
             if set(gate) != required_fields:
@@ -340,6 +426,8 @@ class EvaluationReport(BaseModel):
         ):
             raise ValueError("release_passed does not match evaluation gates")
         if self.release_passed:
+            if any(case.actual is None for case in self.cases):
+                raise ValueError("passed evaluation cases must include actual outputs")
             missing = sorted(REQUIRED_RELEASE_GATE_NAMES - self.gates.keys())
             if missing:
                 raise ValueError(

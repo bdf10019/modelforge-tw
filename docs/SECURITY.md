@@ -71,6 +71,8 @@
   manifest 只接受已支援值，不讓拼字錯誤或未實作政策進入發布契約。
 - Evaluation schema 與 scoring contract 同樣 fail closed；未知 schema 或 release-metrics 版本不能
   被目前程式解析成已理解的發布證據，舊版 1.0–1.5 報告仍可按已知欄位唯讀驗證。
+- Evaluation report 會從 cases 重算可獨立驗證的 accuracy、macro-F1、case pass rate 與完整延遲摘要，
+  並要求 `passed` 與 errors 一致；發布通過時不接受缺少 actual output 的案例。
 - 資料與續跑快取 JSONL 的單行上限為 1 MiB；正式資料超限或非 UTF-8 時 fail closed，快取則只
   丟棄損壞行並重新產生受影響案例，不讓一行殘片破壞後續可恢復結果。
 - `MODELFORGE_LOG_INPUTS` 唯一合法值為 `false`；誤設 `true` 時服務拒絕啟動，API 不提供事件原文
