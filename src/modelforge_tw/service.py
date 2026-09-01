@@ -26,6 +26,7 @@ from modelforge_tw.schemas import InferenceMetadata, TriageRequest, TriageRespon
 from modelforge_tw.settings import Settings
 
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,96}$")
+HTTP_TOKEN = re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]+$")
 BODY_METHODS = frozenset({"POST", "PUT", "PATCH"})
 PROTECTED_API_PATHS = frozenset({"/v1/triage", "/v1/chat/completions"})
 NO_STORE_PATHS = PROTECTED_API_PATHS | {"/", "/api/config"}
@@ -180,6 +181,85 @@ class BearerAuthMiddleware:
                 "valid bearer authentication is required",
                 extra_headers=[(b"www-authenticate", b"Bearer")],
             )
+            return
+        await self.app(scope, receive, send)
+
+
+def _is_json_content_type(value: bytes) -> bool:
+    try:
+        content_type = value.decode("ascii")
+    except UnicodeDecodeError:
+        return False
+    if any(
+        (ord(character) < 32 and character != "\t") or ord(character) == 127
+        for character in content_type
+    ):
+        return False
+
+    media_type, *raw_parameters = content_type.split(";")
+    media_type = media_type.strip().lower()
+    if media_type != "application/json":
+        category, separator, subtype = media_type.partition("/")
+        if (
+            not separator
+            or category != "application"
+            or not subtype.endswith("+json")
+            or not subtype.removesuffix("+json")
+            or not HTTP_TOKEN.fullmatch(subtype)
+        ):
+            return False
+
+    parameter_names: set[str] = set()
+    for raw_parameter in raw_parameters:
+        name, separator, raw_value = raw_parameter.strip().partition("=")
+        name = name.strip().lower()
+        raw_value = raw_value.strip()
+        if (
+            not separator
+            or not HTTP_TOKEN.fullmatch(name)
+            or name in parameter_names
+            or not raw_value
+        ):
+            return False
+        parameter_names.add(name)
+        if raw_value.startswith('"') or raw_value.endswith('"'):
+            if len(raw_value) < 2 or not (raw_value.startswith('"') and raw_value.endswith('"')):
+                return False
+            value_without_quotes = raw_value[1:-1]
+            if '"' in value_without_quotes or "\\" in value_without_quotes:
+                return False
+        else:
+            if not HTTP_TOKEN.fullmatch(raw_value):
+                return False
+            value_without_quotes = raw_value
+        if not value_without_quotes or any(
+            ord(character) < 32 or ord(character) == 127 for character in value_without_quotes
+        ):
+            return False
+        if name == "charset" and value_without_quotes.lower() not in {"utf-8", "utf8"}:
+            return False
+    return True
+
+
+class JSONContentTypeMiddleware:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if (
+            scope["type"] != "http"
+            or scope["method"] not in BODY_METHODS
+            or scope["path"] not in PROTECTED_API_PATHS
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        values = [value for name, value in scope["headers"] if name.lower() == b"content-type"]
+        if len(values) > 1:
+            await _send_json_error(send, 400, "multiple Content-Type values")
+            return
+        if not values or not _is_json_content_type(values[0]):
+            await _send_json_error(send, 415, "Content-Type must be application/json")
             return
         await self.app(scope, receive, send)
 
@@ -374,6 +454,7 @@ def create_app(
         RequestBodyLimitMiddleware,
         max_body_bytes=selected_settings.max_request_body_bytes,
     )
+    app.add_middleware(JSONContentTypeMiddleware)
     configured_api_key = (
         selected_settings.api_key.get_secret_value() if selected_settings.api_key else None
     )

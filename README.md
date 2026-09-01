@@ -59,8 +59,8 @@ API、安全 gate、評測與 registry 機制，其數字不代表 LLM 品質，
 
 ## 服務與發布控制
 
-- 請求 body 預設 32 KiB、模型 server 回應預設 256 KiB；一般 JSON、chunked body 與無換行 SSE
-  都依實收 bytes 停止，不在解析後才補救。
+- 推論請求只接受單一 JSON media type；body 預設 32 KiB、模型 server 回應預設 256 KiB。一般 JSON、
+  chunked body 與無換行 SSE 都依實收 bytes 停止，不在解析後才補救。
 - 每 replica 有 concurrency、5 秒 queue timeout 與有限 queue depth；逾時後不可取消的同步模型工作
   仍占用槽位，排隊滿載立即 503，Prometheus 分開呈現 HTTP、queue 與 engine job。
 - 關閉時先撤 readiness，再在有界寬限內排空背景工作；Kubernetes 的 Pod 終止期限刻意更長。

@@ -317,6 +317,61 @@ async def test_oversized_declared_request_body_is_rejected_with_413(path):
     assert response.json() == {"detail": "request body is too large"}
 
 
+@pytest.mark.parametrize("path", ["/v1/triage", "/v1/chat/completions"])
+@pytest.mark.parametrize(
+    "content_type",
+    [
+        None,
+        "text/plain",
+        "application/+json",
+        "application/json; charset=latin-1",
+        "application/json; broken",
+        'application/json; profile="unterminated',
+        "application/json; charset=utf-8; charset=utf8",
+    ],
+)
+async def test_inference_routes_require_a_valid_json_content_type(path, content_type):
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    headers = {} if content_type is None else {"Content-Type": content_type}
+    async with app_client(app) as client:
+        response = await client.post(path, content=b"{}", headers=headers)
+
+    assert response.status_code == 415
+    assert response.json() == {"detail": "Content-Type must be application/json"}
+    assert REQUEST_ID.fullmatch(response.headers["X-Request-ID"])
+
+
+async def test_duplicate_content_type_headers_are_rejected():
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage",
+            content=b"{}",
+            headers=[
+                ("Content-Type", "application/json"),
+                ("Content-Type", "application/json"),
+            ],
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "multiple Content-Type values"}
+
+
+@pytest.mark.parametrize(
+    "content_type", ["application/json; charset=utf-8", "application/vnd.modelforge+json"]
+)
+async def test_supported_json_content_types_reach_schema_validation(content_type):
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage",
+            content=b"{}",
+            headers={"Content-Type": content_type},
+        )
+
+    assert response.status_code == 422
+
+
 async def test_chunked_request_body_is_counted_when_content_length_is_absent():
     app = create_app(
         settings=Settings(max_request_body_bytes=1024),
@@ -466,7 +521,7 @@ async def test_authentication_rejects_before_json_body_parsing():
         response = await client.post(
             "/v1/triage",
             content=b"not-json",
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "text/plain"},
         )
         openapi = (await client.get("/openapi.json")).json()
 
