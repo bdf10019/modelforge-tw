@@ -11,6 +11,7 @@ def test_kubernetes_manifests_parse_and_default_to_q8_candidate():
     )
     config = next(item for item in documents if item["kind"] == "ConfigMap")
     assert config["data"]["MODELFORGE_MODEL_ID"] == "modelforge-tw-q8_0"
+    assert config["data"]["MODELFORGE_MODEL_VERSION"] == "qwen3-1.7b-merged-v5-q8_0-policy-v2"
     assert config["data"]["MODELFORGE_QUANTIZATION"] == "q8_0"
     assert config["data"]["MODELFORGE_CONTEXT_WINDOW_TOKENS"] == "2048"
     assert config["data"]["MODELFORGE_SAFETY_POLICY_VERSION"] == "risk-precedence-v2"

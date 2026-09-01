@@ -74,7 +74,7 @@ modelforge merge --adapter artifacts\qwen3-1.7b-triage-lora-v5\final-adapter `
 
 ```powershell
 .\scripts\run-demo.ps1 -Engine llama-http -ModelId modelforge-tw-q8_0 `
-  -ModelVersion qwen3-1.7b-merged-v5-q8_0-json-schema-v2 -Quantization q8_0
+  -ModelVersion qwen3-1.7b-merged-v5-q8_0-policy-v2 -Quantization q8_0
 ```
 
 大型權重與實測輸出皆位於 Git 忽略目錄；模型 revision、資料 manifest、設定與 artifact SHA-256

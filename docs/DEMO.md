@@ -35,7 +35,7 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/triage -ContentType
 .\scripts\serve-gguf.ps1 -Quantization q8_0 -Port 8081
 # 另開終端機
 .\scripts\run-demo.ps1 -Engine llama-http -ModelId modelforge-tw-q8_0 `
-  -ModelVersion qwen3-1.7b-merged-v5-q8_0-json-schema-v2 -Quantization q8_0 `
+  -ModelVersion qwen3-1.7b-merged-v5-q8_0-policy-v2 -Quantization q8_0 `
   -LlamaBaseUrl http://127.0.0.1:8081
 ```
 
