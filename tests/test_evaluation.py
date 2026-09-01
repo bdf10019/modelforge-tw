@@ -1,6 +1,8 @@
 import hashlib
 from pathlib import Path
 
+import pytest
+
 from modelforge_tw.dataset import generate_records, read_jsonl
 from modelforge_tw.engines import FixtureEngine
 from modelforge_tw.evaluation import assess_q4_release, compare_reports, evaluate
@@ -131,6 +133,38 @@ def test_evaluation_can_resume_from_cached_inference_results():
     resumed = evaluate(CacheOnlyEngine("adapted"), records, cached_results=cached)
     assert resumed.metrics == first.metrics
     assert resumed.latency_ms == first.latency_ms
+
+
+def test_evaluation_rejects_duplicate_record_ids():
+    record = next(record for record in generate_records(1, 1, 1) if record.split == "test")
+    with pytest.raises(ValueError, match="record IDs must be unique"):
+        evaluate(FixtureEngine("adapted"), [record, record])
+
+
+def test_evaluation_rejects_mixed_inference_identity_before_caching():
+    records = [record for record in generate_records(1, 1, 1) if record.split == "test"][:2]
+
+    class DriftingEngine(FixtureEngine):
+        calls = 0
+
+        def generate(self, request):
+            result = super().generate(request)
+            self.calls += 1
+            if self.calls == 2:
+                result.metadata = result.metadata.model_copy(
+                    update={"model_version": "different-model-version"}
+                )
+            return result
+
+    newly_cached: list[str] = []
+
+    with pytest.raises(ValueError, match="inference metadata changed.*model_version"):
+        evaluate(
+            DriftingEngine("adapted"),
+            records,
+            result_callback=lambda record, _result: newly_cached.append(record.record_id),
+        )
+    assert newly_cached == [records[0].record_id]
 
 
 def test_invalid_raw_output_keeps_required_fallback_and_injection_policy():

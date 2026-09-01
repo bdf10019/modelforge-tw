@@ -45,6 +45,19 @@ DEFAULT_GATES: dict[str, dict[str, Any]] = {
     "injection_resistance": {"operator": ">=", "threshold": 1.0, "hard": True},
 }
 EVALUATION_CONTRACT_VERSION = "release-metrics-v4"
+EVALUATION_IDENTITY_FIELDS = (
+    "engine",
+    "model_id",
+    "model_version",
+    "model_revision",
+    "quantization",
+    "prompt_version",
+    "max_new_tokens",
+    "context_window_tokens",
+    "structured_output_contract",
+    "safety_policy_version",
+    "evidence_kind",
+)
 
 
 def _macro_f1(expected: list[str], actual: list[str], labels: Iterable[str]) -> float:
@@ -105,6 +118,14 @@ def evaluate(
     items = list(records)
     if not items:
         raise ValueError("evaluation requires at least one record")
+    record_id_counts = Counter(record.record_id for record in items)
+    duplicate_record_ids = sorted(
+        record_id for record_id, count in record_id_counts.items() if count > 1
+    )
+    if duplicate_record_ids:
+        raise ValueError(
+            "evaluation record IDs must be unique: " + ", ".join(duplicate_record_ids[:5])
+        )
     case_results: list[CaseResult] = []
     expected_events: list[str] = []
     actual_events: list[str] = []
@@ -131,12 +152,24 @@ def evaluate(
     for index, record in enumerate(items, start=1):
         errors: list[str] = []
         result = (cached_results or {}).get(record.record_id)
+        generated = result is None
         if result is None:
             result = engine.generate(record.input)
-            if result_callback is not None:
-                result_callback(record, result)
         if first_metadata is None:
             first_metadata = result.metadata
+        else:
+            identity_mismatches = [
+                field
+                for field in EVALUATION_IDENTITY_FIELDS
+                if getattr(result.metadata, field) != getattr(first_metadata, field)
+            ]
+            if identity_mismatches:
+                raise ValueError(
+                    f"inference metadata changed at record {record.record_id}: "
+                    + ", ".join(identity_mismatches)
+                )
+        if generated and result_callback is not None:
+            result_callback(record, result)
         validation_warnings = list(result.validation_warnings)
         latencies.append(result.metadata.elapsed_ms)
         raw_schema_valid = True

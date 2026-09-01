@@ -25,7 +25,8 @@ Web / REST / OpenAI-compatible client
 - `engines/`：相同 protocol 下的 fixture、Transformers 與 OpenAI-compatible HTTP adapter。
 - `evaluation.py`：同資料 hash、release-gate SHA-256 的品質指標與 hard gate；Q4 另檢查相對 Q8
   的 macro-F1、raw schema 與 hard-gate regression。長時間評估逐筆寫入續跑快取；只有資料紀錄
-  SHA-256 與模型、adapter、prompt、解碼、安全政策、評分契約指紋完全一致時才可沿用。
+  SHA-256 與模型、adapter、prompt、解碼、安全政策、評分契約指紋完全一致時才可沿用；評分器
+  也拒絕重複 record ID，並檢查每筆結果的模型與推論契約 metadata 一致後才寫入快取及計分。
 - `external_calibration.py`：驗證第三方來源 SHA-256、固定兩組不重疊抽樣、轉換 AI4I 衍生事件，
   並輸出 calibration／holdout manifest 與 combined leakage audit。
 - `benchmark.py`：併發、P50/P95/P99、吞吐、RAM／整卡 VRAM 峰值取樣；HTTP streaming 可量

@@ -7,7 +7,9 @@
 每 slot context、結構化輸出契約、安全政策版本、評分契約版本、逐案原文、延遲與 `evidence_kind`。
 評分合約 v4 另保存模型原生 evidence precision、後處理介入率、強制 unknown 比率、警告原因計數與
 逐案 `validation_warnings`，避免把安全層修正誤報為模型原生能力。長時間執行逐筆
-寫入續跑快取，只有資料紀錄 SHA-256、adapter 檔案 hash 與所有推論設定完全一致時才能沿用。
+寫入續跑快取，只有資料紀錄 SHA-256、adapter 檔案 hash 與所有推論設定完全一致時才能沿用；
+計分前還會拒絕重複 `record_id`，並逐筆確認模型、版本、量化、prompt、生成、安全與證據類型的
+metadata 全程一致，避免混合快取被包裝成單一模型報告。
 
 絕對門檻：
 
