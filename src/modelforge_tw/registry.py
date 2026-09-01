@@ -191,14 +191,16 @@ class FileRegistry:
                 digest.update(chunk)
         if digest.hexdigest() != manifest.evaluation_report_sha256:
             raise ValueError("registered evaluation report hash changed")
+        evaluation = EvaluationReport.model_validate_json(path.read_text(encoding="utf-8"))
+        self._validate_evaluation_against_manifest(manifest, evaluation)
+        if manifest.release_passed != evaluation.release_passed:
+            raise ValueError("evaluation release result does not match manifest")
 
-    def validate_evaluation(self, manifest_id: str, evaluation: EvaluationReport) -> None:
-        self._validate_id(manifest_id)
-        state = self.load()
-        if manifest_id not in state.manifests:
-            raise KeyError(f"manifest not found: {manifest_id}")
-        manifest = state.manifests[manifest_id]
-        self._require_evaluation_attestation(manifest)
+    @classmethod
+    def _validate_evaluation_against_manifest(
+        cls, manifest: ModelManifest, evaluation: EvaluationReport
+    ) -> None:
+        cls._require_evaluation_attestation(manifest)
         checks = {
             "evaluation_dataset_sha256": (
                 manifest.evaluation_dataset_sha256 == evaluation.dataset_manifest_sha256
@@ -234,6 +236,14 @@ class FileRegistry:
         mismatches = [name for name, matched in checks.items() if not matched]
         if mismatches:
             raise ValueError("evaluation does not match manifest: " + ", ".join(sorted(mismatches)))
+
+    def validate_evaluation(self, manifest_id: str, evaluation: EvaluationReport) -> None:
+        self._validate_id(manifest_id)
+        state = self.load()
+        if manifest_id not in state.manifests:
+            raise KeyError(f"manifest not found: {manifest_id}")
+        manifest = state.manifests[manifest_id]
+        self._validate_evaluation_against_manifest(manifest, evaluation)
 
     def attest_evaluation(
         self,
@@ -308,6 +318,8 @@ class FileRegistry:
         state = self.load()
         if manifest.manifest_id in state.manifests:
             raise ValueError(f"manifest already exists: {manifest.manifest_id}")
+        self._verify_evaluation_report(manifest)
+        self._verify_artifacts(manifest)
         state.manifests[manifest.manifest_id] = manifest
         state.events.append(
             {

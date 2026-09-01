@@ -4,9 +4,70 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from modelforge_tw.registry import ArtifactRef, FileRegistry, ModelManifest
-from modelforge_tw.schemas import EvaluationReport
+from modelforge_tw.schemas import (
+    REQUIRED_RELEASE_GATE_NAMES,
+    CaseResult,
+    EvaluationReport,
+    TriageOutput,
+)
 
 HASH = hashlib.sha256(b"fixture").hexdigest()
+
+
+def valid_evaluation_report(**updates) -> EvaluationReport:
+    output = TriageOutput(
+        event_type="unknown",
+        severity="unknown",
+        summary_zh_tw="測試事件需要人工複核。",
+        evidence_spans=[],
+        missing_information=["需要補充量測資料"],
+        safe_actions=["collect_evidence"],
+        review_required=True,
+        reason_codes=["UNKNOWN_EVENT"],
+    )
+    metrics = {name: 1.0 for name in REQUIRED_RELEASE_GATE_NAMES}
+    report = EvaluationReport(
+        run_id="registry-report",
+        engine="fixture",
+        model_id="fixture",
+        model_version="1",
+        quantization="none",
+        prompt_version="optimized-v1",
+        max_new_tokens=192,
+        structured_output_contract="json-schema-v2",
+        safety_policy_version="risk-precedence-v2",
+        evaluation_contract_version="release-metrics-v2",
+        evidence_kind="measured",
+        dataset_manifest_sha256=HASH,
+        release_gate_sha256=HASH,
+        case_count=1,
+        metrics=metrics,
+        gates={
+            name: {
+                "value": 1.0,
+                "operator": ">=",
+                "threshold": 1.0,
+                "hard": True,
+                "passed": True,
+            }
+            for name in REQUIRED_RELEASE_GATE_NAMES
+        },
+        release_passed=True,
+        latency_ms={"mean": 1.0},
+        cases=[
+            CaseResult(
+                record_id="registry-case",
+                passed=True,
+                errors=[],
+                expected=output,
+                actual=output,
+                raw_text=output.model_dump_json(),
+                elapsed_ms=1.0,
+                repair_used=False,
+            )
+        ],
+    )
+    return EvaluationReport.model_validate({**report.model_dump(mode="json"), **updates})
 
 
 def manifest(manifest_id: str, passed: bool = True) -> ModelManifest:
@@ -38,7 +99,7 @@ def manifest(manifest_id: str, passed: bool = True) -> ModelManifest:
                 kind="gguf",
                 relative_path="artifacts/model.gguf",
                 sha256=HASH,
-                bytes=1,
+                bytes=7,
             )
         ],
     )
@@ -267,12 +328,13 @@ def test_registry_allows_only_fully_legacy_previous_good_on_schema_1_rollback(tm
 def test_registry_rechecks_artifact_before_promotion(tmp_path):
     evaluation_report = tmp_path / "outputs" / "evaluation.json"
     evaluation_report.parent.mkdir()
-    evaluation_report.write_bytes(b"fixture")
+    evaluation_report.write_text(valid_evaluation_report().model_dump_json(), encoding="utf-8")
     artifact = tmp_path / "model.gguf"
     artifact.write_bytes(b"original")
     digest = hashlib.sha256(b"original").hexdigest()
     candidate = manifest("v1").model_copy(
         update={
+            "evaluation_report_sha256": hashlib.sha256(evaluation_report.read_bytes()).hexdigest(),
             "artifacts": [
                 ArtifactRef(
                     kind="gguf",
@@ -280,7 +342,7 @@ def test_registry_rechecks_artifact_before_promotion(tmp_path):
                     sha256=digest,
                     bytes=8,
                 )
-            ]
+            ],
         }
     )
     registry = FileRegistry(tmp_path / "registry.json", artifact_root=tmp_path)
@@ -291,12 +353,15 @@ def test_registry_rechecks_artifact_before_promotion(tmp_path):
 
 
 def test_registry_rechecks_evaluation_report_before_promotion(tmp_path):
+    artifact = tmp_path / "artifacts" / "model.gguf"
+    artifact.parent.mkdir()
+    artifact.write_bytes(b"fixture")
     report_path = tmp_path / "evaluation.json"
-    report_path.write_bytes(b"original")
+    report_path.write_text(valid_evaluation_report().model_dump_json(), encoding="utf-8")
     candidate = manifest("v1").model_copy(
         update={
             "evaluation_report": "evaluation.json",
-            "evaluation_report_sha256": hashlib.sha256(b"original").hexdigest(),
+            "evaluation_report_sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
         }
     )
     registry = FileRegistry(tmp_path / "registry.json", artifact_root=tmp_path)
@@ -305,6 +370,25 @@ def test_registry_rechecks_evaluation_report_before_promotion(tmp_path):
 
     with pytest.raises(ValueError, match="evaluation report hash changed"):
         registry.promote("v1")
+
+
+def test_registry_rejects_hash_valid_report_with_wrong_identity(tmp_path):
+    report_path = tmp_path / "evaluation.json"
+    report_path.write_text(
+        valid_evaluation_report(model_id="different-model").model_dump_json(),
+        encoding="utf-8",
+    )
+    candidate = manifest("v1").model_copy(
+        update={
+            "evaluation_report": "evaluation.json",
+            "evaluation_report_sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
+        }
+    )
+    registry = FileRegistry(tmp_path / "registry.json", artifact_root=tmp_path)
+
+    with pytest.raises(ValueError, match="evaluation_model_id"):
+        registry.add(candidate)
+    assert not registry.path.exists()
 
 
 def test_registry_attests_and_locks_evaluation_contract(tmp_path):
