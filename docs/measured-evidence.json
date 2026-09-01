@@ -250,6 +250,7 @@
     "decision": "holdout_passed_but_prompt_v5_rejected_for_internal_regression"
   },
   "training": {
+    "source_report": "artifacts/qwen3-1.7b-triage-lora-v5/training-report.json",
     "run": "qwen3-1.7b-qlora-v5",
     "base_model": "Qwen/Qwen3-1.7B",
     "base_revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
@@ -383,24 +384,29 @@
   },
   "artifacts": {
     "merged_safetensors": {
+      "source_report": "artifacts/qwen3-1.7b-triage-merged/merge-report.json",
       "bytes": 3441185608,
       "sha256": "d7fb897a84c0553b934717fb1b2cf4299a67cdcd6a709c2f7d07ca0bb2e303e1"
     },
     "gguf_f16": {
+      "source_report": "artifacts/gguf/quantization-report.json",
       "bytes": 3447349024,
       "sha256": "1a1cbf88f5575f7fa3377187e2b4916114d69efeed3e46b2c9742c88a7c739fa"
     },
     "gguf_q8_0": {
+      "source_report": "artifacts/gguf/quantization-report.json",
       "bytes": 1834426144,
       "sha256": "d4729ea11ea540d46be45effe7b41ffbe55bc51ce7e42bf7443cd2bbf84ca9ed"
     },
     "gguf_q4_k_m": {
+      "source_report": "artifacts/gguf/quantization-report.json",
       "bytes": 1107408672,
       "sha256": "8745574ab802c7ac799c4d2261fea0e067c638e87ea1f5591e4a9bf2cc49566d"
     }
   },
   "concurrency_benchmarks": {
     "q8_0": {
+      "source_report": "outputs/benchmark-q8-v5.json",
       "requests": 36,
       "errors": 0,
       "host_gpu_peak_mib": 3134,
@@ -412,6 +418,7 @@
       }
     },
     "q4_k_m": {
+      "source_report": "outputs/benchmark-q4-v5.json",
       "requests": 36,
       "errors": 0,
       "host_gpu_peak_mib": 2443,
@@ -423,6 +430,7 @@
       }
     }
   },
+  "registry_source_report": "outputs/model-registry.json",
   "registry_expected_state": {
     "released": "qwen3-1.7b-qlora-v5-policy-v2",
     "previous_good": "qwen3-1.7b-gguf-q8-v5-policy-v2",

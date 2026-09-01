@@ -43,6 +43,13 @@ def test_public_evidence_snapshot_is_self_consistent():
         "previous_good": "qwen3-1.7b-gguf-q8-v5-policy-v2",
         "blocked": "qwen3-1.7b-gguf-q4-v5-policy-v2",
     }
+    assert evidence["registry_source_report"] == "outputs/model-registry.json"
+    assert evidence["training"]["source_report"].endswith("training-report.json")
+    assert all(artifact["source_report"] for artifact in evidence["artifacts"].values())
+    assert all(
+        benchmark["source_report"] and benchmark["requests"] > 0 and benchmark["errors"] == 0
+        for benchmark in evidence["concurrency_benchmarks"].values()
+    )
 
     comparison = evidence["q8_to_q4_comparison"]
     assert all(comparison["compatibility_checks"].values())

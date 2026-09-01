@@ -80,8 +80,9 @@ policy-v2 報告的合約不同，只作診斷，不用來覆寫既有 attestati
 - `scripts/quantize.ps1`、`scripts/serve-gguf.ps1`：GGUF 與 llama.cpp。
 - `scripts/benchmark.ps1`：併發與 TTFT。
 - `scripts/verify.ps1`：格式、型別、測試、資料 audit、隱私與封裝檢查。
-- `scripts/verify-local-evidence.ps1`：本機逐案報告存在時，核對公開快照的 run ID、設定、gate、
-  指標、警告計數及外部 manifest hash；乾淨 clone 沒有 Git 忽略報告時安全略過。
+- `scripts/verify-local-evidence.ps1`：本機原始產物存在時，核對公開快照與 3 份正式評測、6 份外部
+  評測、Q8/Q4 比較、訓練、merge/quantization、2 份 benchmark、registry 最終狀態及外部 manifest；
+  乾淨 clone 沒有 Git 忽略報告時安全略過對應項目。
 
 若重新執行產生不同 run ID，必須同時檢查資料 hash、gate hash、模型版本與 artifact hash，不能只
 比較檔名。
