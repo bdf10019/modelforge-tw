@@ -278,6 +278,43 @@ def test_registry_event_report_hash_requires_report_path():
         )
 
 
+def test_registry_event_action_rejects_inconsistent_report_fields():
+    candidate = manifest("v1")
+    with pytest.raises(ValidationError, match="attestation event requires"):
+        RegistryState(
+            schema_version="1.0",
+            manifests={"v1": candidate},
+            events=[
+                {
+                    "at": "2026-01-01T00:00:00+00:00",
+                    "action": "evaluation_attested",
+                    "manifest_id": "v1",
+                }
+            ],
+        )
+    with pytest.raises(ValidationError, match="action cannot include"):
+        RegistryState(
+            schema_version="1.0",
+            manifests={"v1": candidate},
+            events=[
+                {
+                    "at": "2026-01-01T00:00:00+00:00",
+                    "action": "promoted",
+                    "manifest_id": "v1",
+                    "evaluation_report": "outputs/evaluation.json",
+                }
+            ],
+        )
+
+
+def test_model_manifest_requires_immutable_base_revision():
+    payload = manifest("v1").model_dump(mode="json")
+    payload["base_revision"] = "main"
+
+    with pytest.raises(ValidationError, match="base_revision"):
+        ModelManifest.model_validate(payload)
+
+
 def test_registry_state_rejects_inconsistent_release_pointers_and_ids():
     candidate = manifest("v1")
     with pytest.raises(ValidationError, match="released pointer"):

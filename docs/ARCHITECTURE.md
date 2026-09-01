@@ -59,6 +59,8 @@ Web / REST / OpenAI-compatible client
   1.0–1.3 可唯讀相容，下一次 mutation 才封入新鏈。這可偵測未同步重算的封存後改寫，但不是
   外部數位簽章或不可變 audit storage；能改寫檔案的攻擊者也能重算整條鏈。正式環境必須把 head digest／registry
   副本送往獨立受控稽核系統，才能對抗事後重算。
+  Manifest 的 base revision 必須是 40–64 位 lowercase commit hash；事件 action 也限制可帶的欄位，
+  例如 evaluation attestation 缺 report，或 promoted 事件夾帶 report，都會在載入時拒絕。
 
 資料 split／manifest、評測、比較、benchmark、訓練、merge、量化與 registry JSON 都先寫入同目錄
 的唯一暫存檔，完成後再原子替換；Python 路徑會先 flush + fsync。中斷或 replace 失敗會保留上一份

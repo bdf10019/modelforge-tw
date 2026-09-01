@@ -56,10 +56,10 @@ class ModelManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     manifest_id: str = Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
-    base_model: str
-    base_revision: str
-    license: str
-    prompt_version: str
+    base_model: str = Field(min_length=1, max_length=256)
+    base_revision: str = Field(pattern=r"^[a-f0-9]{40,64}$")
+    license: str = Field(min_length=1, max_length=128)
+    prompt_version: str = Field(min_length=1, max_length=128)
     dataset_manifest_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     training_config_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     release_gate_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
@@ -122,6 +122,12 @@ class RegistryEvent(BaseModel):
     def report_hash_requires_report(self) -> RegistryEvent:
         if self.evaluation_report_sha256 is not None and self.evaluation_report is None:
             raise ValueError("event evaluation report SHA-256 requires a report path")
+        if self.action == "evaluation_attested" and self.evaluation_report is None:
+            raise ValueError("evaluation attestation event requires a report path")
+        if self.action not in {"evaluation_attested", "blocked"} and (
+            self.evaluation_report is not None or self.evaluation_report_sha256 is not None
+        ):
+            raise ValueError("event action cannot include an evaluation report")
         return self
 
 
