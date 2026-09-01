@@ -48,6 +48,10 @@ def _consume_task_exception(task: asyncio.Task[Any]) -> None:
         task.exception()
 
 
+class _RegistryDeploymentNotReadyError(Exception):
+    pass
+
+
 class SecurityHeadersMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -643,29 +647,33 @@ def create_app(
         if not getattr(app.state, "ready", False):
             raise HTTPException(status_code=503, detail="model engine is not ready")
         engine: InferenceEngine = app.state.engine
-        if selected_settings.registry_deployment_role is not None:
+
+        def check_dependencies() -> bool:
+            if selected_settings.registry_deployment_role is None:
+                return engine.ready()
             try:
                 current_manifest_id = validate_registry_deployment(selected_settings, engine)
-            except Exception:
-                raise HTTPException(
-                    status_code=503,
-                    detail="registry deployment binding is not ready",
-                ) from None
+            except Exception as error:
+                raise _RegistryDeploymentNotReadyError from error
             if current_manifest_id != app.state.registry_manifest_id:
-                raise HTTPException(
-                    status_code=503,
-                    detail="registry deployment binding is not ready",
-                )
+                raise _RegistryDeploymentNotReadyError
+            return engine.ready()
+
         try:
             readiness_task: asyncio.Task[bool] | None = app.state.readiness_task
             if readiness_task is None or readiness_task.done():
-                readiness_task = asyncio.create_task(asyncio.to_thread(engine.ready))
+                readiness_task = asyncio.create_task(asyncio.to_thread(check_dependencies))
                 readiness_task.add_done_callback(_consume_task_exception)
                 app.state.readiness_task = readiness_task
             dependency_ready = await asyncio.wait_for(
                 asyncio.shield(readiness_task),
                 timeout=selected_settings.readiness_timeout_seconds,
             )
+        except _RegistryDeploymentNotReadyError:
+            raise HTTPException(
+                status_code=503,
+                detail="registry deployment binding is not ready",
+            ) from None
         except Exception:
             raise HTTPException(
                 status_code=503, detail="model engine dependency is not ready"

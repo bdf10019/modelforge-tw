@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 import httpx
 import pytest
 
+import modelforge_tw.service as service_module
 from modelforge_tw.engines import FixtureEngine
 from modelforge_tw.registry import ArtifactRef, FileRegistry, ModelManifest
 from modelforge_tw.service import REQUEST_ID, create_app
@@ -421,6 +422,54 @@ async def test_readiness_timeout_reuses_one_inflight_dependency_check():
 
     assert recovered.status_code == 200
     assert engine.calls == 2
+
+
+async def test_slow_registry_readiness_check_is_bounded_and_reused(tmp_path, monkeypatch):
+    engine = FixtureEngine("adapted")
+    engine.name = "openai-http"
+    engine.model_id = "deployed-model"
+    engine.model_version = "measured-v1"
+    engine.quantization = "q8_0"
+    engine.max_new_tokens = 192
+    engine.structured_output_contract = "json-schema-v2"
+    engine.evidence_kind = "measured"
+    registry_path = tmp_path / "registry.json"
+    write_runtime_registry(registry_path, engine)
+    app = create_app(
+        settings=Settings(
+            registry_path=registry_path,
+            registry_deployment_role="released",
+            readiness_timeout_seconds=0.1,
+        ),
+        engine_factory=lambda: engine,
+    )
+    release = threading.Event()
+    calls = 0
+
+    def slow_registry_check(_settings, _engine):
+        nonlocal calls
+        calls += 1
+        release.wait(timeout=1)
+        return "measured-v1"
+
+    async with app_client(app) as client:
+        monkeypatch.setattr(service_module, "validate_registry_deployment", slow_registry_check)
+        started = time.perf_counter()
+        first = await client.get("/readyz")
+        second = await client.get("/readyz")
+        elapsed = time.perf_counter() - started
+
+        assert first.status_code == 503
+        assert second.status_code == 503
+        assert calls == 1
+        assert elapsed < 0.5
+
+        release.set()
+        await asyncio.wait_for(app.state.readiness_task, timeout=1)
+        recovered = await client.get("/readyz")
+
+    assert recovered.status_code == 200
+    assert calls == 2
 
 
 async def test_invalid_request_id_and_extra_input_are_rejected():

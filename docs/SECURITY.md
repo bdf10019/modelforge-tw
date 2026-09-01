@@ -45,7 +45,8 @@
 - `X-Request-ID` 在 JSON 解析前限制為 1–96 字元安全字元；重複或非法值回 400 且不回顯。所有 HTTP
   response 都由 server 附追蹤 ID，便於關聯失敗而不需要記錄事件原文。
 - semaphore、timeout、request ID 驗證、Prometheus outcome 與 readiness 檢查；readiness 有獨立 4 秒
-  上限，卡住時後續探針共用同一背景檢查，不重複堆積執行緒。
+  總上限，registry metadata 與引擎健康都在同一背景檢查內；卡住時後續探針共用該工作，不阻塞
+  event loop 或重複堆積執行緒。
 - timeout 後仍保留同步模型的容量槽，直到不可取消的背景推論真正結束，避免資源耗盡。
 - 等待容量另有獨立 queue timeout；超時回 503／`Retry-After` 並記錄非原文 outcome，防止卡住的
   模型讓未執行請求在服務內無限累積。每 replica 的等待區另有可設定筆數上限，滿載立即拒絕；
