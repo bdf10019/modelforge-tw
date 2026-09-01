@@ -190,3 +190,25 @@ def test_registry_cli_exports_validated_anchor(tmp_path, capsys):
     assert output["registry_sha256"] == hashlib.sha256(registry_path.read_bytes()).hexdigest()
     assert output["event_chain_verified"] is True
     assert output["event_chain_head_sha256"]
+
+
+def test_registry_cli_maps_lock_timeout_to_concise_error(tmp_path, monkeypatch, capsys):
+    def time_out(_registry, _manifest_id):
+        raise TimeoutError("timed out waiting for file lock: .registry.json.lock")
+
+    monkeypatch.setattr(FileRegistry, "promote", time_out)
+
+    exit_code = cli.main(
+        [
+            "registry",
+            "promote",
+            "candidate-v1",
+            "--registry",
+            str(tmp_path / "registry.json"),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert captured.out == ""
+    assert captured.err == "error: timed out waiting for file lock: .registry.json.lock\n"

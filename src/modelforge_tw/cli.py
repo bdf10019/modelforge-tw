@@ -710,7 +710,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     try:
         return int(args.func(args))
-    except (FileNotFoundError, ValueError, KeyError) as error:
+    except (FileNotFoundError, TimeoutError, ValueError, KeyError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
 
