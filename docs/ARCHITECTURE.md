@@ -51,7 +51,8 @@ Web / REST / OpenAI-compatible client
   機制但不能成為正式發布。rollback
   同樣採此規則；唯一相容例外是 schema 1.0 中八個新版 identity／報告雜湊欄位全部不存在、
   且早已被指定為 previous-good 的既有狀態，避免安全升級反而切斷已驗證的舊回退路徑；
-  部分遷移的資料不放行。
+  部分遷移的資料不放行。Registry 載入時另驗證 manifest key／ID、唯一 released status、released
+  pointer、通過結果與 retired previous-good pointer 一致；人工改壞的狀態不能進入後續操作。
 
 資料 split／manifest、評測、比較、benchmark、訓練、merge、量化與 registry JSON 都先寫入同目錄
 的唯一暫存檔，完成後再原子替換；Python 路徑會先 flush + fsync。中斷或 replace 失敗會保留上一份

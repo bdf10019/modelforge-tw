@@ -4,8 +4,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
-from modelforge_tw.registry import ArtifactRef, FileRegistry, ModelManifest
+from modelforge_tw.registry import ArtifactRef, FileRegistry, ModelManifest, RegistryState
 from modelforge_tw.schemas import (
     REQUIRED_RELEASE_GATE_NAMES,
     CaseResult,
@@ -164,6 +165,48 @@ def test_registry_preserves_parallel_candidate_additions(tmp_path):
     assert set(registry.load().manifests) == {
         f"parallel-{index}" for index in range(len(candidates))
     }
+
+
+def test_registry_state_rejects_inconsistent_release_pointers_and_ids():
+    candidate = manifest("v1")
+    with pytest.raises(ValidationError, match="released pointer"):
+        RegistryState(
+            released="v1",
+            manifests={"v1": candidate},
+        )
+
+    released = candidate.model_copy(update={"status": "released"})
+    with pytest.raises(ValidationError, match="keys do not match"):
+        RegistryState(
+            released="v1",
+            manifests={"different-key": released},
+        )
+
+    second = manifest("v2").model_copy(update={"status": "released"})
+    with pytest.raises(ValidationError, match="released pointer"):
+        RegistryState(
+            released="v1",
+            manifests={"v1": released, "v2": second},
+        )
+
+
+def test_registry_state_rejects_invalid_previous_good_pointer():
+    released = manifest("v1").model_copy(update={"status": "released"})
+    candidate = manifest("v2")
+
+    with pytest.raises(ValidationError, match="previous-good pointer"):
+        RegistryState(
+            released="v1",
+            previous_good="v2",
+            manifests={"v1": released, "v2": candidate},
+        )
+
+    with pytest.raises(ValidationError, match="cannot equal"):
+        RegistryState(
+            released="v1",
+            previous_good="v1",
+            manifests={"v1": released},
+        )
 
 
 def test_registry_rejects_failed_or_unsafe_candidate(tmp_path):

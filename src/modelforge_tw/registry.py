@@ -7,7 +7,7 @@ from hashlib import sha256
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from modelforge_tw.io_utils import atomic_write_text, exclusive_file_lock
 from modelforge_tw.schemas import EvaluationReport
@@ -50,7 +50,7 @@ class ArtifactRef(BaseModel):
 class ModelManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    manifest_id: str
+    manifest_id: str = Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
     base_model: str
     base_revision: str
     license: str
@@ -87,11 +87,36 @@ class ModelManifest(BaseModel):
 class RegistryState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: str = "1.3"
+    schema_version: Literal["1.0", "1.1", "1.2", "1.3"] = "1.3"
     released: str | None = None
     previous_good: str | None = None
     manifests: dict[str, ModelManifest] = Field(default_factory=dict)
     events: list[dict[str, str]] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_state_consistency(self) -> RegistryState:
+        mismatched_ids = sorted(
+            key for key, manifest in self.manifests.items() if key != manifest.manifest_id
+        )
+        if mismatched_ids:
+            raise ValueError("registry manifest keys do not match manifest IDs")
+
+        released_ids = sorted(
+            key for key, manifest in self.manifests.items() if manifest.status == "released"
+        )
+        expected_released = [self.released] if self.released is not None else []
+        if released_ids != expected_released:
+            raise ValueError("registry released pointer does not match manifest statuses")
+        if self.released is not None and not self.manifests[self.released].release_passed:
+            raise ValueError("released manifest does not have a passing release result")
+
+        if self.previous_good is not None:
+            if self.previous_good == self.released:
+                raise ValueError("previous-good manifest cannot equal the released manifest")
+            previous = self.manifests.get(self.previous_good)
+            if previous is None or previous.status != "retired":
+                raise ValueError("previous-good pointer must reference a retired manifest")
+        return self
 
 
 class FileRegistry:
