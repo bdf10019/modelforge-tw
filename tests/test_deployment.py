@@ -92,7 +92,7 @@ def test_kubernetes_runtime_security_and_probe_contracts():
     assert api_key["valueFrom"]["secretKeyRef"] == {
         "name": "modelforge-api-auth",
         "key": "api-key",
-        "optional": True,
+        "optional": False,
     }
 
 

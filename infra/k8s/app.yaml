@@ -138,7 +138,7 @@ spec:
                 secretKeyRef:
                   name: modelforge-api-auth
                   key: api-key
-                  optional: true
+                  optional: false
           ports:
             - name: http
               containerPort: 8000

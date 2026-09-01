@@ -11,9 +11,9 @@ NVIDIA device plugin；目前只完成多文件 YAML 解析與設定一致性檢
 - 若執行訓練 Job，另需名為 `modelforge-artifacts` 的可寫 PVC。
 - 內部 registry 的 `modelforge-tw:0.1.0` 與 `modelforge-tw-gpu:0.1.0` images。
 - 正式部署前把 llama.cpp 的 mutable tag 換成經弱點掃描且鎖定 digest 的 image。
-- 正式環境建立 `modelforge-api-auth` Secret，key 名稱為 `api-key`、值至少 32 字元；manifest
-  將它注入 `MODELFORGE_API_KEY`。Secret 引用刻意為 optional，僅方便無認證的本機／隔離環境
-  演示；對外環境不可省略，且實際值應由 secret manager 管理而非寫入 repository 或指令歷史。
+- 套用前必須建立 `modelforge-api-auth` Secret，key 名稱為 `api-key`、值至少 32 字元；manifest
+  將它注入 `MODELFORGE_API_KEY`，Secret 遺漏時 Pod 不啟動。實際值應由 secret manager 管理，
+  不可寫入 repository 或指令歷史；無認證模式只保留給 loopback／Compose 本機演示。
 
 ## 拓樸
 

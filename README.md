@@ -64,8 +64,9 @@ API、安全 gate、評測與 registry 機制，其數字不代表 LLM 品質，
 - 每 replica 有 concurrency、5 秒 queue timeout 與有限 queue depth；逾時後不可取消的同步模型工作
   仍占用槽位，排隊滿載立即 503，Prometheus 分開呈現 HTTP、queue 與 engine job。
 - 關閉時先撤 readiness，再在有界寬限內排空背景工作；Kubernetes 的 Pod 終止期限刻意更長。
-- 推論路由可選至少 32 字元的 shared bearer key，且禁止開啟輸入原文 logging；這仍不等同企業 IAM、
-  TLS、跨 replica rate limit 或集中稽核。
+- 推論路由支援至少 32 字元的 shared bearer key，Kubernetes baseline 缺少 Secret 時不啟動；只有
+  loopback／Compose demo 保留無認證模式。輸入原文 logging 不可開啟；這仍不等同企業 IAM、TLS、
+  跨 replica rate limit 或集中稽核。
 - 新版 registry mutation 會把 typed event 封入 SHA-256 前向鏈；線上服務也可選擇綁定完整 attestation
   的 `released`／`previous-good` runtime identity。現有實測 registry 是可相容讀取的 1.0 歷史資料，
   在受控的新 mutation 前不冒充已封鏈或已具新版線上綁定欄位。
