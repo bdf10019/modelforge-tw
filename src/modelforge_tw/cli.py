@@ -5,7 +5,7 @@ import hashlib
 import json
 import platform
 import sys
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from modelforge_tw.benchmark import run_benchmark, write_benchmark
 from modelforge_tw.dataset import audit_records, load_splits, sha256_file, write_dataset
@@ -328,6 +328,8 @@ def command_demo(_: argparse.Namespace) -> int:
 
 
 def command_registry(args: argparse.Namespace) -> int:
+    from modelforge_tw.training import TrainingConfig, TrainingReportAttestation
+
     registry = FileRegistry(args.registry, artifact_root=PROJECT_ROOT)
     if args.registry_action == "show":
         state = registry.load()
@@ -337,7 +339,35 @@ def command_registry(args: argparse.Namespace) -> int:
         evaluation = EvaluationReport.model_validate_json(
             args.evaluation.read_text(encoding="utf-8")
         )
-        training = json.loads(args.training_report.read_text(encoding="utf-8"))
+        training = TrainingReportAttestation.model_validate_json(
+            args.training_report.read_text(encoding="utf-8")
+        )
+        training_config = TrainingConfig.model_validate(training.config)
+        if training_config.prompt_version != evaluation.prompt_version:
+            raise ValueError(
+                "training prompt version does not match evaluation: "
+                f"{training_config.prompt_version} != {evaluation.prompt_version}"
+            )
+        configured_data_dir = training_config.data_dir
+        raw_data_dir = str(training.config.get("data_dir", training_config.data_dir))
+        windows_data_dir = PureWindowsPath(raw_data_dir)
+        if "\\" in raw_data_dir and not windows_data_dir.is_absolute():
+            configured_data_dir = Path(*windows_data_dir.parts)
+        data_dir = (
+            (PROJECT_ROOT / configured_data_dir).resolve()
+            if not configured_data_dir.is_absolute()
+            else configured_data_dir.resolve()
+        )
+        try:
+            data_dir.relative_to(PROJECT_ROOT)
+        except ValueError as error:
+            raise ValueError(
+                "training data directory must remain inside the project root"
+            ) from error
+        dataset_manifest_path = data_dir / "manifest.json"
+        dataset_manifest = json.loads(dataset_manifest_path.read_text(encoding="utf-8"))
+        if dataset_manifest.get("dataset_manifest_sha256") != training.dataset_manifest_sha256:
+            raise ValueError("training report does not match the local dataset manifest")
         if args.registry_quantization != evaluation.quantization:
             raise ValueError(
                 "registry quantization does not match evaluation: "
@@ -378,12 +408,12 @@ def command_registry(args: argparse.Namespace) -> int:
                 )
         manifest = ModelManifest(
             manifest_id=args.manifest_id,
-            base_model=training["model_id"],
-            base_revision=training.get("resolved_model_revision") or training["model_revision"],
+            base_model=training.model_id,
+            base_revision=training.resolved_model_revision,
             license=args.license,
             prompt_version=evaluation.prompt_version,
-            dataset_manifest_sha256=training["dataset_manifest_sha256"],
-            training_config_sha256=training["training_config_sha256"],
+            dataset_manifest_sha256=training.dataset_manifest_sha256,
+            training_config_sha256=training.training_config_sha256,
             release_gate_sha256=evaluation.release_gate_sha256,
             engine=args.registry_engine,
             quantization=args.registry_quantization,

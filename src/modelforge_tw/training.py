@@ -11,7 +11,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from modelforge_tw.dataset import load_splits, sha256_file
 from modelforge_tw.io_utils import atomic_write_text
@@ -61,6 +61,35 @@ class TrainingConfig(BaseModel):
         "optimized-v5",
         "optimized-v6",
     ] = "optimized-v1"
+
+
+class TrainingReportAttestation(BaseModel):
+    """Minimum verified lineage required before a training run enters the registry."""
+
+    model_config = ConfigDict(extra="allow")
+
+    schema_version: Literal["1.0", "1.1"]
+    evidence_kind: Literal["measured"]
+    model_id: str = Field(min_length=1, max_length=256)
+    model_revision: str = Field(min_length=1, max_length=256)
+    resolved_model_revision: str = Field(pattern=r"^[a-f0-9]{40,64}$")
+    config: dict[str, Any]
+    training_config_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    dataset_manifest_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+    @model_validator(mode="after")
+    def validate_lineage(self) -> TrainingReportAttestation:
+        config = TrainingConfig.model_validate(self.config)
+        mismatches: list[str] = []
+        if config.model_id != self.model_id:
+            mismatches.append("model_id")
+        if config.model_revision != self.model_revision:
+            mismatches.append("model_revision")
+        if _stable_hash(self.config) != self.training_config_sha256:
+            mismatches.append("training_config_sha256")
+        if mismatches:
+            raise ValueError("training report lineage mismatch: " + ", ".join(mismatches))
+        return self
 
 
 def load_training_config(path: Path) -> TrainingConfig:

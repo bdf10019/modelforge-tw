@@ -33,6 +33,14 @@ def manifest(manifest_id: str, passed: bool = True) -> ModelManifest:
         evaluation_report="outputs/evaluation.json",
         evaluation_report_sha256=HASH,
         release_passed=passed,
+        artifacts=[
+            ArtifactRef(
+                kind="gguf",
+                relative_path="artifacts/model.gguf",
+                sha256=HASH,
+                bytes=1,
+            )
+        ],
     )
 
 
@@ -69,6 +77,14 @@ def test_registry_rejects_failed_or_unsafe_candidate(tmp_path):
         registry.promote("failed")
     with pytest.raises(ValueError):
         registry.add(manifest("../escape"))
+
+
+def test_registry_rejects_release_without_model_artifact(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    registry.add(manifest("metadata-only").model_copy(update={"artifacts": []}))
+
+    with pytest.raises(ValueError, match="at least one immutable model artifact"):
+        registry.promote("metadata-only")
 
 
 @pytest.mark.parametrize(

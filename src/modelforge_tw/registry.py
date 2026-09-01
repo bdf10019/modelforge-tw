@@ -138,6 +138,8 @@ class FileRegistry:
         cls._require_evaluation_attestation(manifest)
         if manifest.evaluation_evidence_kind != "measured":
             raise ValueError("only measured evaluation evidence can be released")
+        if not manifest.artifacts:
+            raise ValueError("at least one immutable model artifact is required for release")
 
     @classmethod
     def _require_rollback_evidence(cls, state: RegistryState, manifest: ModelManifest) -> None:

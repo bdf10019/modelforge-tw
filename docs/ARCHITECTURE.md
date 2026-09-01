@@ -34,7 +34,9 @@ Web / REST / OpenAI-compatible client
   會保留樣本並讓 CLI 回傳非零狀態，不能把部分或全數失敗的壓測當作成功產物。
 - `training.py`：固定 seed 的 completion-only QLoRA 與 merge；新版報告保存資料／設定／adapter
   hash、Python、Torch、CUDA、cuDNN、GPU capability、實體顯存與完整 ML 依賴版本，避免只鎖
-  模型卻漏掉訓練 runtime 漂移。
+  模型卻漏掉訓練 runtime 漂移。候選加入 registry 前會驗證報告 schema、measured evidence、
+  immutable resolved revision、內嵌 config 雜湊、模型 identity、prompt 契約及本機資料 manifest；
+  正式發布另要求至少一個已雜湊模型 artifact，不能發布只有 metadata 的空候選。
 - `registry.py`：candidate、evaluation attestation、promote、previous-good 與 rollback 的原子檔案
   registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住評測資料 hash、引擎、
   模型 identity、evidence kind、生成、安全與評分契約。新候選缺少任一 attestation 欄位都不能
