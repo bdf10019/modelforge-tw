@@ -54,6 +54,23 @@ async def test_triage_health_metrics_and_no_input_echo():
         assert "modelforge_requests_total" in metrics.text
 
 
+@pytest.mark.parametrize("ready_behavior", [False, RuntimeError("private dependency detail")])
+async def test_readiness_maps_dependency_failures_to_sanitized_503(ready_behavior):
+    class UnreadyEngine(FixtureEngine):
+        def ready(self):
+            if isinstance(ready_behavior, Exception):
+                raise ready_behavior
+            return ready_behavior
+
+    app = create_app(engine_factory=lambda: UnreadyEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.get("/readyz")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "model engine dependency is not ready"
+    assert "private dependency detail" not in response.text
+
+
 async def test_invalid_request_id_and_extra_input_are_rejected():
     app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
     async with app_client(app) as client:

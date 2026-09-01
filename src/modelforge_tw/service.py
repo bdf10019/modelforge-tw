@@ -204,7 +204,13 @@ def create_app(
         if not getattr(app.state, "ready", False):
             raise HTTPException(status_code=503, detail="model engine is not ready")
         engine: InferenceEngine = app.state.engine
-        if not await asyncio.to_thread(engine.ready):
+        try:
+            dependency_ready = await asyncio.to_thread(engine.ready)
+        except Exception:
+            raise HTTPException(
+                status_code=503, detail="model engine dependency is not ready"
+            ) from None
+        if not dependency_ready:
             raise HTTPException(status_code=503, detail="model engine dependency is not ready")
         return {
             "status": "ready",
