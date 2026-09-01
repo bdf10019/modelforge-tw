@@ -27,6 +27,9 @@
   數字必須是有限值且在明確範圍內，控制字元會在進入 prompt 前拒絕。
 - HTTP body 預設上限 32 KiB；有無 `Content-Length` 都會依實收 bytes 計數，超限先回 413，
   不讓大型 payload 進入 JSON／Pydantic 解析。上限可設定但限制在 1 KiB 至 1 MiB。
+- 設定 `MODELFORGE_API_KEY` 後，兩個推論路由都要求標準 `Authorization: Bearer ...`；key 至少
+  32 字元、以 constant-time 比對、不出現在 config response。Kubernetes 由可選 Secret 注入，
+  repository 不保存值；未設定時保留 loopback 本機 demo 相容性。
 - semaphore、timeout、request ID 驗證、Prometheus outcome 與 readiness 檢查。
 - timeout 後仍保留同步模型的容量槽，直到不可取消的背景推論真正結束，避免資源耗盡。
 - `MODELFORGE_LOG_INPUTS` 唯一合法值為 `false`；誤設 `true` 時服務拒絕啟動，API 不提供事件原文
@@ -44,6 +47,7 @@
 
 ## Residual risk
 
-regex 不是完整語意安全分類器；本機 llama-server 只綁定 `127.0.0.1` 且沒有 API key。真實部署
-需要領域規則、身分驗證、TLS、rate limit、網路隔離、集中 audit 與事故應變流程。本 demo 沒有
-宣稱具備這些外部基礎設施。
+regex 不是完整語意安全分類器；本機 llama-server 只綁定 `127.0.0.1` 且沒有 API key。統一 API
+雖提供 shared bearer key 基線，但不等同使用者身分、細粒度授權或 key rotation。真實部署仍需要
+領域規則、TLS、rate limit、網路隔離、集中 audit 與事故應變流程。本 demo 沒有宣稱具備這些
+外部基礎設施。

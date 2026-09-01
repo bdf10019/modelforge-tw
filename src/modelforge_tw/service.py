@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import secrets
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -10,8 +11,9 @@ from contextlib import asynccontextmanager
 from importlib.resources import files
 from typing import Any, Literal
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Security
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -24,21 +26,71 @@ from modelforge_tw.settings import Settings
 
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,96}$")
 BODY_METHODS = frozenset({"POST", "PUT", "PATCH"})
+PROTECTED_API_PATHS = frozenset({"/v1/triage", "/v1/chat/completions"})
 
 
-async def _send_body_error(send: Send, status: int, detail: str) -> None:
+async def _send_json_error(
+    send: Send,
+    status: int,
+    detail: str,
+    *,
+    extra_headers: list[tuple[bytes, bytes]] | None = None,
+) -> None:
     content = json.dumps({"detail": detail}, separators=(",", ":")).encode()
+    headers = [
+        (b"content-type", b"application/json"),
+        (b"content-length", str(len(content)).encode()),
+    ]
+    if extra_headers:
+        headers.extend(extra_headers)
     await send(
         {
             "type": "http.response.start",
             "status": status,
-            "headers": [
-                (b"content-type", b"application/json"),
-                (b"content-length", str(len(content)).encode()),
-            ],
+            "headers": headers,
         }
     )
     await send({"type": "http.response.body", "body": content})
+
+
+def _valid_bearer(authorization: str | None, expected: str) -> bool:
+    scheme, separator, provided = (authorization or "").partition(" ")
+    return (
+        bool(separator)
+        and scheme.lower() == "bearer"
+        and secrets.compare_digest(provided, expected)
+    )
+
+
+class BearerAuthMiddleware:
+    def __init__(self, app: ASGIApp, *, api_key: str | None) -> None:
+        self.app = app
+        self.api_key = api_key
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if (
+            self.api_key is None
+            or scope["type"] != "http"
+            or scope["path"] not in PROTECTED_API_PATHS
+        ):
+            await self.app(scope, receive, send)
+            return
+        values = [value for name, value in scope["headers"] if name.lower() == b"authorization"]
+        authorization: str | None = None
+        if len(values) == 1:
+            try:
+                authorization = values[0].decode("ascii")
+            except UnicodeDecodeError:
+                pass
+        if not _valid_bearer(authorization, self.api_key):
+            await _send_json_error(
+                send,
+                401,
+                "valid bearer authentication is required",
+                extra_headers=[(b"www-authenticate", b"Bearer")],
+            )
+            return
+        await self.app(scope, receive, send)
 
 
 class RequestBodyLimitMiddleware:
@@ -56,14 +108,14 @@ class RequestBodyLimitMiddleware:
             if name.lower() != b"content-length":
                 continue
             if not value.isdigit():
-                await _send_body_error(send, 400, "invalid Content-Length")
+                await _send_json_error(send, 400, "invalid Content-Length")
                 return
             declared_lengths.append(int(value))
         if len(declared_lengths) > 1:
-            await _send_body_error(send, 400, "multiple Content-Length values")
+            await _send_json_error(send, 400, "multiple Content-Length values")
             return
         if declared_lengths and declared_lengths[0] > self.max_body_bytes:
-            await _send_body_error(send, 413, "request body is too large")
+            await _send_json_error(send, 413, "request body is too large")
             return
 
         body = bytearray()
@@ -75,13 +127,13 @@ class RequestBodyLimitMiddleware:
                 continue
             body.extend(message.get("body", b""))
             if len(body) > self.max_body_bytes:
-                await _send_body_error(send, 413, "request body is too large")
+                await _send_json_error(send, 413, "request body is too large")
                 return
             if not message.get("more_body", False):
                 break
 
         if declared_lengths and len(body) != declared_lengths[0]:
-            await _send_body_error(send, 400, "Content-Length does not match the request body")
+            await _send_json_error(send, 400, "Content-Length does not match the request body")
             return
 
         delivered = False
@@ -180,6 +232,10 @@ def create_app(
         RequestBodyLimitMiddleware,
         max_body_bytes=selected_settings.max_request_body_bytes,
     )
+    configured_api_key = (
+        selected_settings.api_key.get_secret_value() if selected_settings.api_key else None
+    )
+    app.add_middleware(BearerAuthMiddleware, api_key=configured_api_key)
     web_root = files("modelforge_tw").joinpath("web")
     app.mount("/static", StaticFiles(directory=str(web_root)), name="static")
 
@@ -187,6 +243,23 @@ def create_app(
         if value is not None and not REQUEST_ID.fullmatch(value):
             raise HTTPException(status_code=400, detail="invalid X-Request-ID")
         return value or str(uuid.uuid4())
+
+    bearer_scheme = HTTPBearer(auto_error=False)
+
+    def require_api_key(
+        credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
+    ) -> None:
+        if configured_api_key is None:
+            return
+        authorization = (
+            f"{credentials.scheme} {credentials.credentials}" if credentials is not None else None
+        )
+        if not _valid_bearer(authorization, configured_api_key):
+            raise HTTPException(
+                status_code=401,
+                detail="valid bearer authentication is required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
     async def infer(request: TriageRequest, request_id: str) -> TriageResponse:
         engine: InferenceEngine = app.state.engine
@@ -309,6 +382,7 @@ def create_app(
             "evidence_kind": engine.evidence_kind,
             "max_concurrency": selected_settings.max_concurrency,
             "max_request_body_bytes": selected_settings.max_request_body_bytes,
+            "authentication_required": selected_settings.api_key is not None,
             "input_logging": selected_settings.log_inputs,
         }
 
@@ -316,11 +390,16 @@ def create_app(
     async def triage(
         payload: TriageRequest,
         x_request_id: str | None = Header(default=None),
+        _authentication: None = Depends(require_api_key),
     ) -> TriageResponse:
         return await infer(payload, resolve_request_id(x_request_id))
 
     @app.post("/v1/chat/completions")
-    async def chat(payload: ChatCompletionRequest, request: Request) -> Response:
+    async def chat(
+        payload: ChatCompletionRequest,
+        request: Request,
+        _authentication: None = Depends(require_api_key),
+    ) -> Response:
         engine: InferenceEngine = app.state.engine
         if payload.model not in {None, "released", engine.model_id}:
             raise HTTPException(status_code=404, detail="requested model is not deployed")

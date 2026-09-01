@@ -127,6 +127,13 @@ spec:
           envFrom:
             - configMapRef:
                 name: modelforge-config
+          env:
+            - name: MODELFORGE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: modelforge-api-auth
+                  key: api-key
+                  optional: true
           ports:
             - name: http
               containerPort: 8000

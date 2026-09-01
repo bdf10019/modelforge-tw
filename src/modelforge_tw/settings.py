@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from modelforge_tw.safety import SAFETY_POLICY_VERSION, SafetyPolicyVersion
@@ -31,4 +31,17 @@ class Settings(BaseSettings):
     request_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     max_concurrency: int = Field(default=2, ge=1, le=64)
     max_request_body_bytes: int = Field(default=32768, ge=1024, le=1048576)
+    api_key: SecretStr | None = None
     log_inputs: Literal[False] = False
+
+    @field_validator("api_key", mode="before")
+    @classmethod
+    def empty_api_key_disables_authentication(cls, value: object) -> object:
+        return None if value == "" else value
+
+    @field_validator("api_key")
+    @classmethod
+    def require_strong_api_key(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None and len(value.get_secret_value()) < 32:
+            raise ValueError("API key must contain at least 32 characters")
+        return value

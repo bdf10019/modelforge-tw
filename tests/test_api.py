@@ -32,6 +32,14 @@ def test_request_body_limit_has_safe_bounds():
         Settings(max_request_body_bytes=1023)
 
 
+def test_api_key_is_optional_but_rejects_weak_values():
+    assert Settings(api_key="").api_key is None
+    with pytest.raises(ValueError, match="at least 32 characters"):
+        Settings(**{"api_key": "too-short"})
+    credential = "never-show-this-api-key-in-settings-repr"
+    assert credential not in repr(Settings(api_key=credential))
+
+
 @asynccontextmanager
 async def app_client(app):
     async with app.router.lifespan_context(app):
@@ -174,6 +182,61 @@ async def test_openai_compatible_non_streaming_and_streaming():
             json=payload,
         )
         assert invalid_id.status_code == 400
+
+
+@pytest.mark.parametrize("path", ["/v1/triage", "/v1/chat/completions"])
+async def test_configured_bearer_key_protects_inference_routes(path):
+    credential = "test-api-key-with-at-least-32-characters"
+    app = create_app(
+        settings=Settings(api_key=credential),
+        engine_factory=lambda: FixtureEngine("adapted"),
+    )
+    payload = (
+        {"incident_text": "馬達溫度持續升高，需要人員確認。"}
+        if path == "/v1/triage"
+        else {
+            "model": "released",
+            "messages": [{"role": "user", "content": "馬達溫度持續升高"}],
+        }
+    )
+    async with app_client(app) as client:
+        missing = await client.post(path, json=payload)
+        wrong = await client.post(
+            path,
+            json=payload,
+            headers={"Authorization": "Bearer " + ("w" * 32)},
+        )
+        accepted = await client.post(
+            path,
+            json=payload,
+            headers={"Authorization": f"Bearer {credential}"},
+        )
+        config = (await client.get("/api/config")).json()
+
+    assert missing.status_code == 401
+    assert missing.headers["WWW-Authenticate"] == "Bearer"
+    assert wrong.status_code == 401
+    assert accepted.status_code == 200
+    assert config["authentication_required"] is True
+    assert credential not in str(config)
+
+
+async def test_authentication_rejects_before_json_body_parsing():
+    app = create_app(
+        settings=Settings(api_key="x" * 32),
+        engine_factory=lambda: FixtureEngine("adapted"),
+    )
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage",
+            content=b"not-json",
+            headers={"Content-Type": "application/json"},
+        )
+        openapi = (await client.get("/openapi.json")).json()
+
+    assert response.status_code == 401
+    security = openapi["paths"]["/v1/triage"]["post"]["security"]
+    assert security == [{"HTTPBearer": []}]
 
 
 async def test_openai_compatible_rejects_unsupported_or_misleading_parameters():

@@ -11,12 +11,17 @@ NVIDIA device plugin；目前只完成多文件 YAML 解析與設定一致性檢
 - 若執行訓練 Job，另需名為 `modelforge-artifacts` 的可寫 PVC。
 - 內部 registry 的 `modelforge-tw:0.1.0` 與 `modelforge-tw-gpu:0.1.0` images。
 - 正式部署前把 llama.cpp 的 mutable tag 換成經弱點掃描且鎖定 digest 的 image。
+- 正式環境建立 `modelforge-api-auth` Secret，key 名稱為 `api-key`、值至少 32 字元；manifest
+  將它注入 `MODELFORGE_API_KEY`。Secret 引用刻意為 optional，僅方便無認證的本機／隔離環境
+  演示；對外環境不可省略，且實際值應由 secret manager 管理而非寫入 repository 或指令歷史。
 
 ## 拓樸
 
 `llama-server` Deployment 取得一張 GPU，提供叢集內 OpenAI-compatible API；`modelforge-api` 不
 直接掛載權重，負責 schema、安全政策、request ID、timeout、併發與 metrics。API 的 `/readyz`
 會連帶檢查 llama.cpp `/health`，因此模型尚未載入或服務中斷時不會接收流量。
+設定 Secret 時，兩個 `/v1` 推論路由在解析 JSON 前要求 bearer key；health、readiness 與 config
+保留給叢集探針。這個 shared key 是最低部署基線，不等同企業 IAM、每使用者授權或 key rotation。
 
 ## 套用前檢查
 

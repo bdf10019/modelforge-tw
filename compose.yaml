@@ -7,6 +7,8 @@ services:
       MODELFORGE_ENGINE: fixture
       MODELFORGE_LOG_INPUTS: "false"
       MODELFORGE_MAX_REQUEST_BODY_BYTES: "32768"
+      # Null means pass through only when the operator exports it; no value lives in this file.
+      MODELFORGE_API_KEY:
     ports:
       - "8000:8000"
     read_only: true

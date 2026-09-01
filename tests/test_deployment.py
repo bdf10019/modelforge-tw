@@ -49,6 +49,7 @@ def test_compose_baseline_is_non_privileged_and_does_not_log_inputs():
     api = compose["services"]["api"]
     assert api["environment"]["MODELFORGE_LOG_INPUTS"] == "false"
     assert api["environment"]["MODELFORGE_MAX_REQUEST_BODY_BYTES"] == "32768"
+    assert api["environment"]["MODELFORGE_API_KEY"] is None
     assert api["read_only"] is True
     assert "/tmp" in api["tmpfs"]
     assert "no-new-privileges:true" in api["security_opt"]
@@ -77,6 +78,12 @@ def test_kubernetes_runtime_security_and_probe_contracts():
     assert api["securityContext"]["allowPrivilegeEscalation"] is False
     assert api["securityContext"]["readOnlyRootFilesystem"] is True
     assert api["securityContext"]["capabilities"]["drop"] == ["ALL"]
+    api_key = next(item for item in api["env"] if item["name"] == "MODELFORGE_API_KEY")
+    assert api_key["valueFrom"]["secretKeyRef"] == {
+        "name": "modelforge-api-auth",
+        "key": "api-key",
+        "optional": True,
+    }
 
 
 def test_training_job_is_fail_closed_and_requests_one_gpu():
