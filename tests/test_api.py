@@ -4,10 +4,20 @@ import time
 from contextlib import asynccontextmanager
 
 import httpx
+import pytest
 
 from modelforge_tw.engines import FixtureEngine
 from modelforge_tw.service import create_app
 from modelforge_tw.settings import Settings
+
+
+def test_settings_reject_context_capacity_below_measured_minimum():
+    with pytest.raises(ValueError):
+        Settings(context_window_tokens=1024)
+
+
+def test_service_defaults_to_attested_safety_policy_v2():
+    assert Settings().safety_policy_version == "risk-precedence-v2"
 
 
 @asynccontextmanager

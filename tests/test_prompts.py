@@ -3,6 +3,7 @@ from modelforge_tw.prompts import (
     OPTIMIZED_PROMPT_V3_VERSION,
     OPTIMIZED_PROMPT_V4_VERSION,
     OPTIMIZED_PROMPT_V5_VERSION,
+    OPTIMIZED_PROMPT_V6_VERSION,
     messages_for_version,
 )
 from modelforge_tw.schemas import TriageRequest
@@ -53,3 +54,15 @@ def test_optimized_v5_requires_unknown_when_event_type_is_explicitly_indetermina
     assert "event_type 必須是 unknown" in system
     assert "severity 也必須是 unknown" in system
     assert "不得自行套用未提供的數值門檻" in system
+
+
+def test_optimized_v6_preserves_v2_rubric_and_only_adds_compact_output_rules():
+    messages = messages_for_version(
+        TriageRequest(incident_text="散熱口間歇出風不足，尚缺量測紀錄。"),
+        OPTIMIZED_PROMPT_V6_VERSION,
+    )
+    system = messages[0]["content"]
+    assert "medium 是反覆或間歇" in system
+    assert "警告字樣本身不等於 high" in system
+    assert "不得拼接不相鄰片段" in system
+    assert "刀具是 mechanical" not in system

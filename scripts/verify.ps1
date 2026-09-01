@@ -58,6 +58,9 @@ if missing:
 '@ $wheel.FullName
     if ($LASTEXITCODE -ne 0) { throw "wheel 內容驗證失敗" }
     & (Join-Path $PSScriptRoot "privacy-check.ps1")
+    if ($LASTEXITCODE -ne 0) { throw "隱私檢查失敗" }
+    & (Join-Path $PSScriptRoot "verify-local-evidence.ps1")
+    if ($LASTEXITCODE -ne 0) { throw "本機證據快照驗證失敗" }
 }
 finally {
     Pop-Location

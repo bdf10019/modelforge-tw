@@ -25,10 +25,11 @@ from modelforge_tw.prompts import (
     OPTIMIZED_PROMPT_V3_VERSION,
     OPTIMIZED_PROMPT_V4_VERSION,
     OPTIMIZED_PROMPT_V5_VERSION,
+    OPTIMIZED_PROMPT_V6_VERSION,
     OPTIMIZED_PROMPT_VERSION,
 )
 from modelforge_tw.registry import ArtifactRef, FileRegistry, ModelManifest
-from modelforge_tw.safety import SAFETY_POLICY_VERSION
+from modelforge_tw.safety import SAFETY_POLICY_VERSION, SUPPORTED_SAFETY_POLICY_VERSIONS
 from modelforge_tw.schemas import DatasetRecord, EvaluationReport, InferenceResult, TriageRequest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -36,7 +37,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def _engine_from_args(args: argparse.Namespace):
     if args.engine.startswith("fixture-"):
-        return FixtureEngine(args.engine.removeprefix("fixture-"))
+        return FixtureEngine(
+            args.engine.removeprefix("fixture-"),
+            safety_policy_version=args.safety_policy_version,
+        )
     if args.engine == "llama-http":
         return OpenAIHTTPInferenceEngine(
             base_url=args.base_url,
@@ -47,6 +51,7 @@ def _engine_from_args(args: argparse.Namespace):
             timeout_seconds=args.timeout,
             max_tokens=args.max_new_tokens,
             context_window_tokens=args.context_window_tokens,
+            safety_policy_version=args.safety_policy_version,
         )
     if args.engine == "transformers":
         from modelforge_tw.engines.transformers_local import TransformersInferenceEngine
@@ -59,6 +64,7 @@ def _engine_from_args(args: argparse.Namespace):
             load_in_4bit=args.load_in_4bit,
             model_version=args.model_version,
             max_new_tokens=args.max_new_tokens,
+            safety_policy_version=args.safety_policy_version,
         )
     raise ValueError(f"unsupported CLI engine: {args.engine}")
 
@@ -131,9 +137,9 @@ def _evaluation_fingerprint(args: argparse.Namespace) -> str:
             if path.is_file()
         }
     payload = {
-        "cache_fingerprint_version": "6",
+        "cache_fingerprint_version": "7",
         "openai_http_contract_version": OPENAI_HTTP_CONTRACT_VERSION,
-        "safety_policy_version": SAFETY_POLICY_VERSION,
+        "safety_policy_version": args.safety_policy_version,
         "evaluation_contract_version": EVALUATION_CONTRACT_VERSION,
         "engine": args.engine,
         "base_url": args.base_url,
@@ -489,13 +495,19 @@ def build_parser() -> argparse.ArgumentParser:
                 OPTIMIZED_PROMPT_V3_VERSION,
                 OPTIMIZED_PROMPT_V4_VERSION,
                 OPTIMIZED_PROMPT_V5_VERSION,
+                OPTIMIZED_PROMPT_V6_VERSION,
             ],
             default=OPTIMIZED_PROMPT_VERSION,
         )
         command.add_argument("--adapter", type=Path)
         command.add_argument("--load-in-4bit", action="store_true")
         command.add_argument("--max-new-tokens", type=int, default=256)
-        command.add_argument("--context-window-tokens", type=int, default=1024)
+        command.add_argument("--context-window-tokens", type=int, default=2048)
+        command.add_argument(
+            "--safety-policy-version",
+            choices=SUPPORTED_SAFETY_POLICY_VERSIONS,
+            default=SAFETY_POLICY_VERSION,
+        )
 
     evaluation = subparsers.add_parser("evaluate")
     evaluation.add_argument("--data", type=Path, default=PROJECT_ROOT / "data" / "generated")

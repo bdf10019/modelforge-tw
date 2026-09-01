@@ -9,6 +9,7 @@ import httpx
 from modelforge_tw.prompts import messages_for_version
 from modelforge_tw.safety import (
     SAFETY_POLICY_VERSION,
+    SafetyPolicyVersion,
     apply_safety_policy,
     conservative_fallback,
     parse_output,
@@ -51,7 +52,8 @@ class OpenAIHTTPInferenceEngine:
         prompt_version: str,
         timeout_seconds: float = 60,
         max_tokens: int = 256,
-        context_window_tokens: int = 1024,
+        context_window_tokens: int = 2048,
+        safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,
     ) -> None:
         self.name = "openai-http"
         self.base_url = base_url.rstrip("/")
@@ -64,7 +66,7 @@ class OpenAIHTTPInferenceEngine:
         self.max_new_tokens: int | None = max_tokens
         self.context_window_tokens = context_window_tokens
         self.structured_output_contract: str = OPENAI_HTTP_CONTRACT_VERSION
-        self.safety_policy_version: str = SAFETY_POLICY_VERSION
+        self.safety_policy_version: SafetyPolicyVersion = safety_policy_version
         self.evidence_kind: Literal["fixture", "measured"] = "measured"
 
     def ready(self) -> bool:
@@ -158,12 +160,20 @@ class OpenAIHTTPInferenceEngine:
     ) -> InferenceResult:
         try:
             parsed = parse_output(raw, allow_bounded_repair=True)
-            output, warnings = apply_safety_policy(request, parsed.output)
+            output, warnings = apply_safety_policy(
+                request,
+                parsed.output,
+                policy_version=self.safety_policy_version,
+            )
             repair_used = parsed.repair_used
         except (ValueError, TypeError):
             output = conservative_fallback("MODEL_OUTPUT_INVALID")
             warnings = ["MODEL_OUTPUT_INVALID", "SAFE_FALLBACK_APPLIED"]
-            output, policy_warnings = apply_safety_policy(request, output)
+            output, policy_warnings = apply_safety_policy(
+                request,
+                output,
+                policy_version=self.safety_policy_version,
+            )
             warnings.extend(policy_warnings)
             repair_used = False
         output_tokens = usage.get("completion_tokens")

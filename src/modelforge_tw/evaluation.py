@@ -8,11 +8,14 @@ import uuid
 from collections import Counter
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from modelforge_tw.engines.base import InferenceEngine
 from modelforge_tw.safety import (
     INJECTION_PATTERN,
+    SAFETY_POLICY_VERSION,
+    SUPPORTED_SAFETY_POLICY_VERSIONS,
+    SafetyPolicyVersion,
     apply_safety_policy,
     conservative_fallback,
     parse_output,
@@ -150,9 +153,13 @@ def evaluate(
 
         actual = result.output
         if not raw_schema_valid:
+            result_policy_version = result.metadata.safety_policy_version or SAFETY_POLICY_VERSION
+            if result_policy_version not in SUPPORTED_SAFETY_POLICY_VERSIONS:
+                raise ValueError(f"unsupported safety policy version: {result_policy_version}")
             actual, fallback_warnings = apply_safety_policy(
                 record.input,
                 conservative_fallback("MODEL_OUTPUT_INVALID"),
+                policy_version=cast(SafetyPolicyVersion, result_policy_version),
             )
             validation_warnings.extend(fallback_warnings)
         if validation_warnings:

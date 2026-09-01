@@ -8,6 +8,7 @@ from typing import Any, Literal
 from modelforge_tw.prompts import messages_for_version
 from modelforge_tw.safety import (
     SAFETY_POLICY_VERSION,
+    SafetyPolicyVersion,
     apply_safety_policy,
     conservative_fallback,
     parse_output,
@@ -28,6 +29,7 @@ class TransformersInferenceEngine:
         load_in_4bit: bool = False,
         model_version: str = "unversioned",
         max_new_tokens: int = 256,
+        safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,
     ) -> None:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
@@ -41,7 +43,7 @@ class TransformersInferenceEngine:
         self.evidence_kind: Literal["fixture", "measured"] = "measured"
         self.max_new_tokens: int | None = max_new_tokens
         self.structured_output_contract: str = "prompt-schema+bounded-repair-v1"
-        self.safety_policy_version: str = SAFETY_POLICY_VERSION
+        self.safety_policy_version: SafetyPolicyVersion = safety_policy_version
         self._lock = threading.Lock()
         self._torch = torch
         self.tokenizer: Any = AutoTokenizer.from_pretrained(
@@ -132,12 +134,20 @@ class TransformersInferenceEngine:
         raw = decoded.strip()
         try:
             parsed = parse_output(raw, allow_bounded_repair=True)
-            output, warnings = apply_safety_policy(request, parsed.output)
+            output, warnings = apply_safety_policy(
+                request,
+                parsed.output,
+                policy_version=self.safety_policy_version,
+            )
             repair_used = parsed.repair_used
         except (ValueError, TypeError):
             output = conservative_fallback("MODEL_OUTPUT_INVALID")
             warnings = ["MODEL_OUTPUT_INVALID", "SAFE_FALLBACK_APPLIED"]
-            output, policy_warnings = apply_safety_policy(request, output)
+            output, policy_warnings = apply_safety_policy(
+                request,
+                output,
+                policy_version=self.safety_policy_version,
+            )
             warnings.extend(policy_warnings)
             repair_used = False
         output_tokens = int(output_ids.shape[-1])

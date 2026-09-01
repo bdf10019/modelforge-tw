@@ -4,7 +4,12 @@ import pytest
 from pydantic import ValidationError
 
 from modelforge_tw.engines.openai_http import _structured_response_format
-from modelforge_tw.safety import apply_safety_policy, conservative_fallback, parse_output
+from modelforge_tw.safety import (
+    EXPERIMENTAL_SAFETY_POLICY_VERSION,
+    apply_safety_policy,
+    conservative_fallback,
+    parse_output,
+)
 from modelforge_tw.schemas import (
     ALLOWED_REASON_CODES,
     EventType,
@@ -113,11 +118,23 @@ def test_policy_forces_unknown_when_input_explicitly_says_event_is_indeterminate
         review_required=True,
         reason_codes=["INSUFFICIENT_EVIDENCE"],
     )
-    secured, warnings = apply_safety_policy(request, output)
+    secured, warnings = apply_safety_policy(
+        request,
+        output,
+        policy_version=EXPERIMENTAL_SAFETY_POLICY_VERSION,
+    )
     assert secured.event_type == EventType.UNKNOWN
     assert secured.severity == Severity.UNKNOWN
     assert secured.review_required is True
     assert "EVENT_TYPE_FORCED_UNKNOWN_BY_POLICY" in warnings
+
+
+def test_released_policy_v2_does_not_silently_enable_experimental_unknown_override():
+    request = TriageRequest(incident_text="只有單點溫度讀值，無法判定事件類型。")
+    output = valid_output(event_type=EventType.THERMAL, severity=Severity.UNKNOWN)
+    secured, warnings = apply_safety_policy(request, output)
+    assert secured.event_type == EventType.THERMAL
+    assert "EVENT_TYPE_FORCED_UNKNOWN_BY_POLICY" not in warnings
 
 
 @pytest.mark.parametrize(

@@ -10,6 +10,8 @@ data:
   MODELFORGE_QUANTIZATION: q8_0
   MODELFORGE_REQUEST_TIMEOUT_SECONDS: "60"
   MODELFORGE_MAX_CONCURRENCY: "4"
+  MODELFORGE_CONTEXT_WINDOW_TOKENS: "2048"
+  MODELFORGE_SAFETY_POLICY_VERSION: risk-precedence-v2
   MODELFORGE_LOG_INPUTS: "false"
 ---
 apiVersion: apps/v1
@@ -41,7 +43,7 @@ spec:
             - --port
             - "8080"
             - --ctx-size
-            - "4096"
+            - "8192"
             - --parallel
             - "4"
             - --n-gpu-layers

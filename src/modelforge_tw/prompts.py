@@ -10,6 +10,7 @@ OPTIMIZED_PROMPT_V2_VERSION = "optimized-v2"
 OPTIMIZED_PROMPT_V3_VERSION = "optimized-v3"
 OPTIMIZED_PROMPT_V4_VERSION = "optimized-v4"
 OPTIMIZED_PROMPT_V5_VERSION = "optimized-v5"
+OPTIMIZED_PROMPT_V6_VERSION = "optimized-v6"
 
 
 def _input_payload(request: TriageRequest) -> str:
@@ -75,17 +76,21 @@ def optimized_messages(request: TriageRequest) -> list[dict[str, str]]:
     return _optimized_messages(request)
 
 
+def _optimized_v2_guidance() -> str:
+    return (
+        "severity 判定規則：critical 是火花、電弧、焦味、起火、爆炸、人員受傷、大量洩漏或"
+        "立即危害；high 是異常持續、連續惡化、越過警戒值或失去連線；medium 是反覆或間歇"
+        "發生、在特定負載條件再現、目前可恢復但仍需追蹤，或尚缺關鍵量測值，且沒有持續惡化或"
+        "立即危害；low 是單次或偶爾的輕微偏差，已確認回復正常且沒有持續趨勢；資訊不足才使用"
+        " unknown。危害語意優先於頻率字詞，單次火花"
+        "仍是 critical。警告字樣本身不等於 high，必須依持續性、趨勢、超限或危害判定。\n"
+    )
+
+
 def optimized_v2_messages(request: TriageRequest) -> list[dict[str, str]]:
     return _optimized_messages(
         request,
-        severity_guidance=(
-            "severity 判定規則：critical 是火花、電弧、焦味、起火、爆炸、人員受傷、大量洩漏或"
-            "立即危害；high 是異常持續、連續惡化、越過警戒值或失去連線；medium 是反覆或間歇"
-            "發生、在特定負載條件再現、目前可恢復但仍需追蹤，或尚缺關鍵量測值，且沒有持續惡化或"
-            "立即危害；low 是單次或偶爾的輕微偏差，已確認回復正常且沒有持續趨勢；資訊不足才使用"
-            " unknown。危害語意優先於頻率字詞，單次火花"
-            "仍是 critical。警告字樣本身不等於 high，必須依持續性、趨勢、超限或危害判定。\n"
-        ),
+        severity_guidance=_optimized_v2_guidance(),
     )
 
 
@@ -141,6 +146,19 @@ def optimized_v5_messages(request: TriageRequest) -> list[dict[str, str]]:
     )
 
 
+def optimized_v6_messages(request: TriageRequest) -> list[dict[str, str]]:
+    return _optimized_messages(
+        request,
+        severity_guidance=(
+            _optimized_v2_guidance()
+            + "輸出要精簡：summary_zh_tw 不超過 40 個中文字；evidence_spans 最多 2 項，每項只擷取"
+            " incident_text 中最短且具決定性的連續原文，不得拼接不相鄰片段；"
+            "missing_information 最多 3 項；safe_actions 只選最主要的 1 項；"
+            "reason_codes 只用 schema 允許值且最多 2 項。\n"
+        ),
+    )
+
+
 def training_messages(
     record_input: TriageRequest,
     target: TriageOutput,
@@ -170,4 +188,6 @@ def messages_for_version(request: TriageRequest, version: str) -> list[dict[str,
         return optimized_v4_messages(request)
     if version == OPTIMIZED_PROMPT_V5_VERSION:
         return optimized_v5_messages(request)
+    if version == OPTIMIZED_PROMPT_V6_VERSION:
+        return optimized_v6_messages(request)
     raise ValueError(f"unsupported prompt version: {version}")

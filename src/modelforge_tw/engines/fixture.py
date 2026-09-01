@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from modelforge_tw.prompts import MINIMAL_PROMPT_VERSION, OPTIMIZED_PROMPT_VERSION
-from modelforge_tw.safety import SAFETY_POLICY_VERSION, apply_safety_policy
+from modelforge_tw.safety import SAFETY_POLICY_VERSION, SafetyPolicyVersion, apply_safety_policy
 from modelforge_tw.schemas import (
     EventType,
     InferenceMetadata,
@@ -30,6 +30,7 @@ RULES: list[tuple[EventType, tuple[str, ...]]] = [
 @dataclass
 class FixtureEngine:
     variant: str = "adapted"
+    safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION
 
     def __post_init__(self) -> None:
         if self.variant not in {"base", "prompt", "adapted"}:
@@ -40,7 +41,6 @@ class FixtureEngine:
         self.quantization = "none"
         self.max_new_tokens: int | None = None
         self.structured_output_contract: str = "fixture-json-v1"
-        self.safety_policy_version: str = SAFETY_POLICY_VERSION
         self.prompt_version = (
             MINIMAL_PROMPT_VERSION if self.variant == "base" else OPTIMIZED_PROMPT_VERSION
         )
@@ -103,7 +103,11 @@ class FixtureEngine:
             reason_codes=reason_codes,
         )
         if self.variant == "adapted":
-            output, warnings = apply_safety_policy(request, output)
+            output, warnings = apply_safety_policy(
+                request,
+                output,
+                policy_version=self.safety_policy_version,
+            )
         else:
             warnings = []
         raw = json.dumps(output.model_dump(mode="json"), ensure_ascii=False, separators=(",", ":"))

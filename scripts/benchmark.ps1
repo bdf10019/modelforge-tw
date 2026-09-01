@@ -10,7 +10,9 @@ param(
     [string]$Adapter = "artifacts/qwen3-1.7b-triage-lora-v5/final-adapter",
     [string]$BaseUrl = "http://127.0.0.1:8081",
     [string]$Quantization = "unknown",
-    [int]$ContextWindowTokens = 1024,
+    [int]$ContextWindowTokens = 2048,
+    [ValidateSet("risk-precedence-v2", "risk-precedence-v3")]
+    [string]$SafetyPolicyVersion = "risk-precedence-v2",
     [int[]]$Concurrency = @(1, 2, 4),
     [int]$Requests = 30
 )
@@ -28,7 +30,8 @@ $arguments += @(
     "--model-version", $ModelVersion,
     "--prompt-version", $PromptVersion,
     "--max-new-tokens", "192",
-    "--context-window-tokens", $ContextWindowTokens
+    "--context-window-tokens", $ContextWindowTokens,
+    "--safety-policy-version", $SafetyPolicyVersion
 )
 if ($Engine -eq "transformers") {
     $arguments += @("--adapter", $Adapter, "--load-in-4bit")

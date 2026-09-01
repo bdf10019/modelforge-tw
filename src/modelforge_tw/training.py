@@ -47,6 +47,7 @@ class TrainingConfig(BaseModel):
         "optimized-v3",
         "optimized-v4",
         "optimized-v5",
+        "optimized-v6",
     ] = "optimized-v1"
 
 

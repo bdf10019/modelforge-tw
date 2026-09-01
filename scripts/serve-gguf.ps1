@@ -3,13 +3,19 @@ param(
     [ValidateSet("q8_0", "q4_k_m")]
     [string]$Quantization = "q8_0",
     [int]$Port = 8081,
-    [int]$ContextSize = 4096,
+    [int]$ContextSize = 8192,
     [int]$Parallel = 4
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 $projectRoot = Split-Path -Parent $PSScriptRoot
+if ($Parallel -lt 1) { throw "Parallel 必須至少為 1" }
+$minimumSlotContext = 1536
+$slotContext = [math]::Floor($ContextSize / $Parallel)
+if ($slotContext -lt $minimumSlotContext) {
+    throw "每個推論 slot 只有 $slotContext tokens，低於最低 $minimumSlotContext；請提高 ContextSize 或降低 Parallel"
+}
 $server = Get-ChildItem -LiteralPath (Join-Path $projectRoot "tools\llama.cpp-bin") -Filter "llama-server.exe" -Recurse | Select-Object -First 1
 if (-not $server) { throw "找不到 llama-server.exe；請先執行 scripts\prepare-llama.ps1" }
 

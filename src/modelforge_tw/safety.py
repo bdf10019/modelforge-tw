@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from typing import Literal
 
 from pydantic import ValidationError
 
@@ -14,7 +15,13 @@ from modelforge_tw.schemas import (
     TriageRequest,
 )
 
-SAFETY_POLICY_VERSION = "risk-precedence-v3"
+SafetyPolicyVersion = Literal["risk-precedence-v2", "risk-precedence-v3"]
+SAFETY_POLICY_VERSION: SafetyPolicyVersion = "risk-precedence-v2"
+EXPERIMENTAL_SAFETY_POLICY_VERSION: SafetyPolicyVersion = "risk-precedence-v3"
+SUPPORTED_SAFETY_POLICY_VERSIONS = (
+    SAFETY_POLICY_VERSION,
+    EXPERIMENTAL_SAFETY_POLICY_VERSION,
+)
 
 INJECTION_PATTERN = re.compile(
     r"忽略(?:前述|以上|所有)?(?:規則|指令)|ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|"
@@ -68,8 +75,13 @@ def parse_output(raw_text: str, *, allow_bounded_repair: bool) -> ParseResult:
 
 
 def apply_safety_policy(
-    request: TriageRequest, output: TriageOutput
+    request: TriageRequest,
+    output: TriageOutput,
+    *,
+    policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,
 ) -> tuple[TriageOutput, list[str]]:
+    if policy_version not in SUPPORTED_SAFETY_POLICY_VERSIONS:
+        raise ValueError(f"unsupported safety policy version: {policy_version}")
     warnings: list[str] = []
     update: dict[str, object] = {}
 
@@ -80,7 +92,9 @@ def apply_safety_policy(
         update["review_required"] = True
         warnings.append("EVIDENCE_SPAN_NOT_IN_INPUT")
 
-    event_indeterminate = bool(INDETERMINATE_EVENT_PATTERN.search(request.incident_text))
+    event_indeterminate = policy_version == EXPERIMENTAL_SAFETY_POLICY_VERSION and bool(
+        INDETERMINATE_EVENT_PATTERN.search(request.incident_text)
+    )
     if event_indeterminate and output.event_type != EventType.UNKNOWN:
         update["event_type"] = EventType.UNKNOWN
         update["review_required"] = True

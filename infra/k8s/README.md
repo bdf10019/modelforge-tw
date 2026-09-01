@@ -26,4 +26,6 @@ kubectl apply --dry-run=server -f infra/k8s/training-job.yaml
 ```
 
 `dry-run=server` 仍需要目標叢集；本作品機未執行這兩個命令。資源 requests／limits 是 1.7B Q8
-起始值，必須依實際節點、context size、parallel slots 與壓測結果調整。
+起始值。baseline 使用 8192 total context／4 parallel slots，API 宣告每 slot 2048；這是外部校準
+發現 1024-token slot 截斷後的修正。正式環境仍必須依實際節點、prompt 長度、context size、
+parallel slots 與壓測結果調整。

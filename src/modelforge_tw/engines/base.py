@@ -1,5 +1,6 @@
 from typing import Literal, Protocol
 
+from modelforge_tw.safety import SafetyPolicyVersion
 from modelforge_tw.schemas import InferenceResult, TriageRequest
 
 
@@ -11,7 +12,7 @@ class InferenceEngine(Protocol):
     prompt_version: str
     max_new_tokens: int | None
     structured_output_contract: str
-    safety_policy_version: str
+    safety_policy_version: SafetyPolicyVersion
     evidence_kind: Literal["fixture", "measured"]
 
     def generate(self, request: TriageRequest) -> InferenceResult: ...
