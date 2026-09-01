@@ -31,7 +31,7 @@ def write_inputs(tmp_path):
         case_count=0,
         metrics={},
         gates={},
-        release_passed=True,
+        release_passed=False,
         latency_ms={},
         cases=[],
     )

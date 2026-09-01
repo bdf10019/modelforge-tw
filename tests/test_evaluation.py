@@ -2,11 +2,13 @@ import hashlib
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from modelforge_tw.dataset import generate_records, read_jsonl
 from modelforge_tw.engines import FixtureEngine
 from modelforge_tw.evaluation import assess_q4_release, compare_reports, evaluate
 from modelforge_tw.safety import conservative_fallback
+from modelforge_tw.schemas import EvaluationReport
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 GATE_HASH = hashlib.sha256(b"release-gates").hexdigest()
@@ -139,6 +141,42 @@ def test_evaluation_rejects_duplicate_record_ids():
     record = next(record for record in generate_records(1, 1, 1) if record.split == "test")
     with pytest.raises(ValueError, match="record IDs must be unique"):
         evaluate(FixtureEngine("adapted"), [record, record])
+
+
+def test_evaluation_report_rejects_inconsistent_case_count_and_hash():
+    records = [record for record in generate_records(1, 1, 1) if record.split == "test"]
+    payload = evaluate(FixtureEngine("adapted"), records).model_dump(mode="json")
+    payload["case_count"] += 1
+    with pytest.raises(ValidationError, match="case_count"):
+        EvaluationReport.model_validate(payload)
+
+    payload["case_count"] = len(payload["cases"])
+    payload["dataset_manifest_sha256"] = "not-a-sha256"
+    with pytest.raises(ValidationError, match="dataset_manifest_sha256"):
+        EvaluationReport.model_validate(payload)
+
+
+def test_evaluation_report_rejects_false_release_and_gate_claims():
+    records = [record for record in generate_records(1, 1, 1) if record.split == "test"]
+    payload = evaluate(FixtureEngine("adapted"), records).model_dump(mode="json")
+    payload["release_passed"] = True
+    payload["gates"] = {}
+    with pytest.raises(ValidationError, match="lacks required release gates"):
+        EvaluationReport.model_validate(payload)
+
+    payload = evaluate(FixtureEngine("adapted"), records).model_dump(mode="json")
+    gate_name = next(iter(payload["gates"]))
+    payload["gates"][gate_name]["passed"] = not payload["gates"][gate_name]["passed"]
+    with pytest.raises(ValidationError, match="pass result is inconsistent"):
+        EvaluationReport.model_validate(payload)
+
+
+def test_evaluation_report_rejects_non_finite_metrics():
+    records = [record for record in generate_records(1, 1, 1) if record.split == "test"]
+    payload = evaluate(FixtureEngine("adapted"), records).model_dump(mode="json")
+    payload["metrics"]["event_type_accuracy"] = float("nan")
+    with pytest.raises(ValidationError, match="event_type_accuracy"):
+        EvaluationReport.model_validate(payload)
 
 
 def test_evaluation_rejects_mixed_inference_identity_before_caching():

@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class EventType(StrEnum):
@@ -70,6 +70,21 @@ SignalValue = (
         ),
     ]
     | Annotated[str, Field(min_length=1, max_length=128, strict=True)]
+)
+RateValue = Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)]
+NonnegativeFiniteFloat = Annotated[float, Field(ge=0, allow_inf_nan=False)]
+NonnegativeInteger = Annotated[int, Field(ge=0)]
+REQUIRED_RELEASE_GATE_NAMES = frozenset(
+    {
+        "raw_json_schema_rate",
+        "required_field_rate",
+        "event_type_macro_f1",
+        "severity_macro_f1",
+        "high_critical_escalation_recall",
+        "unknown_accuracy",
+        "evidence_span_precision",
+        "injection_resistance",
+    }
 )
 
 
@@ -238,12 +253,56 @@ class EvaluationReport(BaseModel):
     safety_policy_version: str | None = None
     evaluation_contract_version: str | None = None
     evidence_kind: Literal["fixture", "measured"]
-    dataset_manifest_sha256: str
-    release_gate_sha256: str | None = None
-    case_count: int
-    metrics: dict[str, float]
+    dataset_manifest_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    release_gate_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    case_count: int = Field(ge=0)
+    metrics: dict[str, RateValue]
     gates: dict[str, dict[str, Any]]
     release_passed: bool
-    latency_ms: dict[str, float]
-    validation_warning_counts: dict[str, int] = Field(default_factory=dict)
+    latency_ms: dict[str, NonnegativeFiniteFloat]
+    validation_warning_counts: dict[str, NonnegativeInteger] = Field(default_factory=dict)
     cases: list[CaseResult]
+
+    @model_validator(mode="after")
+    def validate_report_consistency(self) -> EvaluationReport:
+        if self.case_count != len(self.cases):
+            raise ValueError("case_count does not match the number of case results")
+        record_ids = [case.record_id for case in self.cases]
+        if len(record_ids) != len(set(record_ids)):
+            raise ValueError("evaluation case record IDs must be unique")
+
+        for name, gate in self.gates.items():
+            required_fields = {"value", "operator", "threshold", "hard", "passed"}
+            if set(gate) != required_fields:
+                raise ValueError(f"evaluation gate has invalid fields: {name}")
+            value = gate["value"]
+            threshold = gate["threshold"]
+            if (
+                type(value) not in {int, float}
+                or type(threshold) not in {int, float}
+                or not 0 <= value <= 1
+                or not 0 <= threshold <= 1
+            ):
+                raise ValueError(f"evaluation gate has invalid numeric bounds: {name}")
+            if gate["operator"] != ">=":
+                raise ValueError(f"evaluation gate has unsupported operator: {name}")
+            if type(gate["hard"]) is not bool or type(gate["passed"]) is not bool:
+                raise ValueError(f"evaluation gate has invalid boolean fields: {name}")
+            if gate["passed"] != (value >= threshold):
+                raise ValueError(f"evaluation gate pass result is inconsistent: {name}")
+            if name not in self.metrics or abs(self.metrics[name] - value) > 0.000001:
+                raise ValueError(f"evaluation gate value does not match metrics: {name}")
+
+        if self.gates and self.release_passed != all(
+            gate["passed"] for gate in self.gates.values()
+        ):
+            raise ValueError("release_passed does not match evaluation gates")
+        if self.release_passed:
+            missing = sorted(REQUIRED_RELEASE_GATE_NAMES - self.gates.keys())
+            if missing:
+                raise ValueError(
+                    "passed evaluation lacks required release gates: " + ", ".join(missing)
+                )
+            if self.evidence_kind == "measured" and self.case_count == 0:
+                raise ValueError("measured release evidence must contain case results")
+        return self

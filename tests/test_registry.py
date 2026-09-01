@@ -183,7 +183,7 @@ def test_registry_rejects_evaluation_from_a_different_dataset(tmp_path):
         case_count=0,
         metrics={},
         gates={},
-        release_passed=True,
+        release_passed=False,
         latency_ms={},
         cases=[],
     )
@@ -327,7 +327,7 @@ def test_registry_attests_and_locks_evaluation_contract(tmp_path):
         case_count=0,
         metrics={},
         gates={},
-        release_passed=True,
+        release_passed=False,
         latency_ms={},
         cases=[],
     )
