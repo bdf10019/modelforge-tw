@@ -33,6 +33,10 @@ spec:
       labels:
         app: llama-server
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: llama-server
           # 正式環境應把 upstream tag 鎖成已掃描的 image digest。
@@ -56,6 +60,12 @@ spec:
           ports:
             - name: model-http
               containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /health
+              port: model-http
+            periodSeconds: 10
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /health
@@ -123,8 +133,11 @@ spec:
         app: modelforge-api
     spec:
       terminationGracePeriodSeconds: 75
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: api
           image: modelforge-tw:0.1.0

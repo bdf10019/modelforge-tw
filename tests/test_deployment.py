@@ -73,15 +73,22 @@ def test_kubernetes_runtime_security_and_probe_contracts():
         item["metadata"]["name"]: item for item in documents if item["kind"] == "Deployment"
     }
     model = deployments["llama-server"]["spec"]["template"]["spec"]["containers"][0]
+    model_pod = deployments["llama-server"]["spec"]["template"]["spec"]
     api_pod = deployments["modelforge-api"]["spec"]["template"]["spec"]
     api = api_pod["containers"][0]
 
     assert model["readinessProbe"]["httpGet"]["path"] == "/health"
     assert model["livenessProbe"]["httpGet"]["path"] == "/health"
+    assert model["startupProbe"]["httpGet"]["path"] == "/health"
+    assert model["startupProbe"]["failureThreshold"] * model["startupProbe"]["periodSeconds"] == 300
+    assert model_pod["automountServiceAccountToken"] is False
+    assert model_pod["securityContext"]["seccompProfile"]["type"] == "RuntimeDefault"
     assert model["securityContext"]["allowPrivilegeEscalation"] is False
     assert model["securityContext"]["readOnlyRootFilesystem"] is True
     assert model["securityContext"]["capabilities"]["drop"] == ["ALL"]
     assert api_pod["securityContext"]["runAsNonRoot"] is True
+    assert api_pod["securityContext"]["seccompProfile"]["type"] == "RuntimeDefault"
+    assert api_pod["automountServiceAccountToken"] is False
     assert api_pod["terminationGracePeriodSeconds"] == 75
     assert api["readinessProbe"]["httpGet"]["path"] == "/readyz"
     assert api["livenessProbe"]["httpGet"]["path"] == "/healthz"

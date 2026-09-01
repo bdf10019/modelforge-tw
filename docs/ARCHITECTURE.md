@@ -56,8 +56,9 @@ Web / REST / OpenAI-compatible client
   線上服務可選擇綁定 `released` 或 `previous-good` 指標；啟用後會在啟動時逐欄比對實際引擎的
   measured identity、模型版本、量化、prompt、生成上限、輸出契約與安全政策，漂移即拒絕啟動。
   Registry 1.4 將操作事件限制為 typed schema，並以 canonical JSON SHA-256 串接前一筆事件；
-  1.0–1.3 可唯讀相容，下一次 mutation 才封入新鏈。這可偵測封存後改寫，但不是外部數位簽章
-  或不可變 audit storage，正式環境仍應把 registry 副本送往獨立受控稽核系統。
+  1.0–1.3 可唯讀相容，下一次 mutation 才封入新鏈。這可偵測未同步重算的封存後改寫，但不是
+  外部數位簽章或不可變 audit storage；能改寫檔案的攻擊者也能重算整條鏈。正式環境必須把 head digest／registry
+  副本送往獨立受控稽核系統，才能對抗事後重算。
 
 資料 split／manifest、評測、比較、benchmark、訓練、merge、量化與 registry JSON 都先寫入同目錄
 的唯一暫存檔，完成後再原子替換；Python 路徑會先 flush + fsync。中斷或 replace 失敗會保留上一份

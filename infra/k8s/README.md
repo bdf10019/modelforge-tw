@@ -25,6 +25,8 @@ NVIDIA device plugin；目前只完成多文件 YAML 解析與設定一致性檢
 API baseline 每 replica 最多同時送出 4 筆推論、等待區 16 筆、queue timeout 5 秒；request body 與
 模型回應分別限制 32 KiB／256 KiB。關閉時應用最多排空 65 秒，Pod 終止期限為 75 秒，讓 60 秒
 下游 timeout 有完成空間；超期同步工作最終仍須由容器平台終止。
+兩個 Pod 都關閉不需要的 service-account token 自動掛載並使用 RuntimeDefault seccomp；llama.cpp
+另有最長 300 秒 startup probe，模型載入期間不會先被 liveness probe 誤判重啟。
 
 範例沒有把 Git 忽略的 `outputs/model-registry.json` 打進 image 或掛入 Pod，因此刻意不設定
 `MODELFORGE_REGISTRY_DEPLOYMENT_ROLE`，不能宣稱已做線上 registry binding。正式環境若要啟用，
@@ -44,5 +46,6 @@ kubectl apply --dry-run=server -f infra/k8s/training-job.yaml
 parallel slots 與壓測結果調整。
 
 沒有容器／叢集 runtime 時，repository 測試只驗證 YAML、image／port／probe 對應、非 root、
-read-only root filesystem、capability drop、GPU request/limit 與 training fail-closed 設定；這些是
+read-only root filesystem、capability drop、seccomp、service-account token、GPU request/limit 與
+training fail-closed 設定；這些是
 靜態部署契約，不等同 image build、admission、排程、GPU device plugin 或線上流量實測。

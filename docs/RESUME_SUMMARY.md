@@ -60,6 +60,7 @@ prompt-only、QLoRA、合併權重到 GGUF 量化，以同一封存資料與安�
 
 本作品沒有連接真實工廠、沒有設備控制權；shared bearer key 只是內部服務基線，不宣稱具備
 生產環境的企業 IAM、細粒度授權、TLS、跨 replica rate limit、外部不可變稽核與事故應變。
-內建 hash chain 只能偵測封存後改寫，不能取代外部簽章或 WORM storage。Docker／Kubernetes 是可部署基線，
+內建 hash chain 只能偵測未同步重算的破壞，不能取代外部 anchor、簽章或 WORM storage；能改寫
+registry 的攻擊者也能重算整條鏈。Docker／Kubernetes 是可部署基線，
 尚未在本機叢集執行；品質結果來自原創合成資料、
 開發 challenge 與第三方合成 AI4I，不代表外部真實工廠分布。
