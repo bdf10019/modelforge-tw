@@ -85,3 +85,21 @@ def test_measured_cli_requires_explicit_model_version():
     with pytest.raises(SystemExit) as error:
         build_parser().parse_args(["evaluate", "--model-version", "unversioned"])
     assert error.value.code == 2
+
+
+def test_llama_cli_requires_explicit_quantization():
+    args = build_parser().parse_args(
+        [
+            "evaluate",
+            "--engine",
+            "llama-http",
+            "--model-version",
+            "qwen3-q8-v1",
+        ]
+    )
+    with pytest.raises(ValueError, match="--quantization"):
+        cli._engine_from_args(args)
+
+    with pytest.raises(SystemExit) as error:
+        build_parser().parse_args(["evaluate", "--quantization", "unknown"])
+    assert error.value.code == 2

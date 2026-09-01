@@ -9,6 +9,7 @@ from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_REVISION,
     DEFAULT_MAX_NEW_TOKENS,
     validate_model_version,
+    validate_quantization,
 )
 from modelforge_tw.prompts import DEFAULT_PROMPT_VERSION, PromptVersion
 from modelforge_tw.safety import SAFETY_POLICY_VERSION, SafetyPolicyVersion
@@ -67,6 +68,11 @@ class Settings(BaseSettings):
     @classmethod
     def model_version_is_explicit(cls, value: str) -> str:
         return validate_model_version(value)
+
+    @field_validator("quantization")
+    @classmethod
+    def quantization_is_explicit(cls, value: str) -> str:
+        return validate_quantization(value)
 
     @field_validator("api_key")
     @classmethod

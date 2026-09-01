@@ -92,6 +92,17 @@ def test_model_server_rejects_unversioned_runtime_identity():
         )
 
 
+def test_model_server_rejects_unknown_quantization():
+    with pytest.raises(ValueError, match="quantization"):
+        OpenAIHTTPInferenceEngine(
+            base_url="http://model.test",
+            model_id="model-q8",
+            model_version="v5",
+            quantization="unknown",
+            prompt_version="optimized-v2",
+        )
+
+
 def test_model_response_limit_rejects_unsafe_configuration():
     with pytest.raises(ValueError, match="between 4096 and 4194304"):
         make_engine(max_response_bytes=4194305)

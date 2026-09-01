@@ -44,7 +44,9 @@ Web / REST / OpenAI-compatible client
   未指定時的實測評估與訓練也統一使用現行 attestation 的 `optimized-v2`／192-token 生成契約；歷史
   A/B 實驗的 v1 標記只保留在既有證據與顯式選擇中。
   Transformers／llama-http 評測另強制提供安全格式的 `--model-version`；保留值 `unversioned` 不能
-  進入引擎、評測報告或 registry。載入 probe 則由 immutable base commit 推導可重現版本標記。
+  進入引擎、評測報告或 registry。llama-http 也必須明確提供量化格式，`unknown` 不能進入 measured
+  evidence；Transformers 則依實際 NF4／BF16 載入方式設定。載入 probe 由 immutable base commit
+  推導可重現版本標記。
 - `registry.py`：candidate、evaluation attestation、promote、previous-good 與 rollback 的原子檔案
   registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住評測資料 hash、引擎、
   模型 identity、evidence kind、生成、安全與評分契約。新候選缺少任一 attestation 欄位都不能

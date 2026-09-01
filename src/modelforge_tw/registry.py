@@ -14,7 +14,7 @@ from modelforge_tw.io_utils import (
     exclusive_file_lock,
     read_utf8_text_limited,
 )
-from modelforge_tw.model_identity import validate_model_version
+from modelforge_tw.model_identity import validate_model_version, validate_quantization
 from modelforge_tw.schemas import EvaluationReport
 from modelforge_tw.training import TrainingReportAttestation
 
@@ -93,6 +93,11 @@ class ModelManifest(BaseModel):
     @classmethod
     def evaluation_model_version_is_explicit(cls, value: str | None) -> str | None:
         return validate_model_version(value) if value is not None else None
+
+    @field_validator("quantization")
+    @classmethod
+    def quantization_is_explicit(cls, value: str) -> str:
+        return validate_quantization(value)
 
 
 class RegistryEvent(BaseModel):

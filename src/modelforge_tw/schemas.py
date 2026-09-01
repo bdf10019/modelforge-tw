@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from modelforge_tw.model_identity import validate_model_version
+from modelforge_tw.model_identity import validate_model_version, validate_quantization
 
 
 class EventType(StrEnum):
@@ -170,7 +170,7 @@ class InferenceMetadata(BaseModel):
     model_id: str
     model_version: str
     model_revision: str | None = None
-    quantization: str = "unknown"
+    quantization: str
     prompt_version: str
     elapsed_ms: float = Field(ge=0)
     prompt_tokens: int | None = Field(default=None, ge=0)
@@ -187,6 +187,11 @@ class InferenceMetadata(BaseModel):
     @classmethod
     def model_version_is_explicit(cls, value: str) -> str:
         return validate_model_version(value)
+
+    @field_validator("quantization")
+    @classmethod
+    def quantization_is_explicit(cls, value: str) -> str:
+        return validate_quantization(value)
 
 
 class InferenceResult(BaseModel):
@@ -274,6 +279,11 @@ class EvaluationReport(BaseModel):
     @classmethod
     def model_version_is_explicit(cls, value: str) -> str:
         return validate_model_version(value)
+
+    @field_validator("quantization")
+    @classmethod
+    def quantization_is_explicit(cls, value: str) -> str:
+        return validate_quantization(value)
 
     @model_validator(mode="after")
     def validate_report_consistency(self) -> EvaluationReport:

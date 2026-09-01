@@ -8,7 +8,11 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from modelforge_tw.model_identity import DEFAULT_MAX_NEW_TOKENS, validate_model_version
+from modelforge_tw.model_identity import (
+    DEFAULT_MAX_NEW_TOKENS,
+    validate_model_version,
+    validate_quantization,
+)
 from modelforge_tw.prompts import PromptVersion, messages_for_version
 from modelforge_tw.safety import (
     SAFETY_POLICY_VERSION,
@@ -120,6 +124,7 @@ class OpenAIHTTPInferenceEngine:
         safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,
     ) -> None:
         validate_model_version(model_version)
+        validate_quantization(quantization)
         self.name = "openai-http"
         self.base_url = _validated_base_url(base_url)
         self.model_id = model_id

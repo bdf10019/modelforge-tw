@@ -359,6 +359,14 @@ def test_model_manifest_rejects_unversioned_evaluation_identity():
         ModelManifest.model_validate(payload)
 
 
+def test_model_manifest_rejects_unknown_quantization():
+    payload = manifest("v1").model_dump(mode="json")
+    payload["quantization"] = "unknown"
+
+    with pytest.raises(ValidationError, match="quantization"):
+        ModelManifest.model_validate(payload)
+
+
 def test_registry_state_rejects_inconsistent_release_pointers_and_ids():
     candidate = manifest("v1")
     with pytest.raises(ValidationError, match="released pointer"):

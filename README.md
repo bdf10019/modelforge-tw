@@ -79,6 +79,7 @@ API、安全 gate、評測與 registry 機制，其數字不代表 LLM 品質，
 `probe-model` 也有明確 `--model-revision`，因此下載探針、訓練、評測、merge 與服務不會各自漂移。
 實測評估與訓練的省略值同樣對齊現行 `optimized-v2`、192-token 契約；歷史 v1 比較仍須顯式指定。
 Transformers／llama-http 的評估與壓測必須顯式帶 `--model-version`，不接受 `unversioned` 身份。
+llama-http 另須提供 `--quantization`，不接受 `unknown` 進入實測證據。
 
 ```powershell
 .\scripts\bootstrap.ps1 -Profile ml -DownloadModel
