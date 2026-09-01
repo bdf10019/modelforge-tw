@@ -53,15 +53,11 @@ def _unlock(handle: BinaryIO) -> None:
 
 @contextmanager
 def exclusive_file_lock(path: Path, *, timeout_seconds: float = 10.0) -> Iterator[None]:
-    """Hold a cross-process advisory lock backed by a stable one-byte file."""
+    """Hold a cross-process advisory lock backed by a stable lock file."""
     if timeout_seconds < 0:
         raise ValueError("lock timeout cannot be negative")
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+b") as handle:
-        handle.seek(0, os.SEEK_END)
-        if handle.tell() == 0:
-            handle.write(b"\0")
-            handle.flush()
         deadline = monotonic() + timeout_seconds
         while True:
             try:

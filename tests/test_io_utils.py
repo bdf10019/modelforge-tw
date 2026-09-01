@@ -70,6 +70,7 @@ def test_exclusive_file_lock_serializes_parallel_writers(tmp_path):
         list(executor.map(lambda _: enter_critical_section(), range(8)))
 
     assert maximum_active == 1
+    assert lock_path.exists()
 
 
 def test_exclusive_file_lock_rejects_negative_timeout(tmp_path):
