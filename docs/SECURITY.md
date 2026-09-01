@@ -21,6 +21,8 @@
 - 危險語句的 stop/isolate-and-escalate 優先於缺證據的 collect-evidence 規則；缺證據只能增加人工
   複核與缺失資訊，不能把既有升級動作降級。
 - 解析失敗、timeout、engine exception 都回 unknown + collect evidence + review required。
+- 所有引擎解析後都拒絕 allowlist 以外的 event、severity、safe action 與 reason code；llama.cpp
+  路徑還會在生成前用 strict JSON Schema 約束同一份契約。
 - semaphore、timeout、request ID 驗證、Prometheus outcome 與 readiness 檢查。
 - timeout 後仍保留同步模型的容量槽，直到不可取消的背景推論真正結束，避免資源耗盡。
 - `MODELFORGE_LOG_INPUTS` 唯一合法值為 `false`；誤設 `true` 時服務拒絕啟動，API 不提供事件原文

@@ -13,6 +13,7 @@ from modelforge_tw.dataset import audit_records, sha256_file
 from modelforge_tw.schemas import (
     DatasetRecord,
     EventType,
+    ReasonCode,
     SafeAction,
     Severity,
     Signal,
@@ -250,6 +251,7 @@ def _to_record(
     split: CalibrationSplit,
 ) -> DatasetRecord:
     evidence = _evidence(row, cohort)
+    reason_codes: list[ReasonCode]
     if cohort.severity == Severity.HIGH:
         suffix = "，需要隔離風險並由人員確認。"
         safe_actions = [SafeAction.ISOLATE_AND_ESCALATE]

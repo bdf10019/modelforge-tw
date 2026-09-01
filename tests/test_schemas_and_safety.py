@@ -52,8 +52,10 @@ def test_parse_distinguishes_raw_json_and_bounded_repair():
 
 
 def test_outbound_schema_requires_every_contract_field():
+    base_schema = TriageOutput.model_json_schema()
     response_format = _structured_response_format()
     schema = response_format["json_schema"]["schema"]
+    assert base_schema["properties"]["reason_codes"]["items"]["enum"] == list(ALLOWED_REASON_CODES)
     assert response_format["type"] == "json_schema"
     assert response_format["json_schema"]["strict"] is True
     assert set(schema["required"]) == set(TriageOutput.model_fields)
@@ -62,6 +64,9 @@ def test_outbound_schema_requires_every_contract_field():
     incomplete = valid_output().model_dump(mode="json", exclude={"evidence_spans"})
     with pytest.raises(ValidationError):
         TriageOutput.model_validate(incomplete)
+
+    with pytest.raises(ValidationError):
+        valid_output(reason_codes=["MODEL_SUPPLIED_FREE_TEXT"])
 
 
 def test_policy_removes_hallucinated_evidence_and_forces_review():
@@ -89,7 +94,7 @@ def test_explicit_critical_risk_cannot_be_downgraded_by_missing_evidence():
         review_required=True,
         evidence_spans=[],
         missing_information=[],
-        reason_codes=[f"MODEL_NOTE_{index}" for index in range(12)],
+        reason_codes=[],
     )
     secured, warnings = apply_safety_policy(request, output)
     assert secured.severity == Severity.CRITICAL
@@ -98,7 +103,7 @@ def test_explicit_critical_risk_cannot_be_downgraded_by_missing_evidence():
     assert secured.missing_information == ["可驗證的設備狀態與量測證據"]
     assert "HIGH_SEVERITY" in secured.reason_codes
     assert "INSUFFICIENT_EVIDENCE" in secured.reason_codes
-    assert len(secured.reason_codes) == 12
+    assert len(secured.reason_codes) == 2
     assert "RISK_ESCALATED_BY_POLICY" in warnings
 
 

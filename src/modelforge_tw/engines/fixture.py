@@ -11,6 +11,7 @@ from modelforge_tw.schemas import (
     EventType,
     InferenceMetadata,
     InferenceResult,
+    ReasonCode,
     SafeAction,
     Severity,
     TriageOutput,
@@ -79,7 +80,7 @@ class FixtureEngine:
         else:
             actions = [SafeAction.OBSERVE]
 
-        reason_codes: list[str] = []
+        reason_codes: list[ReasonCode] = []
         missing: list[str] = []
         if review:
             reason_codes.append(

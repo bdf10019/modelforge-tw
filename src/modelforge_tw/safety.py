@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from modelforge_tw.schemas import (
     EventType,
+    ReasonCode,
     SafeAction,
     Severity,
     TriageOutput,
@@ -164,7 +165,7 @@ def apply_safety_policy(
     return output, warnings
 
 
-def conservative_fallback(reason_code: str) -> TriageOutput:
+def conservative_fallback(reason_code: ReasonCode) -> TriageOutput:
     return TriageOutput(
         event_type=EventType.UNKNOWN,
         severity=Severity.UNKNOWN,

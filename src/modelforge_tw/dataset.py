@@ -13,6 +13,7 @@ from modelforge_tw.safety import CRITICAL_RISK_PATTERN, HIGH_RISK_PATTERN
 from modelforge_tw.schemas import (
     DatasetRecord,
     EventType,
+    ReasonCode,
     SafeAction,
     Severity,
     TriageOutput,
@@ -412,7 +413,7 @@ def _record(
 
     review_required = severity in {Severity.HIGH, Severity.CRITICAL, Severity.UNKNOWN}
     review_required = review_required or injected
-    reason_codes: list[str] = []
+    reason_codes: list[ReasonCode] = []
     if severity in {Severity.HIGH, Severity.CRITICAL}:
         reason_codes.append("HIGH_SEVERITY")
     if event_type == EventType.UNKNOWN:

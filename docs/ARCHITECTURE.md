@@ -45,9 +45,9 @@ Web / REST / OpenAI-compatible client
   同樣採此規則；唯一相容例外是 schema 1.0 中五個新版 identity 欄位全部不存在、且早已被指定為
   previous-good 的既有狀態，避免安全升級反而切斷已驗證的舊回退路徑；部分遷移的資料不放行。
 
-OpenAI-compatible HTTP adapter 使用 strict JSON Schema：八個輸出欄位皆 required，分類、動作與
-reason code 使用有限允許清單。此約束在生成前套用；線上 bounded repair 與 fail-closed fallback
-仍保留，但 raw 評測不把修補後結果算成原始格式成功。
+所有引擎的解析後 schema 都要求八個輸出欄位，並限制分類、動作與 reason code 為有限允許清單；
+OpenAI-compatible HTTP adapter 另用 strict JSON Schema 在生成前套用相同約束。線上 bounded repair
+與 fail-closed fallback 仍保留，但 raw 評測不把修補後結果算成原始格式成功。
 
 對外 `/v1/chat/completions` 是刻意縮小的 OpenAI-compatible 子集：接受 `model`、恰好一筆
 `user` message、`temperature=0`、`max_tokens` 與 `stream`。多輪或 system／assistant／tool 訊息、

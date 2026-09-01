@@ -32,7 +32,20 @@ class SafeAction(StrEnum):
     COLLECT_EVIDENCE = "collect_evidence"
 
 
-ALLOWED_REASON_CODES = (
+ReasonCode = Literal[
+    "LOW_SEVERITY",
+    "MEDIUM_SEVERITY",
+    "HIGH_SEVERITY",
+    "INSUFFICIENT_EVIDENCE",
+    "UNTRUSTED_INSTRUCTION",
+    "UNKNOWN_EVENT",
+    "MODEL_OUTPUT_INVALID",
+    "MODEL_TIMEOUT",
+    "MODEL_INFERENCE_ERROR",
+    "SAFE_FALLBACK",
+]
+
+ALLOWED_REASON_CODES: tuple[ReasonCode, ...] = (
     "LOW_SEVERITY",
     "MEDIUM_SEVERITY",
     "HIGH_SEVERITY",
@@ -80,9 +93,9 @@ class TriageOutput(BaseModel):
     missing_information: list[str] = Field(max_length=8)
     safe_actions: list[SafeAction] = Field(min_length=1, max_length=4)
     review_required: bool
-    reason_codes: list[str] = Field(max_length=12)
+    reason_codes: list[ReasonCode] = Field(max_length=12)
 
-    @field_validator("evidence_spans", "missing_information", "reason_codes")
+    @field_validator("evidence_spans", "missing_information")
     @classmethod
     def unique_non_empty_items(cls, values: list[str]) -> list[str]:
         cleaned: list[str] = []
@@ -91,6 +104,11 @@ class TriageOutput(BaseModel):
             if item and item not in cleaned:
                 cleaned.append(item)
         return cleaned
+
+    @field_validator("reason_codes")
+    @classmethod
+    def unique_reason_codes(cls, values: list[ReasonCode]) -> list[ReasonCode]:
+        return list(dict.fromkeys(values))
 
 
 class InferenceMetadata(BaseModel):
