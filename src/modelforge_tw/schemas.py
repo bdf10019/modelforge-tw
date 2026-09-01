@@ -6,7 +6,11 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from modelforge_tw.model_identity import validate_model_version, validate_quantization
+from modelforge_tw.model_identity import (
+    validate_immutable_model_revision,
+    validate_model_version,
+    validate_quantization,
+)
 
 
 class EventType(StrEnum):
@@ -193,6 +197,11 @@ class InferenceMetadata(BaseModel):
     def quantization_is_explicit(cls, value: str) -> str:
         return validate_quantization(value)
 
+    @field_validator("model_revision")
+    @classmethod
+    def model_revision_is_immutable(cls, value: str | None) -> str | None:
+        return validate_immutable_model_revision(value) if value is not None else None
+
 
 class InferenceResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -284,6 +293,11 @@ class EvaluationReport(BaseModel):
     @classmethod
     def quantization_is_explicit(cls, value: str) -> str:
         return validate_quantization(value)
+
+    @field_validator("model_revision")
+    @classmethod
+    def model_revision_is_immutable(cls, value: str | None) -> str | None:
+        return validate_immutable_model_revision(value) if value is not None else None
 
     @model_validator(mode="after")
     def validate_report_consistency(self) -> EvaluationReport:

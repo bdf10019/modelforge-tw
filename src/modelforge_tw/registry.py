@@ -445,6 +445,10 @@ class FileRegistry:
             "evaluation_model_version": (
                 manifest.evaluation_model_version == evaluation.model_version
             ),
+            "evaluation_model_revision": (
+                evaluation.model_revision is None
+                or manifest.base_revision == evaluation.model_revision
+            ),
             "evaluation_evidence_kind": (
                 manifest.evaluation_evidence_kind == evaluation.evidence_kind
             ),

@@ -507,6 +507,20 @@ def test_registry_rejects_mismatched_evaluation_metadata(tmp_path):
         registry.validate_evaluation("v1", report)
 
 
+def test_registry_binds_transformers_evaluation_to_base_revision(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    registry.add(manifest("v1"))
+    report = valid_evaluation_report(model_revision="b" * 64)
+
+    with pytest.raises(ValueError, match="evaluation_model_revision"):
+        registry.validate_evaluation("v1", report)
+
+
+def test_evaluation_rejects_floating_model_revision():
+    with pytest.raises(ValidationError, match="model_revision"):
+        valid_evaluation_report(model_revision="main")
+
+
 def test_registry_rejects_evaluation_from_a_different_dataset(tmp_path):
     registry = FileRegistry(tmp_path / "registry.json")
     registry.add(manifest("v1"))

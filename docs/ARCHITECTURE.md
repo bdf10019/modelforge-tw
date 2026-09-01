@@ -47,6 +47,8 @@ Web / REST / OpenAI-compatible client
   進入引擎、評測報告或 registry。llama-http 也必須明確提供量化格式，`unknown` 不能進入 measured
   evidence；Transformers 則依實際 NF4／BF16 載入方式設定。載入 probe 由 immutable base commit
   推導可重現版本標記。
+  Transformers inference metadata／evaluation 內的非空 model revision 同樣只接受 commit hash，且
+  registry 必須確認它等於 training manifest 的 base revision；遠端 llama-http 無法證明時保留 `null`。
 - `registry.py`：candidate、evaluation attestation、promote、previous-good 與 rollback 的原子檔案
   registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住評測資料 hash、引擎、
   模型 identity、evidence kind、生成、安全與評分契約。新候選缺少任一 attestation 欄位都不能
