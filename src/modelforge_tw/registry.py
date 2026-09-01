@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from modelforge_tw.io_utils import atomic_write_text
+from modelforge_tw.io_utils import atomic_write_text, exclusive_file_lock
 from modelforge_tw.schemas import EvaluationReport
 
 SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
@@ -94,6 +94,7 @@ class RegistryState(BaseModel):
 class FileRegistry:
     def __init__(self, path: Path, *, artifact_root: Path | None = None) -> None:
         self.path = path
+        self.lock_path = path.with_name(f".{path.name}.lock")
         self.artifact_root = artifact_root.resolve() if artifact_root else None
 
     def load(self) -> RegistryState:
@@ -240,6 +241,22 @@ class FileRegistry:
         evaluation_report_sha256: str,
         evaluation: EvaluationReport,
     ) -> RegistryState:
+        with exclusive_file_lock(self.lock_path):
+            return self._attest_evaluation_unlocked(
+                manifest_id,
+                evaluation_report=evaluation_report,
+                evaluation_report_sha256=evaluation_report_sha256,
+                evaluation=evaluation,
+            )
+
+    def _attest_evaluation_unlocked(
+        self,
+        manifest_id: str,
+        *,
+        evaluation_report: str,
+        evaluation_report_sha256: str,
+        evaluation: EvaluationReport,
+    ) -> RegistryState:
         evaluation_report = _validate_portable_relative_path(evaluation_report)
         if not re.fullmatch(r"[a-f0-9]{64}", evaluation_report_sha256):
             raise ValueError("evaluation report SHA-256 must be lowercase hexadecimal")
@@ -280,6 +297,10 @@ class FileRegistry:
         return state
 
     def add(self, manifest: ModelManifest) -> RegistryState:
+        with exclusive_file_lock(self.lock_path):
+            return self._add_unlocked(manifest)
+
+    def _add_unlocked(self, manifest: ModelManifest) -> RegistryState:
         self._validate_id(manifest.manifest_id)
         self._require_evaluation_attestation(manifest)
         state = self.load()
@@ -297,6 +318,10 @@ class FileRegistry:
         return state
 
     def promote(self, manifest_id: str) -> RegistryState:
+        with exclusive_file_lock(self.lock_path):
+            return self._promote_unlocked(manifest_id)
+
+    def _promote_unlocked(self, manifest_id: str) -> RegistryState:
         self._validate_id(manifest_id)
         state = self.load()
         if manifest_id not in state.manifests:
@@ -324,6 +349,10 @@ class FileRegistry:
         return state
 
     def rollback(self) -> RegistryState:
+        with exclusive_file_lock(self.lock_path):
+            return self._rollback_unlocked()
+
+    def _rollback_unlocked(self) -> RegistryState:
         state = self.load()
         if not state.previous_good:
             raise ValueError("no previous-good manifest is available")
@@ -353,6 +382,22 @@ class FileRegistry:
         return state
 
     def block(
+        self,
+        manifest_id: str,
+        *,
+        evaluation_report: str | None = None,
+        evaluation_report_sha256: str | None = None,
+        release_passed: bool | None = None,
+    ) -> RegistryState:
+        with exclusive_file_lock(self.lock_path):
+            return self._block_unlocked(
+                manifest_id,
+                evaluation_report=evaluation_report,
+                evaluation_report_sha256=evaluation_report_sha256,
+                release_passed=release_passed,
+            )
+
+    def _block_unlocked(
         self,
         manifest_id: str,
         *,

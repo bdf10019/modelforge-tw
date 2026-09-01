@@ -1,4 +1,5 @@
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -47,6 +48,18 @@ def test_registry_promote_and_rollback(tmp_path):
     state = registry.rollback()
     assert state.released == "v1"
     assert state.previous_good == "v2"
+
+
+def test_registry_preserves_parallel_candidate_additions(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    candidates = [manifest(f"parallel-{index}") for index in range(8)]
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        list(executor.map(registry.add, candidates))
+
+    assert set(registry.load().manifests) == {
+        f"parallel-{index}" for index in range(len(candidates))
+    }
 
 
 def test_registry_rejects_failed_or_unsafe_candidate(tmp_path):
