@@ -195,7 +195,10 @@ class RequestBodyLimitMiddleware:
             return
 
         declared_lengths: list[int] = []
+        has_transfer_encoding = False
         for name, value in scope["headers"]:
+            if name.lower() == b"transfer-encoding":
+                has_transfer_encoding = True
             if name.lower() != b"content-length":
                 continue
             if not value.isdigit():
@@ -204,6 +207,9 @@ class RequestBodyLimitMiddleware:
             declared_lengths.append(int(value))
         if len(declared_lengths) > 1:
             await _send_json_error(send, 400, "multiple Content-Length values")
+            return
+        if declared_lengths and has_transfer_encoding:
+            await _send_json_error(send, 400, "ambiguous request body framing")
             return
         if declared_lengths and declared_lengths[0] > self.max_body_bytes:
             await _send_json_error(send, 413, "request body is too large")

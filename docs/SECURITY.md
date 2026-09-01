@@ -26,7 +26,8 @@
 - `incident_text`、asset 與 signal 文字都視為不可信資料並納入注入偵測；signal 字串限制 128 字，
   數字必須是有限值且在明確範圍內，控制字元會在進入 prompt 前拒絕。
 - HTTP body 預設上限 32 KiB；有無 `Content-Length` 都會依實收 bytes 計數，超限先回 413，
-  不讓大型 payload 進入 JSON／Pydantic 解析。上限可設定但限制在 1 KiB 至 1 MiB。
+  不讓大型 payload 進入 JSON／Pydantic 解析。重複 Content-Length 或同時宣告 Content-Length 與
+  Transfer-Encoding 的歧義 framing 會在讀取前回 400；上限可設定但限制在 1 KiB 至 1 MiB。
 - llama.cpp 一般與 SSE 回應都以解碼後 bytes 計數，預設上限 256 KiB；`Content-Length` 超限會
   在讀 body 前拒絕，chunked／壓縮回應則依實收解碼內容停止，無換行事件也不能無界累積。
 - 模型 server 只接受具有 host、無內嵌帳密／query／fragment 的 HTTP(S) base URL；client 固定

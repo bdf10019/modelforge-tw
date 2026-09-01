@@ -326,6 +326,24 @@ async def test_multiple_content_length_headers_are_rejected():
     assert response.json() == {"detail": "multiple Content-Length values"}
 
 
+async def test_content_length_with_transfer_encoding_is_rejected():
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage",
+            content=b"{}",
+            headers=[
+                ("Content-Type", "application/json"),
+                ("Content-Length", "2"),
+                ("Transfer-Encoding", "chunked"),
+            ],
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "ambiguous request body framing"}
+    assert REQUEST_ID.fullmatch(response.headers["X-Request-ID"])
+
+
 @pytest.mark.parametrize(
     ("declared_length", "detail"),
     [
