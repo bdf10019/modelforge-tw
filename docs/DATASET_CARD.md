@@ -34,7 +34,19 @@ scenario family 硬性稽核。這段歷史保留用來證明 gate 能阻止小�
 情境生成，train 的 low／medium／high 各 220 筆、critical 60 筆、unknown 120 筆；每個切分使用
 不同核心症狀，並保留風險下限稽核。這能改善校準，但不等同真實場域的嚴重度先驗分布。
 
+## 第三方外部校準
+
+另有 UCI AI4I 2020 的 98 筆 calibration 與 98 筆 row-disjoint holdout；它們不加入 train／
+validation，也不計入上方 1,204 筆。來源 CSV、轉換版本、兩組 seed、選取列與輸出檔都鎖定
+SHA-256；combined audit 的跨 split 文字、模板、情境家族與來源列重疊皆為 0。
+
+AI4I 本身仍是第三方合成資料。事件類型、severity、繁體中文敘述與衍生門檻由本專案的
+`ai4i-calibration-v2` 規則建立，不是 UCI 原始人工標籤。它只覆蓋 thermal、electrical、mechanical、
+process 與 unknown，不能代表 pressure、communication 或真實維修判讀。完整方法與 hash 見
+[`EXTERNAL_CALIBRATION.md`](EXTERNAL_CALIBRATION.md)。
+
 ## 授權與限制
 
-原創資料以 CC BY 4.0 發布。它是工程展示資料，不代表特定工廠分布、故障率或維修 SOP；不得用來
-訓練自動控制系統。正式落地需要由領域專家建立真實、去識別且有資料權利的驗證集。
+原創資料以 CC BY 4.0 發布；AI4I 來源資料也依 UCI 標示的 CC BY 4.0 使用。兩者都是工程展示資料，
+不代表特定工廠分布、故障率或維修 SOP；不得用來訓練自動控制系統。正式落地需要由領域專家建立
+真實、去識別且有資料權利的驗證集。

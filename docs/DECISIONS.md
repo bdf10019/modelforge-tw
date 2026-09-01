@@ -51,3 +51,16 @@ released，Q8 policy-v2 保留為 previous-good。
 
 Q4 雖只有 1.11 GB 且 mean latency 0.825 秒，event macro-F1 相對同契約 Q8 退化 10.73 個百分點並
 低於絕對門檻，因此 blocked。速度、檔案大小或安全硬門檻不能抵銷主任務品質失敗。
+
+## ADR-009：外部單一來源通過不能覆寫內部回歸失敗
+
+AI4I calibration 與首次 row-disjoint holdout 上，prompt v5 的政策後結果皆為 100%；但 holdout
+raw evidence precision 只有 84.85%、16.33% 案例需安全層介入，且同一 prompt 回到內部 224 筆
+event F1 降至 69.72%。因此 v5 不建立發布 manifest。候選必須以同一 prompt 同時通過既有完整集
+與新的跨來源 holdout，不能依資料來源切換專用規則後宣稱泛化。
+
+## ADR-010：Context 是評估與部署相容性的一部分
+
+4096 total context／4 parallel slots 的每-slot 1024 token 在外部輸入造成全數截斷。context 因此
+納入 inference metadata、評估報告、快取指紋與 Q4 相容性檢查；本機與 Kubernetes baseline 改為
+8192／4，每 slot 2048。本機啟動低於 1536 時 fail fast，避免把容量錯誤誤判成模型品質。

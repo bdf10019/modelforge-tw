@@ -52,3 +52,57 @@ def test_public_evidence_snapshot_is_self_consistent():
         "event_type_macro_f1"
     ] == pytest.approx(event_delta, abs=1e-6)
     assert -event_delta > comparison["event_macro_f1_max_regression"]
+
+
+def test_external_evidence_snapshot_preserves_holdout_and_rejection_decision():
+    evidence = json.loads(
+        (PROJECT_ROOT / "docs" / "measured-evidence.json").read_text(encoding="utf-8")
+    )
+    external = evidence["external_calibration"]
+    assert external["source"]["kind"] == "third-party-synthetic"
+    assert external["source"]["license"] == "CC-BY-4.0"
+    assert external["calibration"]["records"] == 98
+    assert external["holdout"]["records"] == 98
+    assert (
+        external["calibration"]["source_rows_sha256"] != external["holdout"]["source_rows_sha256"]
+    )
+    assert external["holdout"]["used_for_prompt_tuning"] is False
+    assert external["audit"]["source_row_overlap"] == 0
+    assert all(value == 0 for key, value in external["audit"].items() if key not in {"records"})
+
+    runs = external["evaluations"]
+    contract_fields = {
+        "model_id": "Qwen3-1.7B",
+        "model_version": "qwen3-1.7b-qlora-v5",
+        "quantization": "q8_0",
+        "max_new_tokens": 192,
+        "context_window_tokens": 2048,
+        "structured_output_contract": "json-schema-v2",
+        "safety_policy_version": "risk-precedence-v3",
+        "evaluation_contract_version": "release-metrics-v4",
+        "release_gate_sha256": "2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a",
+        "evidence_kind": "measured",
+    }
+    assert all(
+        run[field] == value
+        for run in runs.values()
+        for field, value in contract_fields.items()
+    )
+    internal_v2 = runs["internal_q8_prompt_v2_policy_v3"]
+    external_v2 = runs["external_calibration_q8_prompt_v2"]
+    calibration_v5 = runs["external_calibration_q8_prompt_v5"]
+    holdout_v5 = runs["external_holdout_q8_prompt_v5"]
+    regression_v5 = runs["internal_regression_q8_prompt_v5"]
+    external_v6 = runs["external_calibration_q8_prompt_v6"]
+    assert internal_v2["release_passed"] is True
+    assert external_v2["release_passed"] is False
+    assert calibration_v5["release_passed"] is True
+    assert holdout_v5["release_passed"] is True
+    assert regression_v5["release_passed"] is False
+    assert external_v6["release_passed"] is False
+    assert holdout_v5["metrics"]["raw_evidence_span_precision"] < 1.0
+    warning_total = sum(holdout_v5["validation_warning_counts"].values())
+    assert holdout_v5["metrics"]["postprocessing_intervention_rate"] == pytest.approx(
+        warning_total / holdout_v5["cases"], abs=1e-6
+    )
+    assert external["decision"] == ("holdout_passed_but_prompt_v5_rejected_for_internal_regression")

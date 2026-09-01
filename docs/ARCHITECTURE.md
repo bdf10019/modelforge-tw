@@ -26,6 +26,8 @@ Web / REST / OpenAI-compatible client
 - `evaluation.py`：同資料 hash、release-gate SHA-256 的品質指標與 hard gate；Q4 另檢查相對 Q8
   的 macro-F1、raw schema 與 hard-gate regression。長時間評估逐筆寫入續跑快取；只有資料紀錄
   SHA-256 與模型、adapter、prompt、解碼、安全政策、評分契約指紋完全一致時才可沿用。
+- `external_calibration.py`：驗證第三方來源 SHA-256、固定兩組不重疊抽樣、轉換 AI4I 衍生事件，
+  並輸出 calibration／holdout manifest 與 combined leakage audit。
 - `benchmark.py`：併發、P50/P95/P99、吞吐、RAM／整卡 VRAM 峰值取樣；HTTP streaming 可量
   TTFT，不支援時明確記 `null`。
 - `registry.py`：candidate、evaluation attestation、promote、previous-good 與 rollback 的原子檔案
@@ -45,3 +47,10 @@ reason code 使用有限允許清單。此約束在生成前套用；線上 boun
 同步模型推論逾時時會立即回傳保守 fallback，但底層執行緒無法強制取消；該工作真正結束以前仍
 占用 concurrency slot，避免連續 timeout 繞過容量上限並堆積 GPU 工作。Prometheus 分開呈現
 尚未回應的 HTTP request 與仍在執行的 engine job，因此 timeout 後的背景負載仍可觀測。
+
+llama.cpp 的 `--ctx-size` 是所有 parallel slots 的總容量。部署設定把每-slot context 明確寫入 API
+metadata 與評估報告；本機預設 8192／4＝2048 tokens，低於實測最低值時啟動失敗，避免容量截斷
+被誤判為模型品質退化。
+
+安全政策同樣由版本明確選擇：服務、`.env` 與 Kubernetes 預設 `risk-precedence-v2`，和 registry
+attestation 一致；外部實驗的 v3 必須由 CLI／環境變數顯式指定，並進入 metadata 與快取指紋。

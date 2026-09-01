@@ -41,6 +41,17 @@ NF4 的描述性差距為 10.01 個百分點；Q8 保留為 previous-good。相�
 這些結果來自原創合成測試與小型人工 challenge，只能證明工程流程、已定義分布與安全 gate，
 不能外推為真實工廠準確率或安全認證。
 
+## 外部校準診斷
+
+UCI AI4I 第三方合成資料另形成 98 筆 calibration 與 98 筆來源列不重疊 holdout，不參與訓練。
+現行 Q8 prompt v2 在內部新版診斷 gate 通過，但 external calibration event F1 只有 40.82%。實驗
+prompt v5 在 calibration 與首次 holdout 的政策後結果皆達 100%，可是 holdout raw evidence
+precision 只有 84.85%、16.33% 案例需要安全層介入；同一 prompt 回到內部資料時 event F1 降到
+69.72%、unknown accuracy 降到 45.16%。因此 v5 不發布，正式模型與 registry 狀態不變。
+
+這項 holdout 只能稱為「同一第三方合成來源內的未觸碰列級驗證」，不是獨立工廠或真實設備驗證。
+完整方法見 [`EXTERNAL_CALIBRATION.md`](EXTERNAL_CALIBRATION.md)。
+
 ## Intended use
 
 將繁體中文設備事件正規化為事件類型、嚴重度、摘要、原文證據、缺失資訊、允許清單動作與人工
@@ -59,3 +70,4 @@ critical、high、unknown、提示注入、無效 schema 與無 grounding 證據
   severity mismatch。
 - Q4 的主要退化是事件類型：57 筆 mismatch，顯示 4-bit 檔案雖小且快，不能只憑安全硬門檻發布。
 - 人工 challenge 已用於迭代診斷，屬於開發回歸集，不是未觸碰的外部驗證集。
+- AI4I v5 的外部高分無法泛化回內部資料；安全層介入後的正確率不得當成模型原生正確率。

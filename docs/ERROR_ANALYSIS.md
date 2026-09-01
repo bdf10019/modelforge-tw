@@ -66,11 +66,28 @@ Q4 完整集有 57 筆 event mismatch、21 筆 severity mismatch；event macro-F
 accuracy 83.87%。相對 Q8 的 event macro-F1 退化 10.73 個百分點，超過允許的 1.5 個百分點，
 因此即使格式與所有安全硬門檻為 100%，仍必須 blocked。
 
+## 外部校準揭露的問題
+
+第一版 AI4I 轉換器把每筆資料的五個感測欄位全部標成相同 warning／critical，造成 thermal、
+electrical、mechanical、process 訊號同時異常。這是輸入契約缺陷，不應算成模型錯誤；v2 改成只
+標示事件相關衍生訊號，並保留原抽樣列與不重疊 holdout。
+
+現行 prompt v2 在修正後的 external calibration 仍有 56 筆 event mismatch、14 筆 raw schema
+invalid，event F1 40.82%；這是實質跨來源失敗。外部專用 v5 可讓 calibration 與首次 holdout 的
+系統結果都達 100%，但 holdout 原生 evidence precision 只有 84.85%，而且 v5 回到內部資料時有
+65 筆 event mismatch、event F1 降至 69.72%、unknown accuracy 降至 45.16%。因此 v5 被拒絕，
+不能用外部單一資料型態的高分覆蓋內部回歸。
+
+另一個重要發現是 context 容量：4096 total context／4 slots 讓每 slot 只有 1024 tokens，外部
+prompt 加 192-token output 預算後全數截斷。改成 8192／4 後容量問題消失；啟動預設與報告契約
+已修正。容量事故報告保留，不把 raw 0% 當成模型分類能力。
+
 ## 下一步
 
-1. 增加未參與迭代的外部 severity calibration set，特別補強 medium／low 邊界。
-2. 增加 thermal／pressure、electrical／thermal 與 process／pressure 的困難負例。
-3. 對 Q8 做量化感知的校準或少量蒸餾，再以相同 224 筆與獨立資料重驗。
-4. Q4 只有在重新訓練或改變量化方法後才建立新 manifest；不得覆寫本次 blocked 證據。
+1. 下一輪訓練加入來源多樣但有授權的 equipment-language 資料；不能再用 AI4I holdout 調 prompt。
+2. 增加 thermal／pressure、electrical／thermal、process／pressure 與 insufficient-evidence 困難負例。
+3. 對 Q8 做少量蒸餾或 adapter 再訓練，使同一 prompt 同時通過內部 224 與新的跨來源 holdout。
+4. 把 raw evidence precision 與安全層介入率納入下一版發布門檻，降低對後處理的依賴。
+5. Q4 只有在重新訓練或改變量化方法後才建立新 manifest；不得覆寫本次 blocked 證據。
 
 本結果不能代表真實工廠分布、設備安全認證或自動控制能力。模型仍是人工分流輔助。

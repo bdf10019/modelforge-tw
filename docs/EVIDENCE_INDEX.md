@@ -35,6 +35,26 @@ relative gate。
   max tokens、structured-output contract、safety policy、evaluation contract 七項相容性檢查皆為
   `true`。
 
+## 外部校準、holdout 與新版診斷
+
+來源與方法見 [`EXTERNAL_CALIBRATION.md`](EXTERNAL_CALIBRATION.md)。公開固定值：
+
+| 證據 | report／hash | run ID | gate |
+|---|---|---|---|
+| AI4I calibration v2 JSONL | `cfa2b95d127a52ad3b5e6692394f7ffaec96ae654ceccf0d0c26429f74f005bd` | — | audit pass |
+| AI4I holdout v2 JSONL | `e1e2b4b1f45ba23b513636c0c5d9091b7d1256fee99ffb84aad7bdae0e1aab57` | — | audit pass |
+| Q8 v2／內部 224／policy-v3 | `outputs/eval-internal-q8-policy-v3-prompt-v2-full.json` | `6d2b16ec-f07f-4dd1-9da1-62aba7fc9b72` | pass |
+| Q8 v2／外部 calibration | `outputs/eval-external-ai4i-v2-q8-policy-v3-prompt-v2.json` | `10de7848-eae0-4356-90d0-72b3b50c79cd` | fail |
+| Q8 v5／外部 calibration | `outputs/eval-external-ai4i-v2-q8-policy-v3-prompt-v5-final.json` | `1b9d021a-a9db-4a08-8207-85bb1bcebf44` | pass |
+| Q8 v5／首次 holdout | `outputs/eval-external-ai4i-v2-holdout-q8-policy-v3-prompt-v5.json` | `9143d92d-ac77-48e3-a28a-6bacffb1e2b3` | pass |
+| Q8 v5／內部回歸 | `outputs/eval-internal-q8-policy-v3-prompt-v5-full.json` | `7d5ab68d-ed93-4528-8ff1-8efc5dda5446` | fail |
+| Q8 v6／外部 calibration | `outputs/eval-external-ai4i-v2-q8-policy-v3-prompt-v6.json` | `93719bcf-d1e4-40ee-b0f3-47ef42fea346` | fail |
+
+新版報告鎖定 192 max tokens、2048 per-slot context、`json-schema-v2`、`risk-precedence-v3` 與
+`release-metrics-v4`。它們新增 raw evidence 與 postprocessing intervention 統計；和上方 registry
+policy-v2 報告的合約不同，只作診斷，不用來覆寫既有 attestation。外部 v5 holdout 雖通過，因
+內部回歸失敗而不建立／promote manifest。
+
 ## 量化 artifact
 
 | 檔案 | bytes | SHA-256 |
@@ -60,6 +80,8 @@ relative gate。
 - `scripts/quantize.ps1`、`scripts/serve-gguf.ps1`：GGUF 與 llama.cpp。
 - `scripts/benchmark.ps1`：併發與 TTFT。
 - `scripts/verify.ps1`：格式、型別、測試、資料 audit、隱私與封裝檢查。
+- `scripts/verify-local-evidence.ps1`：本機逐案報告存在時，核對公開快照的 run ID、設定、gate、
+  指標、警告計數及外部 manifest hash；乾淨 clone 沒有 Git 忽略報告時安全略過。
 
 若重新執行產生不同 run ID，必須同時檢查資料 hash、gate hash、模型版本與 artifact hash，不能只
 比較檔名。

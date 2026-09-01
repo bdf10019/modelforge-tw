@@ -30,10 +30,22 @@ foreach ($entry in $external.evaluations.PSObject.Properties) {
     Assert-Equal "$($entry.Name).run_id" $expected.run_id $actual.run_id
     Assert-Equal "$($entry.Name).cases" $expected.cases $actual.case_count
     Assert-Equal "$($entry.Name).prompt" $expected.prompt_version $actual.prompt_version
-    Assert-Equal `
-        "$($entry.Name).context" `
-        $expected.context_window_tokens `
-        $actual.context_window_tokens
+    $contractFields = @(
+        "model_id",
+        "model_version",
+        "quantization",
+        "max_new_tokens",
+        "context_window_tokens",
+        "structured_output_contract",
+        "safety_policy_version",
+        "evaluation_contract_version",
+        "dataset_manifest_sha256",
+        "release_gate_sha256",
+        "evidence_kind"
+    )
+    foreach ($field in $contractFields) {
+        Assert-Equal "$($entry.Name).$field" $expected.$field $actual.$field
+    }
     Assert-Equal `
         "$($entry.Name).release_passed" `
         $expected.release_passed `

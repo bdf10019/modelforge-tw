@@ -57,8 +57,19 @@ Q8 mean latency 是 NF4 路徑的 12.7%，描述上約 7.86 倍加速。相同�
 | Q4_K_M | 4 | 2.692 | 226.6 | 1.441 s | 1.542 s | 374 ms | 2,443 MiB |
 
 上述壓測使用 llama-server 的 4 個 parallel slots、4096 總 context、全部 GPU layers 與 flash
-attention。每 slot context 為 1024，足以容納本資料的約 700–900 token prompt；不同資料或硬體必須
-重新設定與評測，不能沿用本數字。
+attention。每 slot context 為 1024，當時足以容納內部資料的約 700–900 token prompt；這份吞吐量
+結果仍有效，但後續外部校準證明它不是安全的通用預設。
+
+## Context 容量回歸
+
+AI4I 外部輸入的 prompt 約 967 tokens；再加 192-token output budget 後，4096 total context／4 slots
+會在 1024-token 邊界截斷。第一輪 Q8 的 98/98 raw schema 因此失敗，server log 顯示
+`truncated=1`。改為 8192／4（每 slot 2048）後沒有截斷，transform-v1 raw schema 回升至 77.55%，
+確認剩餘問題才是模型輸出與分類，而非容量。
+
+目前 `serve-gguf.ps1` 與 Kubernetes baseline 改用 8192／4，API／報告宣告每 slot 2048；本機腳本
+拒絕低於 1536 的 slot。這項變更沒有回寫上方既有 4096-context 併發數字；若要宣稱新設定的吞吐量，
+必須另跑 8192-context benchmark。
 
 ## 未執行邊界
 

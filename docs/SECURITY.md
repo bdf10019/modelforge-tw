@@ -15,6 +15,8 @@
 - llama.cpp 出站請求使用 strict JSON Schema，所有欄位 required，enum 與 reason code 採允許清單。
 - prompt 明確把事件視為不可信資料；server 另做注入 regex，不依賴模型服從。
 - 證據必須逐字存在輸入；否則移除並強制人工複核。
+- 評估分開記錄模型原生 evidence precision、政策後 evidence precision、後處理介入率與逐案警告，
+  防止把安全層修正包裝成模型能力。
 - critical/high 關鍵風險只可向上升級；動作來自四項 allowlist，沒有設備控制工具。
 - 危險語句的 stop/isolate-and-escalate 優先於缺證據的 collect-evidence 規則；缺證據只能增加人工
   複核與缺失資訊，不能把既有升級動作降級。
@@ -22,6 +24,8 @@
 - semaphore、timeout、request ID 驗證、Prometheus outcome 與 readiness 檢查。
 - timeout 後仍保留同步模型的容量槽，直到不可取消的背景推論真正結束，避免資源耗盡。
 - 預設 `MODELFORGE_LOG_INPUTS=false`；repository 忽略模型、資料生成物與輸出報告。
+- llama.cpp 每-slot context 預設 2048；本機啟動腳本低於 1536 時 fail fast，避免輸出被靜默截斷。
+- 安全政策不可因程式更新靜默漂移；部署預設鎖定 registry 已 attested 的 v2，實驗 v3 必須顯式選擇。
 
 ## Secret and privacy checks
 

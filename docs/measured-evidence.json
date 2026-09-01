@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "evidence_kind": "measured",
   "scope": "2026-08-28/29 本機實測的去識別摘要；不含逐案文字、模型權重或生成資料",
   "environment": {
@@ -33,6 +33,221 @@
       "invalid_evidence_spans": 0,
       "policy_severity_mismatches": 0
     }
+  },
+  "external_calibration": {
+    "source": {
+      "dataset": "AI4I 2020 Predictive Maintenance Dataset",
+      "landing_page": "https://archive.ics.uci.edu/dataset/601/ai4i",
+      "doi": "10.24432/C5HS5C",
+      "license": "CC-BY-4.0",
+      "kind": "third-party-synthetic",
+      "rows": 10000,
+      "zip_sha256": "f601f14294bcf190f9d720676b7f0aea46a26cde9ab8ebc7b4f8174d9d26b252",
+      "csv_sha256": "dc6630cd9b1f0f853922fad78a1b6436570d3f1ec863f1dd5c4340ac56bc8a8e"
+    },
+    "transform_version": "ai4i-calibration-v2",
+    "manifest_sha256": "2376ff98af427d01c99e0ba3b57832f7f0a5c59836662983ef1e09f1177101ac",
+    "calibration": {
+      "records": 98,
+      "source_rows_sha256": "afbf2bc44364db46ad175710a8758a852bf638357a2de6325ef970b43d2260e5",
+      "jsonl_sha256": "cfa2b95d127a52ad3b5e6692394f7ffaec96ae654ceccf0d0c26429f74f005bd"
+    },
+    "holdout": {
+      "records": 98,
+      "source_rows_sha256": "1820378b4ff4c6a5737aac5aaec20217a13b7c27f5e27dec309a73b2c2229ed7",
+      "jsonl_sha256": "e1e2b4b1f45ba23b513636c0c5d9091b7d1256fee99ffb84aad7bdae0e1aab57",
+      "first_evaluated_after_commit": "61ce586",
+      "used_for_prompt_tuning": false
+    },
+    "audit": {
+      "records": 196,
+      "source_row_overlap": 0,
+      "cross_split_normalized_texts": 0,
+      "cross_split_template_ids": 0,
+      "cross_split_scenario_families": 0,
+      "invalid_evidence_spans": 0,
+      "policy_severity_mismatches": 0
+    },
+    "evaluations": {
+      "internal_q8_prompt_v2_policy_v3": {
+        "source_report": "outputs/eval-internal-q8-policy-v3-prompt-v2-full.json",
+        "run_id": "6d2b16ec-f07f-4dd1-9da1-62aba7fc9b72",
+        "cases": 224,
+        "model_id": "Qwen3-1.7B",
+        "model_version": "qwen3-1.7b-qlora-v5",
+        "quantization": "q8_0",
+        "prompt_version": "optimized-v2",
+        "max_new_tokens": 192,
+        "context_window_tokens": 2048,
+        "structured_output_contract": "json-schema-v2",
+        "safety_policy_version": "risk-precedence-v3",
+        "evaluation_contract_version": "release-metrics-v4",
+        "dataset_manifest_sha256": "01893121075ce7b2436f18407292e44dccc0e6a13b2299c9929af259e58d7f17",
+        "release_gate_sha256": "2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a",
+        "evidence_kind": "measured",
+        "release_passed": true,
+        "metrics": {
+          "raw_json_schema_rate": 1.0,
+          "event_type_macro_f1": 0.8554,
+          "severity_macro_f1": 0.856392,
+          "unknown_accuracy": 0.967742,
+          "raw_evidence_span_precision": 0.994845,
+          "postprocessing_intervention_rate": 0.241071,
+          "case_pass_rate": 0.767857
+        }
+      },
+      "external_calibration_q8_prompt_v2": {
+        "source_report": "outputs/eval-external-ai4i-v2-q8-policy-v3-prompt-v2.json",
+        "run_id": "10de7848-eae0-4356-90d0-72b3b50c79cd",
+        "cases": 98,
+        "model_id": "Qwen3-1.7B",
+        "model_version": "qwen3-1.7b-qlora-v5",
+        "quantization": "q8_0",
+        "prompt_version": "optimized-v2",
+        "max_new_tokens": 192,
+        "context_window_tokens": 2048,
+        "structured_output_contract": "json-schema-v2",
+        "safety_policy_version": "risk-precedence-v3",
+        "evaluation_contract_version": "release-metrics-v4",
+        "dataset_manifest_sha256": "6a94a83fc14388ed68791efedc219f63a126f36ccf090e7424371f42af5cbc1d",
+        "release_gate_sha256": "2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a",
+        "evidence_kind": "measured",
+        "release_passed": false,
+        "metrics": {
+          "raw_json_schema_rate": 0.857143,
+          "event_type_macro_f1": 0.408205,
+          "severity_macro_f1": 1.0,
+          "unknown_accuracy": 1.0,
+          "raw_evidence_span_precision": 0.920455,
+          "postprocessing_intervention_rate": 0.193878,
+          "case_pass_rate": 0.285714
+        }
+      },
+      "external_calibration_q8_prompt_v5": {
+        "source_report": "outputs/eval-external-ai4i-v2-q8-policy-v3-prompt-v5-final.json",
+        "run_id": "1b9d021a-a9db-4a08-8207-85bb1bcebf44",
+        "cases": 98,
+        "model_id": "Qwen3-1.7B",
+        "model_version": "qwen3-1.7b-qlora-v5",
+        "quantization": "q8_0",
+        "prompt_version": "optimized-v5",
+        "max_new_tokens": 192,
+        "context_window_tokens": 2048,
+        "structured_output_contract": "json-schema-v2",
+        "safety_policy_version": "risk-precedence-v3",
+        "evaluation_contract_version": "release-metrics-v4",
+        "dataset_manifest_sha256": "6a94a83fc14388ed68791efedc219f63a126f36ccf090e7424371f42af5cbc1d",
+        "release_gate_sha256": "2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a",
+        "evidence_kind": "measured",
+        "release_passed": true,
+        "metrics": {
+          "raw_json_schema_rate": 1.0,
+          "event_type_macro_f1": 1.0,
+          "severity_macro_f1": 1.0,
+          "unknown_accuracy": 1.0,
+          "raw_evidence_span_precision": 0.848485,
+          "postprocessing_intervention_rate": 0.173469,
+          "forced_unknown_rate": 0.020408,
+          "case_pass_rate": 1.0
+        },
+        "validation_warning_counts": {
+          "EVENT_TYPE_FORCED_UNKNOWN_BY_POLICY": 2,
+          "EVIDENCE_SPAN_NOT_IN_INPUT": 15
+        }
+      },
+      "external_holdout_q8_prompt_v5": {
+        "source_report": "outputs/eval-external-ai4i-v2-holdout-q8-policy-v3-prompt-v5.json",
+        "run_id": "9143d92d-ac77-48e3-a28a-6bacffb1e2b3",
+        "cases": 98,
+        "model_id": "Qwen3-1.7B",
+        "model_version": "qwen3-1.7b-qlora-v5",
+        "quantization": "q8_0",
+        "prompt_version": "optimized-v5",
+        "max_new_tokens": 192,
+        "context_window_tokens": 2048,
+        "structured_output_contract": "json-schema-v2",
+        "safety_policy_version": "risk-precedence-v3",
+        "evaluation_contract_version": "release-metrics-v4",
+        "dataset_manifest_sha256": "40fbda7841f59ada6ba02b45abbfe46a7c0b89a404c74ae5bcfc19f4e8d96474",
+        "release_gate_sha256": "2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a",
+        "evidence_kind": "measured",
+        "release_passed": true,
+        "metrics": {
+          "raw_json_schema_rate": 1.0,
+          "event_type_macro_f1": 1.0,
+          "severity_macro_f1": 1.0,
+          "unknown_accuracy": 1.0,
+          "raw_evidence_span_precision": 0.848485,
+          "postprocessing_intervention_rate": 0.163265,
+          "forced_unknown_rate": 0.010204,
+          "case_pass_rate": 1.0
+        },
+        "validation_warning_counts": {
+          "EVENT_TYPE_FORCED_UNKNOWN_BY_POLICY": 1,
+          "EVIDENCE_SPAN_NOT_IN_INPUT": 15
+        }
+      },
+      "internal_regression_q8_prompt_v5": {
+        "source_report": "outputs/eval-internal-q8-policy-v3-prompt-v5-full.json",
+        "run_id": "7d5ab68d-ed93-4528-8ff1-8efc5dda5446",
+        "cases": 224,
+        "model_id": "Qwen3-1.7B",
+        "model_version": "qwen3-1.7b-qlora-v5",
+        "quantization": "q8_0",
+        "prompt_version": "optimized-v5",
+        "max_new_tokens": 192,
+        "context_window_tokens": 2048,
+        "structured_output_contract": "json-schema-v2",
+        "safety_policy_version": "risk-precedence-v3",
+        "evaluation_contract_version": "release-metrics-v4",
+        "dataset_manifest_sha256": "01893121075ce7b2436f18407292e44dccc0e6a13b2299c9929af259e58d7f17",
+        "release_gate_sha256": "2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a",
+        "evidence_kind": "measured",
+        "release_passed": false,
+        "metrics": {
+          "raw_json_schema_rate": 1.0,
+          "event_type_macro_f1": 0.697244,
+          "severity_macro_f1": 0.849715,
+          "unknown_accuracy": 0.451613,
+          "raw_evidence_span_precision": 0.995098,
+          "postprocessing_intervention_rate": 0.34375,
+          "case_pass_rate": 0.589286
+        }
+      },
+      "external_calibration_q8_prompt_v6": {
+        "source_report": "outputs/eval-external-ai4i-v2-q8-policy-v3-prompt-v6.json",
+        "run_id": "93719bcf-d1e4-40ee-b0f3-47ef42fea346",
+        "cases": 98,
+        "model_id": "Qwen3-1.7B",
+        "model_version": "qwen3-1.7b-qlora-v5",
+        "quantization": "q8_0",
+        "prompt_version": "optimized-v6",
+        "max_new_tokens": 192,
+        "context_window_tokens": 2048,
+        "structured_output_contract": "json-schema-v2",
+        "safety_policy_version": "risk-precedence-v3",
+        "evaluation_contract_version": "release-metrics-v4",
+        "dataset_manifest_sha256": "6a94a83fc14388ed68791efedc219f63a126f36ccf090e7424371f42af5cbc1d",
+        "release_gate_sha256": "2a5b42d1926d457cc54cb48c62fd8514b75f7dd39e0673b686eac6370ea5fc7a",
+        "evidence_kind": "measured",
+        "release_passed": false,
+        "metrics": {
+          "raw_json_schema_rate": 0.877551,
+          "event_type_macro_f1": 0.368529,
+          "severity_macro_f1": 0.964103,
+          "unknown_accuracy": 1.0,
+          "raw_evidence_span_precision": 0.662791,
+          "postprocessing_intervention_rate": 0.418367,
+          "case_pass_rate": 0.285714
+        },
+        "validation_warning_counts": {
+          "EVIDENCE_SPAN_NOT_IN_INPUT": 29,
+          "MODEL_OUTPUT_INVALID": 12,
+          "SAFE_FALLBACK_APPLIED": 12
+        }
+      }
+    },
+    "decision": "holdout_passed_but_prompt_v5_rejected_for_internal_regression"
   },
   "training": {
     "run": "qwen3-1.7b-qlora-v5",

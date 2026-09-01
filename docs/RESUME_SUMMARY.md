@@ -14,6 +14,8 @@ prompt-only、QLoRA、合併權重到 GGUF 量化，以同一封存資料與安�
   （0.504%），1 epoch 需 1,467.5 秒，peak allocated VRAM 4.52 GB。
 - 建立 224 筆正式發布 gate；QLoRA v5 policy-v2 達 event macro-F1 86.24%、severity macro-F1 95.35%，
   high/critical 複核召回、unknown、證據精度與注入抵抗皆為 100%。
+- 導入 UCI AI4I 第三方合成校準與 98 筆 row-disjoint holdout，鎖定來源／轉換／抽樣 hash；辨識
+  1024-token slot 截斷、資料轉換矛盾與跨來源泛化缺口，並拒絕「外部 100% 但內部 F1 退化」候選。
 - 完成 llama.cpp Q8／Q4 實測：Q8 平均延遲 1.060 秒、四路 2.116 req/s 與 201.9 output tok/s；
   Q4 平均延遲 0.825 秒，但 event macro-F1 74.43%，由自動門檻封鎖。
 - 實作 FastAPI、OpenAI-compatible API、真正 streaming TTFT、嚴格 JSON Schema、原文證據驗證、
@@ -28,6 +30,8 @@ prompt-only、QLoRA、合併權重到 GGUF 量化，以同一封存資料與安�
    Q8 與 Q4。
 3. 展示 registry 事件：policy-v2 Q4 gate fail→blocked、Q8 pass→previous-good、NF4 policy-v2
    attestation→released。
+4. 開啟 `docs/EXTERNAL_CALIBRATION.md`，展示如何區分模型原生 evidence、政策後結果與 holdout
+   污染邊界，以及為何外部單一資料高分仍被內部回歸否決。
 
 ## 技術取捨
 
@@ -36,6 +40,7 @@ prompt-only、QLoRA、合併權重到 GGUF 量化，以同一封存資料與安�
 - 不把 fixture 或靜態部署設定包裝成模型／叢集實績；報告以 `evidence_kind` 和限制章節區分。
 - 不因 Q4 檔案小、速度快就發布；完整品質與相對量化門檻都有否決權。
 - 不讓模型控制設備；所有高風險、未知或無效結果一律轉人工。
+- 不把安全層修正後的 100% 冒充模型原生 100%；報告另列 raw evidence 與介入率。
 
 ## 可追問的工程細節
 
@@ -49,5 +54,5 @@ prompt-only、QLoRA、合併權重到 GGUF 量化，以同一封存資料與安�
 ## 誠實邊界
 
 本作品沒有連接真實工廠、沒有設備控制權，也未宣稱具備生產環境的身分驗證、TLS、集中稽核與
-事故應變。Docker／Kubernetes 是可部署基線，尚未在本機叢集執行；所有品質結果來自原創合成
-資料與開發 challenge，不代表外部真實分布。
+事故應變。Docker／Kubernetes 是可部署基線，尚未在本機叢集執行；品質結果來自原創合成資料、
+開發 challenge 與第三方合成 AI4I，不代表外部真實工廠分布。

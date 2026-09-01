@@ -6,6 +6,7 @@ repository 散布權重或大型 binary，實際使用時仍應以鎖定版本�
 | 項目 | 用途 | 授權／來源 |
 |---|---|---|
 | Qwen3-1.7B | 候選 base model | Apache-2.0；<https://huggingface.co/Qwen/Qwen3-1.7B> |
+| AI4I 2020 Predictive Maintenance Dataset | 第三方合成外部校準與 row-disjoint holdout | CC BY 4.0；DOI `10.24432/C5HS5C`；<https://archive.ics.uci.edu/dataset/601/ai4i> |
 | PyTorch | 訓練與 Transformers 推論 | BSD-style；<https://pytorch.org/> |
 | Hugging Face Transformers | 模型載入與生成 | Apache-2.0 |
 | PEFT | LoRA／QLoRA | Apache-2.0 |

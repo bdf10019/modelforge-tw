@@ -39,6 +39,7 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/triage -ContentType
   -LlamaBaseUrl http://127.0.0.1:8081
 ```
 
-`llama-server` 使用 4096 context、4 個 parallel slots、全部可用 GPU layers 與 flash attention。若硬體
-不同，應先降低 parallel／context 或 GPU layers，再重新執行 benchmark，不可沿用本機數字。Q8
+`llama-server` 預設使用 8192 total context、4 個 parallel slots，即每 slot 2048；啟動腳本會拒絕
+低於 1536 的 slot。若硬體不同，應調整 parallel／context 或 GPU layers，再重新執行 benchmark，
+不可沿用本機數字。Q8
 通過完整絕對門檻；Q4_K_M 僅供展示量化退化與 blocked 流程，不應作為預設 demo。

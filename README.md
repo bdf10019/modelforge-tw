@@ -6,7 +6,8 @@ QLoRA、合併權重與 GGUF 量化版本，並用實測報告回答品質、延
 
 > 專案狀態：公司實務版已完成本機端到端驗證。正式 registry 目前發布完成 policy-v2 attestation
 > 的 Qwen3-1.7B QLoRA v5（Transformers NF4）；llama.cpp Q8 通過絕對門檻並保留為 previous-good，
-> Q4_K_M 因完整品質門檻失敗而封鎖。資料皆為原創合成內容，不包含公司、客戶或私人資料。
+> Q4_K_M 因完整品質門檻失敗而封鎖。訓練／正式 registry 資料為原創合成內容；另有授權清楚的
+> UCI AI4I 第三方合成外部校準，不包含公司、客戶或私人資料。
 
 ## 核心成果
 
@@ -27,6 +28,11 @@ QLoRA、合併權重與 GGUF 量化版本，並用實測報告回答品質、延
 相對 Q8 退化 10.73 個百分點，不能發布。
 完整條件與逐階段失敗紀錄見 [評測文件](docs/EVALUATION.md)、[錯誤分析](docs/ERROR_ANALYSIS.md)與
 [證據索引](docs/EVIDENCE_INDEX.md)。
+
+外部校準另外揭露現行 Q8 v2 的跨來源缺口（external event F1 40.82%）。專用 v5 雖在首次
+row-disjoint holdout 得到 98/98 系統通過，卻讓內部 event F1 降至 69.72%，而且 16.33% holdout
+案例需要安全層介入，因此 v5 被拒絕、registry 不變。完整方法與誠實邊界見
+[外部校準報告](docs/EXTERNAL_CALIBRATION.md)。
 
 ## 快速驗證
 
@@ -89,6 +95,7 @@ src/modelforge_tw/       schema、資料、prompt、引擎、評測、registry�
 configs/                 資料、訓練、benchmark 與發布 gate 設定
 data/source/             原創人工 challenge source
 data/generated/          可重建 split；Git 忽略
+data/external/           UCI 原始檔與可重建 calibration／holdout；Git 忽略
 artifacts/               adapter、合併權重與 GGUF；Git 忽略
 outputs/                 評測、benchmark、registry 與 trace；Git 忽略
 infra/k8s/               Deployment、Service、ConfigMap 與 training Job
