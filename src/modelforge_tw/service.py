@@ -298,6 +298,7 @@ def create_app(
         app.state.registry_manifest_id = validate_registry_deployment(selected_settings, engine)
         app.state.engine = engine
         app.state.semaphore = asyncio.Semaphore(selected_settings.max_concurrency)
+        app.state.queued_requests = 0
         engine_tasks.clear()
         app.state.engine_tasks = engine_tasks
         app.state.ready = True
@@ -360,6 +361,7 @@ def create_app(
         engine_task: asyncio.Task[Any] | None = None
         engine_job_started = False
         release_deferred = False
+        queue_reserved = False
         engine_job_gauge = metrics.engine_jobs.labels(engine=engine.name)
 
         def release_after_background_completion(task: asyncio.Task[Any]) -> None:
@@ -369,6 +371,18 @@ def create_app(
                 task.exception()
 
         try:
+            active_jobs = sum(not task.done() for task in engine_tasks)
+            admitted_limit = selected_settings.max_concurrency + selected_settings.max_queue_depth
+            if active_jobs + app.state.queued_requests >= admitted_limit:
+                outcome = "capacity_rejected"
+                raise HTTPException(
+                    status_code=503,
+                    detail="inference capacity is temporarily unavailable",
+                    headers={"Retry-After": "1"},
+                )
+            app.state.queued_requests += 1
+            metrics.queued.inc()
+            queue_reserved = True
             try:
                 await asyncio.wait_for(
                     app.state.semaphore.acquire(),
@@ -385,6 +399,9 @@ def create_app(
             engine_task = asyncio.create_task(asyncio.to_thread(engine.generate, request))
             engine_tasks.add(engine_task)
             engine_task.add_done_callback(engine_tasks.discard)
+            app.state.queued_requests -= 1
+            metrics.queued.dec()
+            queue_reserved = False
             engine_job_gauge.inc()
             engine_job_started = True
             try:
@@ -433,6 +450,9 @@ def create_app(
                 engine_task.add_done_callback(release_after_background_completion)
             raise
         finally:
+            if queue_reserved:
+                app.state.queued_requests -= 1
+                metrics.queued.dec()
             if slot_acquired and not release_deferred:
                 app.state.semaphore.release()
             if engine_job_started and not release_deferred:
@@ -486,6 +506,7 @@ def create_app(
             "evidence_kind": engine.evidence_kind,
             "max_concurrency": selected_settings.max_concurrency,
             "queue_timeout_seconds": selected_settings.queue_timeout_seconds,
+            "max_queue_depth": selected_settings.max_queue_depth,
             "shutdown_grace_seconds": selected_settings.shutdown_grace_seconds,
             "max_request_body_bytes": selected_settings.max_request_body_bytes,
             "authentication_required": selected_settings.api_key is not None,

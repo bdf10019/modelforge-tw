@@ -22,6 +22,11 @@ class ServiceMetrics:
             "HTTP requests currently queued or waiting for inference.",
             registry=self.registry,
         )
+        self.queued = Gauge(
+            "modelforge_queued_requests",
+            "HTTP inference requests currently waiting for an engine slot.",
+            registry=self.registry,
+        )
         self.engine_jobs = Gauge(
             "modelforge_active_engine_jobs",
             "Underlying engine jobs still running, including jobs that exceeded HTTP timeout.",

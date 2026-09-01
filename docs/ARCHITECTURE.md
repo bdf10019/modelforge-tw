@@ -81,7 +81,8 @@ Transformers token-level streaming。
 占用 concurrency slot，避免連續 timeout 繞過容量上限並堆積 GPU 工作。Prometheus 分開呈現
 尚未回應的 HTTP request 與仍在執行的 engine job，因此 timeout 後的背景負載仍可觀測。等待
 semaphore 另有預設 5 秒 queue timeout；容量未釋放時回 503 + `Retry-After` 並記
-`capacity_rejected`，避免請求在應用層無限堆積。
+`capacity_rejected`。等待區另有預設 8 筆的硬上限，滿載時不等待 timeout 就立即拒絕，並以
+`modelforge_queued_requests` 呈現當前排隊深度，避免請求在應用層無限堆積。
 服務關閉時會先讓 readiness 失敗，再在可設定的寬限期內等待已追蹤的背景推論；等待有上限，
 且不宣稱能強制取消同步模型執行緒。Kubernetes 範例給 API 65 秒應用排空與 75 秒 Pod 終止寬限，
 讓一般 60 秒下游 timeout 有完成空間；若底層工作仍不返回，最終由容器平台強制終止程序。

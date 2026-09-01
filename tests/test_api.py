@@ -43,6 +43,13 @@ def test_shutdown_grace_period_has_safe_bounds():
         Settings(shutdown_grace_seconds=301)
 
 
+def test_inference_queue_depth_has_safe_bounds():
+    assert Settings().max_queue_depth == 8
+    assert Settings(max_queue_depth=0).max_queue_depth == 0
+    with pytest.raises(ValueError):
+        Settings(max_queue_depth=1025)
+
+
 def test_api_key_is_optional_but_rejects_weak_values():
     assert Settings(api_key="").api_key is None
     with pytest.raises(ValueError, match="at least 32 characters"):
@@ -555,3 +562,38 @@ async def test_capacity_queue_times_out_instead_of_growing_without_bound():
         metrics = (await client.get("/metrics")).text
         assert 'outcome="capacity_rejected"' in metrics
         engine.release.set()
+
+
+async def test_full_inference_queue_rejects_without_waiting_for_timeout():
+    engine = BlockingEngine("adapted")
+    settings = Settings(
+        request_timeout_seconds=0.01,
+        queue_timeout_seconds=1,
+        max_concurrency=1,
+        max_queue_depth=1,
+    )
+    app = create_app(settings=settings, engine_factory=lambda: engine)
+    async with app_client(app) as client:
+        first = await client.post(
+            "/v1/triage", json={"incident_text": "第一筆背景推論占用唯一執行容量"}
+        )
+        assert "TIMEOUT_FALLBACK" in first.json()["validation_warnings"]
+        queued = asyncio.create_task(
+            client.post("/v1/triage", json={"incident_text": "第二筆請求占用唯一排隊位置"})
+        )
+        await asyncio.sleep(0.03)
+        assert queued.done() is False
+
+        started = time.perf_counter()
+        rejected = await client.post(
+            "/v1/triage", json={"incident_text": "第三筆請求必須立即拒絕而不是繼續排隊"}
+        )
+        elapsed = time.perf_counter() - started
+        metrics = (await client.get("/metrics")).text
+
+        assert rejected.status_code == 503
+        assert rejected.headers["Retry-After"] == "1"
+        assert elapsed < 0.3
+        assert "modelforge_queued_requests 1.0" in metrics
+        engine.release.set()
+        assert (await asyncio.wait_for(queued, timeout=1)).status_code == 200
