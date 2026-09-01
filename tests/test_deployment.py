@@ -16,6 +16,7 @@ def test_kubernetes_manifests_parse_and_default_to_q8_candidate():
     assert config["data"]["MODELFORGE_CONTEXT_WINDOW_TOKENS"] == "2048"
     assert config["data"]["MODELFORGE_SAFETY_POLICY_VERSION"] == "risk-precedence-v2"
     assert config["data"]["MODELFORGE_MAX_REQUEST_BODY_BYTES"] == "32768"
+    assert config["data"]["MODELFORGE_MAX_MODEL_RESPONSE_BYTES"] == "262144"
     assert config["data"]["MODELFORGE_QUEUE_TIMEOUT_SECONDS"] == "5"
     assert config["data"]["MODELFORGE_MAX_QUEUE_DEPTH"] == "16"
     assert config["data"]["MODELFORGE_SHUTDOWN_GRACE_SECONDS"] == "65"
@@ -53,6 +54,7 @@ def test_compose_baseline_is_non_privileged_and_does_not_log_inputs():
     api = compose["services"]["api"]
     assert api["environment"]["MODELFORGE_LOG_INPUTS"] == "false"
     assert api["environment"]["MODELFORGE_MAX_REQUEST_BODY_BYTES"] == "32768"
+    assert api["environment"]["MODELFORGE_MAX_MODEL_RESPONSE_BYTES"] == "262144"
     assert api["environment"]["MODELFORGE_QUEUE_TIMEOUT_SECONDS"] == "5"
     assert api["environment"]["MODELFORGE_MAX_QUEUE_DEPTH"] == "8"
     assert api["environment"]["MODELFORGE_SHUTDOWN_GRACE_SECONDS"] == "35"
@@ -112,6 +114,7 @@ def test_container_files_run_as_non_root_and_disable_input_logging():
         assert "USER appuser" in dockerfile
         assert "MODELFORGE_LOG_INPUTS=false" in dockerfile
         assert "MODELFORGE_MAX_REQUEST_BODY_BYTES=32768" in dockerfile
+        assert "MODELFORGE_MAX_MODEL_RESPONSE_BYTES=262144" in dockerfile
         assert "MODELFORGE_QUEUE_TIMEOUT_SECONDS=5" in dockerfile
         assert "MODELFORGE_MAX_QUEUE_DEPTH=8" in dockerfile
         assert "MODELFORGE_SHUTDOWN_GRACE_SECONDS=35" in dockerfile

@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     shutdown_grace_seconds: float = Field(default=35.0, ge=0, le=300)
     max_concurrency: int = Field(default=2, ge=1, le=64)
     max_request_body_bytes: int = Field(default=32768, ge=1024, le=1048576)
+    max_model_response_bytes: int = Field(default=262144, ge=4096, le=4194304)
     api_key: SecretStr | None = None
     log_inputs: Literal[False] = False
 

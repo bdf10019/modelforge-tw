@@ -57,6 +57,7 @@ def _engine_from_args(args: argparse.Namespace):
             timeout_seconds=args.timeout,
             max_tokens=args.max_new_tokens,
             context_window_tokens=args.context_window_tokens,
+            max_response_bytes=args.max_model_response_bytes,
             safety_policy_version=args.safety_policy_version,
         )
     if args.engine == "transformers":
@@ -143,7 +144,7 @@ def _evaluation_fingerprint(args: argparse.Namespace) -> str:
             if path.is_file()
         }
     payload = {
-        "cache_fingerprint_version": "7",
+        "cache_fingerprint_version": "8",
         "openai_http_contract_version": OPENAI_HTTP_CONTRACT_VERSION,
         "safety_policy_version": args.safety_policy_version,
         "evaluation_contract_version": EVALUATION_CONTRACT_VERSION,
@@ -157,6 +158,7 @@ def _evaluation_fingerprint(args: argparse.Namespace) -> str:
         "load_in_4bit": args.load_in_4bit,
         "max_new_tokens": args.max_new_tokens,
         "context_window_tokens": args.context_window_tokens,
+        "max_model_response_bytes": args.max_model_response_bytes,
         "adapter_files": adapter_files,
     }
     return hashlib.sha256(
@@ -594,6 +596,7 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--load-in-4bit", action="store_true")
         command.add_argument("--max-new-tokens", type=int, default=256)
         command.add_argument("--context-window-tokens", type=int, default=2048)
+        command.add_argument("--max-model-response-bytes", type=int, default=262144)
         command.add_argument(
             "--safety-policy-version",
             choices=SUPPORTED_SAFETY_POLICY_VERSIONS,

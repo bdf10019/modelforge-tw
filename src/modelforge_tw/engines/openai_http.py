@@ -23,6 +23,44 @@ from modelforge_tw.schemas import (
 )
 
 OPENAI_HTTP_CONTRACT_VERSION = "json-schema-v2"
+DEFAULT_MAX_MODEL_RESPONSE_BYTES = 256 * 1024
+MAX_MODEL_RESPONSE_BYTES = 4 * 1024 * 1024
+
+
+def _validate_declared_response_size(response: httpx.Response, max_bytes: int) -> None:
+    values = response.headers.get_list("content-length")
+    if not values:
+        return
+    if len(values) != 1 or not values[0].isdigit():
+        raise ValueError("model response has an invalid Content-Length")
+    if int(values[0]) > max_bytes:
+        raise ValueError("model response exceeds byte limit")
+
+
+def _read_bounded_response(response: httpx.Response, max_bytes: int) -> bytes:
+    _validate_declared_response_size(response, max_bytes)
+    body = bytearray()
+    for chunk in response.iter_bytes():
+        body.extend(chunk)
+        if len(body) > max_bytes:
+            raise ValueError("model response exceeds byte limit")
+    return bytes(body)
+
+
+def _iter_bounded_response_lines(response: httpx.Response, max_bytes: int):
+    _validate_declared_response_size(response, max_bytes)
+    total = 0
+    buffer = bytearray()
+    for chunk in response.iter_bytes():
+        total += len(chunk)
+        if total > max_bytes:
+            raise ValueError("model response exceeds byte limit")
+        buffer.extend(chunk)
+        while (newline := buffer.find(b"\n")) >= 0:
+            yield bytes(buffer[:newline]).removesuffix(b"\r")
+            del buffer[: newline + 1]
+    if buffer:
+        yield bytes(buffer).removesuffix(b"\r")
 
 
 def _structured_response_format() -> dict[str, Any]:
@@ -53,6 +91,7 @@ class OpenAIHTTPInferenceEngine:
         timeout_seconds: float = 60,
         max_tokens: int = 256,
         context_window_tokens: int = 2048,
+        max_response_bytes: int = DEFAULT_MAX_MODEL_RESPONSE_BYTES,
         safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,
     ) -> None:
         self.name = "openai-http"
@@ -65,6 +104,9 @@ class OpenAIHTTPInferenceEngine:
         self.max_tokens = max_tokens
         self.max_new_tokens: int | None = max_tokens
         self.context_window_tokens = context_window_tokens
+        if not 4096 <= max_response_bytes <= MAX_MODEL_RESPONSE_BYTES:
+            raise ValueError("model response byte limit must be between 4096 and 4194304")
+        self.max_response_bytes = max_response_bytes
         self.structured_output_contract: str = OPENAI_HTTP_CONTRACT_VERSION
         self.safety_policy_version: SafetyPolicyVersion = safety_policy_version
         self.evidence_kind: Literal["fixture", "measured"] = "measured"
@@ -72,8 +114,8 @@ class OpenAIHTTPInferenceEngine:
     def ready(self) -> bool:
         try:
             with httpx.Client(timeout=min(self.timeout_seconds, 3.0)) as client:
-                response = client.get(f"{self.base_url}/health")
-            return response.status_code == 200
+                with client.stream("GET", f"{self.base_url}/health") as response:
+                    return response.status_code == 200
         except httpx.HTTPError:
             return False
 
@@ -90,9 +132,11 @@ class OpenAIHTTPInferenceEngine:
         }
         started = time.perf_counter()
         with httpx.Client(timeout=self.timeout_seconds) as client:
-            response = client.post(f"{self.base_url}/v1/chat/completions", json=payload)
-            response.raise_for_status()
-            body = response.json()
+            with client.stream(
+                "POST", f"{self.base_url}/v1/chat/completions", json=payload
+            ) as response:
+                response.raise_for_status()
+                body = json.loads(_read_bounded_response(response, self.max_response_bytes))
         elapsed_ms = (time.perf_counter() - started) * 1000
         raw = body["choices"][0]["message"]["content"]
         return self._build_result(
@@ -123,7 +167,11 @@ class OpenAIHTTPInferenceEngine:
                 "POST", f"{self.base_url}/v1/chat/completions", json=payload
             ) as response:
                 response.raise_for_status()
-                for line in response.iter_lines():
+                for raw_line in _iter_bounded_response_lines(response, self.max_response_bytes):
+                    try:
+                        line = raw_line.decode("utf-8")
+                    except UnicodeDecodeError as error:
+                        raise ValueError("model response is not valid UTF-8") from error
                     if not line.startswith("data: "):
                         continue
                     data = line.removeprefix("data: ").strip()

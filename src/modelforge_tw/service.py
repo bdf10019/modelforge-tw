@@ -235,6 +235,7 @@ def build_engine(settings: Settings) -> InferenceEngine:
             timeout_seconds=settings.request_timeout_seconds,
             max_tokens=settings.max_new_tokens,
             context_window_tokens=settings.context_window_tokens,
+            max_response_bytes=settings.max_model_response_bytes,
             safety_policy_version=settings.safety_policy_version,
         )
     if settings.engine == "transformers":
@@ -509,6 +510,7 @@ def create_app(
             "max_queue_depth": selected_settings.max_queue_depth,
             "shutdown_grace_seconds": selected_settings.shutdown_grace_seconds,
             "max_request_body_bytes": selected_settings.max_request_body_bytes,
+            "max_model_response_bytes": selected_settings.max_model_response_bytes,
             "authentication_required": selected_settings.api_key is not None,
             "registry_deployment_role": selected_settings.registry_deployment_role,
             "registry_manifest_id": app.state.registry_manifest_id,

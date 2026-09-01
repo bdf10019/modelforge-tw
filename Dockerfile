@@ -17,7 +17,8 @@ ENV MODELFORGE_ENGINE=fixture \
     MODELFORGE_QUEUE_TIMEOUT_SECONDS=5 \
     MODELFORGE_MAX_QUEUE_DEPTH=8 \
     MODELFORGE_SHUTDOWN_GRACE_SECONDS=35 \
-    MODELFORGE_MAX_REQUEST_BODY_BYTES=32768
+    MODELFORGE_MAX_REQUEST_BODY_BYTES=32768 \
+    MODELFORGE_MAX_MODEL_RESPONSE_BYTES=262144
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
 ENTRYPOINT ["modelforge", "serve", "--host", "0.0.0.0", "--port", "8000"]

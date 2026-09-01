@@ -1,6 +1,7 @@
 import json
 
 import httpx
+import pytest
 
 from modelforge_tw.engines import openai_http
 from modelforge_tw.engines.openai_http import OpenAIHTTPInferenceEngine
@@ -121,6 +122,32 @@ def test_streaming_generation_uses_first_content_and_final_usage(monkeypatch):
     assert result.metadata.output_tokens == 39
     assert result.metadata.ttft_ms is not None
     assert result.metadata.ttft_ms <= result.metadata.elapsed_ms
+
+
+def test_non_streaming_response_is_rejected_before_oversized_body_is_loaded(monkeypatch):
+    engine = make_engine()
+    engine.max_response_bytes = 64
+
+    install_transport(
+        monkeypatch,
+        lambda request: httpx.Response(200, request=request, content=b"x" * 65),
+    )
+
+    with pytest.raises(ValueError, match="exceeds byte limit"):
+        engine.generate(TriageRequest(incident_text="泵浦持續異音且趨勢尚未停止。"))
+
+
+def test_streaming_response_rejects_oversized_unterminated_event(monkeypatch):
+    engine = make_engine()
+    engine.max_response_bytes = 64
+
+    install_transport(
+        monkeypatch,
+        lambda request: httpx.Response(200, request=request, content=b"data: " + b"x" * 59),
+    )
+
+    with pytest.raises(ValueError, match="exceeds byte limit"):
+        engine.generate_streaming(TriageRequest(incident_text="泵浦持續異音且趨勢尚未停止。"))
 
 
 def test_invalid_model_output_returns_auditable_safe_fallback():

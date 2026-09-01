@@ -37,6 +37,12 @@ def test_request_body_limit_has_safe_bounds():
         Settings(max_request_body_bytes=1023)
 
 
+def test_model_response_limit_has_safe_bounds():
+    assert Settings().max_model_response_bytes == 262144
+    with pytest.raises(ValueError):
+        Settings(max_model_response_bytes=4095)
+
+
 def test_shutdown_grace_period_has_safe_bounds():
     assert Settings().shutdown_grace_seconds == 35
     with pytest.raises(ValueError):

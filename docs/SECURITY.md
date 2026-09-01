@@ -27,6 +27,8 @@
   數字必須是有限值且在明確範圍內，控制字元會在進入 prompt 前拒絕。
 - HTTP body 預設上限 32 KiB；有無 `Content-Length` 都會依實收 bytes 計數，超限先回 413，
   不讓大型 payload 進入 JSON／Pydantic 解析。上限可設定但限制在 1 KiB 至 1 MiB。
+- llama.cpp 一般與 SSE 回應都以解碼後 bytes 計數，預設上限 256 KiB；`Content-Length` 超限會
+  在讀 body 前拒絕，chunked／壓縮回應則依實收解碼內容停止，無換行事件也不能無界累積。
 - 設定 `MODELFORGE_API_KEY` 後，兩個推論路由都要求標準 `Authorization: Bearer ...`；key 至少
   32 字元、以 constant-time 比對、不出現在 config response。Kubernetes 由可選 Secret 注入，
   repository 不保存值；未設定時保留 loopback 本機 demo 相容性。
