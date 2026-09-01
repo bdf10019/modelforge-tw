@@ -397,6 +397,7 @@ def command_registry(args: argparse.Namespace) -> int:
             evaluation_model_version=evaluation.model_version,
             evaluation_evidence_kind=evaluation.evidence_kind,
             evaluation_report=args.evaluation.resolve().relative_to(PROJECT_ROOT).as_posix(),
+            evaluation_report_sha256=sha256_file(args.evaluation),
             release_passed=evaluation.release_passed,
             artifacts=artifact_refs,
         )
@@ -411,6 +412,7 @@ def command_registry(args: argparse.Namespace) -> int:
         state = registry.attest_evaluation(
             args.manifest_id,
             evaluation_report=attested_report_path,
+            evaluation_report_sha256=sha256_file(args.evaluation),
             evaluation=evaluation,
         )
     elif args.registry_action == "promote":
@@ -423,6 +425,7 @@ def command_registry(args: argparse.Namespace) -> int:
         if not args.manifest_id:
             raise ValueError("registry block requires a manifest id")
         evaluation_report: str | None = None
+        evaluation_report_sha256: str | None = None
         release_passed: bool | None = None
         if args.evaluation:
             evaluation = EvaluationReport.model_validate_json(
@@ -430,10 +433,12 @@ def command_registry(args: argparse.Namespace) -> int:
             )
             registry.validate_evaluation(args.manifest_id, evaluation)
             evaluation_report = args.evaluation.resolve().relative_to(PROJECT_ROOT).as_posix()
+            evaluation_report_sha256 = sha256_file(args.evaluation)
             release_passed = evaluation.release_passed
         state = registry.block(
             args.manifest_id,
             evaluation_report=evaluation_report,
+            evaluation_report_sha256=evaluation_report_sha256,
             release_passed=release_passed,
         )
     else:

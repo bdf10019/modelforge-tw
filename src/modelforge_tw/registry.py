@@ -70,6 +70,7 @@ class ModelManifest(BaseModel):
     evaluation_evidence_kind: Literal["fixture", "measured"] | None = None
     status: Literal["candidate", "released", "retired", "blocked"] = "candidate"
     evaluation_report: str
+    evaluation_report_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     release_passed: bool
     artifacts: list[ArtifactRef] = Field(default_factory=list)
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
@@ -83,7 +84,7 @@ class ModelManifest(BaseModel):
 class RegistryState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: str = "1.1"
+    schema_version: str = "1.2"
     released: str | None = None
     previous_good: str | None = None
     manifests: dict[str, ModelManifest] = Field(default_factory=dict)
@@ -125,6 +126,7 @@ class FileRegistry:
             "evaluation_model_id": manifest.evaluation_model_id,
             "evaluation_model_version": manifest.evaluation_model_version,
             "evaluation_evidence_kind": manifest.evaluation_evidence_kind,
+            "evaluation_report_sha256": manifest.evaluation_report_sha256,
         }
         missing = [name for name, value in attestation.items() if value is None]
         if missing:
@@ -144,6 +146,7 @@ class FileRegistry:
             manifest.evaluation_model_id,
             manifest.evaluation_model_version,
             manifest.evaluation_evidence_kind,
+            manifest.evaluation_report_sha256,
         )
         if state.schema_version == "1.0" and all(value is None for value in legacy_identity):
             return
@@ -168,6 +171,23 @@ class FileRegistry:
                     digest.update(chunk)
             if digest.hexdigest() != artifact.sha256:
                 raise ValueError(f"registered artifact hash changed: {artifact.relative_path}")
+
+    def _verify_evaluation_report(self, manifest: ModelManifest) -> None:
+        if self.artifact_root is None or manifest.evaluation_report_sha256 is None:
+            return
+        path = (self.artifact_root / manifest.evaluation_report).resolve()
+        try:
+            path.relative_to(self.artifact_root)
+        except ValueError as error:
+            raise ValueError("evaluation report escapes the project root") from error
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        digest = sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        if digest.hexdigest() != manifest.evaluation_report_sha256:
+            raise ValueError("registered evaluation report hash changed")
 
     def validate_evaluation(self, manifest_id: str, evaluation: EvaluationReport) -> None:
         self._validate_id(manifest_id)
@@ -217,9 +237,12 @@ class FileRegistry:
         manifest_id: str,
         *,
         evaluation_report: str,
+        evaluation_report_sha256: str,
         evaluation: EvaluationReport,
     ) -> RegistryState:
         evaluation_report = _validate_portable_relative_path(evaluation_report)
+        if not re.fullmatch(r"[a-f0-9]{64}", evaluation_report_sha256):
+            raise ValueError("evaluation report SHA-256 must be lowercase hexadecimal")
         self.validate_evaluation(manifest_id, evaluation)
         required_contract = {
             "max_new_tokens": evaluation.max_new_tokens,
@@ -234,19 +257,23 @@ class FileRegistry:
         manifest = state.manifests[manifest_id]
         if manifest.status == "released" and not evaluation.release_passed:
             raise ValueError("cannot attest a failed evaluation to the released manifest")
-        state.manifests[manifest_id] = manifest.model_copy(
+        updated_manifest = manifest.model_copy(
             update={
                 **required_contract,
                 "evaluation_report": evaluation_report,
+                "evaluation_report_sha256": evaluation_report_sha256,
                 "release_passed": evaluation.release_passed,
             }
         )
+        self._verify_evaluation_report(updated_manifest)
+        state.manifests[manifest_id] = updated_manifest
         state.events.append(
             {
                 "at": datetime.now(UTC).isoformat(),
                 "action": "evaluation_attested",
                 "manifest_id": manifest_id,
                 "evaluation_report": evaluation_report,
+                "evaluation_report_sha256": evaluation_report_sha256,
             }
         )
         self._write(state)
@@ -278,6 +305,7 @@ class FileRegistry:
         self._require_releasable_evidence(candidate)
         if not candidate.release_passed or candidate.status == "blocked":
             raise ValueError("candidate did not pass its release gates")
+        self._verify_evaluation_report(candidate)
         self._verify_artifacts(candidate)
         if state.released and state.released != manifest_id:
             current = state.manifests[state.released]
@@ -305,6 +333,7 @@ class FileRegistry:
         self._require_rollback_evidence(state, target_manifest)
         if not target_manifest.release_passed:
             raise ValueError("previous-good manifest no longer satisfies release metadata")
+        self._verify_evaluation_report(target_manifest)
         self._verify_artifacts(target_manifest)
         if current:
             state.manifests[current] = state.manifests[current].model_copy(
@@ -328,11 +357,18 @@ class FileRegistry:
         manifest_id: str,
         *,
         evaluation_report: str | None = None,
+        evaluation_report_sha256: str | None = None,
         release_passed: bool | None = None,
     ) -> RegistryState:
         self._validate_id(manifest_id)
         if evaluation_report is not None:
             evaluation_report = _validate_portable_relative_path(evaluation_report)
+            if evaluation_report_sha256 is None or not re.fullmatch(
+                r"[a-f0-9]{64}", evaluation_report_sha256
+            ):
+                raise ValueError("blocking with an evaluation report requires its SHA-256")
+        elif evaluation_report_sha256 is not None:
+            raise ValueError("evaluation report SHA-256 requires an evaluation report")
         state = self.load()
         if manifest_id not in state.manifests:
             raise KeyError(f"manifest not found: {manifest_id}")
@@ -340,9 +376,12 @@ class FileRegistry:
         updates: dict[str, object] = {"status": "blocked"}
         if evaluation_report is not None:
             updates["evaluation_report"] = evaluation_report
+            updates["evaluation_report_sha256"] = evaluation_report_sha256
         if release_passed is not None:
             updates["release_passed"] = release_passed
-        state.manifests[manifest_id] = manifest.model_copy(update=updates)
+        updated_manifest = manifest.model_copy(update=updates)
+        self._verify_evaluation_report(updated_manifest)
+        state.manifests[manifest_id] = updated_manifest
         if state.released == manifest_id:
             state.released = None
         if state.previous_good == manifest_id:
@@ -353,6 +392,11 @@ class FileRegistry:
                 "action": "blocked",
                 "manifest_id": manifest_id,
                 **({"evaluation_report": evaluation_report} if evaluation_report else {}),
+                **(
+                    {"evaluation_report_sha256": evaluation_report_sha256}
+                    if evaluation_report_sha256
+                    else {}
+                ),
             }
         )
         self._write(state)

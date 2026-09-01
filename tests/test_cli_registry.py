@@ -79,6 +79,9 @@ def test_registry_cli_add_locks_complete_evaluation_identity(tmp_path, monkeypat
     assert saved.evaluation_model_id == "fixture-model"
     assert saved.evaluation_model_version == "1.0"
     assert saved.evaluation_evidence_kind == "fixture"
+    assert (
+        saved.evaluation_report_sha256 == hashlib.sha256(evaluation_path.read_bytes()).hexdigest()
+    )
     assert saved.release_gate_sha256 == HASH
     assert saved.max_new_tokens == 192
     assert saved.safety_policy_version == "risk-precedence-v2"

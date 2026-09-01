@@ -30,6 +30,7 @@ def manifest(manifest_id: str, passed: bool = True) -> ModelManifest:
         evaluation_model_version="1",
         evaluation_evidence_kind="measured",
         evaluation_report="outputs/evaluation.json",
+        evaluation_report_sha256=HASH,
         release_passed=passed,
     )
 
@@ -103,6 +104,7 @@ def test_registry_can_block_a_released_candidate(tmp_path):
     state = registry.block(
         "v1",
         evaluation_report="outputs/full.json",
+        evaluation_report_sha256=HASH,
         release_passed=False,
     )
     assert state.released is None
@@ -215,6 +217,7 @@ def test_registry_allows_only_fully_legacy_previous_good_on_schema_1_rollback(tm
         "evaluation_model_id": None,
         "evaluation_model_version": None,
         "evaluation_evidence_kind": None,
+        "evaluation_report_sha256": None,
     }
     state.schema_version = "1.0"
     state.manifests["v1"] = state.manifests["v1"].model_copy(update=legacy_updates)
@@ -233,6 +236,9 @@ def test_registry_allows_only_fully_legacy_previous_good_on_schema_1_rollback(tm
 
 
 def test_registry_rechecks_artifact_before_promotion(tmp_path):
+    evaluation_report = tmp_path / "outputs" / "evaluation.json"
+    evaluation_report.parent.mkdir()
+    evaluation_report.write_bytes(b"fixture")
     artifact = tmp_path / "model.gguf"
     artifact.write_bytes(b"original")
     digest = hashlib.sha256(b"original").hexdigest()
@@ -252,6 +258,23 @@ def test_registry_rechecks_artifact_before_promotion(tmp_path):
     registry.add(candidate)
     artifact.write_bytes(b"tampered")
     with pytest.raises(ValueError, match="hash changed"):
+        registry.promote("v1")
+
+
+def test_registry_rechecks_evaluation_report_before_promotion(tmp_path):
+    report_path = tmp_path / "evaluation.json"
+    report_path.write_bytes(b"original")
+    candidate = manifest("v1").model_copy(
+        update={
+            "evaluation_report": "evaluation.json",
+            "evaluation_report_sha256": hashlib.sha256(b"original").hexdigest(),
+        }
+    )
+    registry = FileRegistry(tmp_path / "registry.json", artifact_root=tmp_path)
+    registry.add(candidate)
+    report_path.write_bytes(b"tampered")
+
+    with pytest.raises(ValueError, match="evaluation report hash changed"):
         registry.promote("v1")
 
 
@@ -280,16 +303,25 @@ def test_registry_attests_and_locks_evaluation_contract(tmp_path):
         cases=[],
     )
     with pytest.raises(ValueError, match="canonical portable relative path"):
-        registry.attest_evaluation("v1", evaluation_report="../outside.json", evaluation=report)
+        registry.attest_evaluation(
+            "v1",
+            evaluation_report="../outside.json",
+            evaluation_report_sha256=HASH,
+            evaluation=report,
+        )
     assert registry.load().manifests["v1"].evaluation_report == "outputs/evaluation.json"
 
     state = registry.attest_evaluation(
-        "v1", evaluation_report="outputs/attested.json", evaluation=report
+        "v1",
+        evaluation_report="outputs/attested.json",
+        evaluation_report_sha256=HASH,
+        evaluation=report,
     )
     attested = state.manifests["v1"]
     assert attested.max_new_tokens == 192
     assert attested.safety_policy_version == "risk-precedence-v2"
     assert attested.evaluation_contract_version == "release-metrics-v2"
+    assert attested.evaluation_report_sha256 == HASH
     assert state.events[-1]["action"] == "evaluation_attested"
 
     mismatch = report.model_copy(update={"safety_policy_version": "obsolete-policy"})
