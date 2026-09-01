@@ -80,6 +80,9 @@ Transformers token-level streaming。
 尚未回應的 HTTP request 與仍在執行的 engine job，因此 timeout 後的背景負載仍可觀測。等待
 semaphore 另有預設 5 秒 queue timeout；容量未釋放時回 503 + `Retry-After` 並記
 `capacity_rejected`，避免請求在應用層無限堆積。
+服務關閉時會先讓 readiness 失敗，再在可設定的寬限期內等待已追蹤的背景推論；等待有上限，
+且不宣稱能強制取消同步模型執行緒。Kubernetes 範例給 API 65 秒應用排空與 75 秒 Pod 終止寬限，
+讓一般 60 秒下游 timeout 有完成空間；若底層工作仍不返回，最終由容器平台強制終止程序。
 
 llama.cpp 的 `--ctx-size` 是所有 parallel slots 的總容量。部署設定把每-slot context 明確寫入 API
 metadata 與評估報告；本機預設 8192／4＝2048 tokens，低於實測最低值時啟動失敗，避免容量截斷

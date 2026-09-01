@@ -16,6 +16,7 @@ def test_kubernetes_manifests_parse_and_default_to_q8_candidate():
     assert config["data"]["MODELFORGE_SAFETY_POLICY_VERSION"] == "risk-precedence-v2"
     assert config["data"]["MODELFORGE_MAX_REQUEST_BODY_BYTES"] == "32768"
     assert config["data"]["MODELFORGE_QUEUE_TIMEOUT_SECONDS"] == "5"
+    assert config["data"]["MODELFORGE_SHUTDOWN_GRACE_SECONDS"] == "65"
 
     model_deployment = next(
         item
@@ -51,6 +52,7 @@ def test_compose_baseline_is_non_privileged_and_does_not_log_inputs():
     assert api["environment"]["MODELFORGE_LOG_INPUTS"] == "false"
     assert api["environment"]["MODELFORGE_MAX_REQUEST_BODY_BYTES"] == "32768"
     assert api["environment"]["MODELFORGE_QUEUE_TIMEOUT_SECONDS"] == "5"
+    assert api["environment"]["MODELFORGE_SHUTDOWN_GRACE_SECONDS"] == "35"
     assert api["environment"]["MODELFORGE_API_KEY"] is None
     assert api["read_only"] is True
     assert "/tmp" in api["tmpfs"]
@@ -75,6 +77,7 @@ def test_kubernetes_runtime_security_and_probe_contracts():
     assert model["securityContext"]["readOnlyRootFilesystem"] is True
     assert model["securityContext"]["capabilities"]["drop"] == ["ALL"]
     assert api_pod["securityContext"]["runAsNonRoot"] is True
+    assert api_pod["terminationGracePeriodSeconds"] == 75
     assert api["readinessProbe"]["httpGet"]["path"] == "/readyz"
     assert api["livenessProbe"]["httpGet"]["path"] == "/healthz"
     assert api["securityContext"]["allowPrivilegeEscalation"] is False
@@ -107,6 +110,7 @@ def test_container_files_run_as_non_root_and_disable_input_logging():
         assert "MODELFORGE_LOG_INPUTS=false" in dockerfile
         assert "MODELFORGE_MAX_REQUEST_BODY_BYTES=32768" in dockerfile
         assert "MODELFORGE_QUEUE_TIMEOUT_SECONDS=5" in dockerfile
+        assert "MODELFORGE_SHUTDOWN_GRACE_SECONDS=35" in dockerfile
         assert '"modelforge", "serve"' in dockerfile
 
 

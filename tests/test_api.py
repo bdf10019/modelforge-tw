@@ -32,6 +32,12 @@ def test_request_body_limit_has_safe_bounds():
         Settings(max_request_body_bytes=1023)
 
 
+def test_shutdown_grace_period_has_safe_bounds():
+    assert Settings().shutdown_grace_seconds == 35
+    with pytest.raises(ValueError):
+        Settings(shutdown_grace_seconds=301)
+
+
 def test_api_key_is_optional_but_rejects_weak_values():
     assert Settings(api_key="").api_key is None
     with pytest.raises(ValueError, match="at least 32 characters"):
@@ -379,6 +385,48 @@ async def test_timed_out_worker_keeps_concurrency_slot_until_it_finishes():
                 break
             await asyncio.sleep(0.01)
         assert engine.calls == 2
+
+
+async def test_shutdown_drains_timed_out_engine_work_within_grace_period():
+    engine = BlockingEngine("adapted")
+    settings = Settings(request_timeout_seconds=0.01, shutdown_grace_seconds=0.5)
+    app = create_app(settings=settings, engine_factory=lambda: engine)
+
+    async def release_worker():
+        await asyncio.sleep(0.03)
+        engine.release.set()
+
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage", json={"incident_text": "部署關閉前應排空既有背景推論工作"}
+        )
+        assert "TIMEOUT_FALLBACK" in response.json()["validation_warnings"]
+        assert len(app.state.engine_tasks) == 1
+        release_task = asyncio.create_task(release_worker())
+
+    await release_task
+    assert app.state.ready is False
+    assert not app.state.engine_tasks
+
+
+async def test_shutdown_wait_is_bounded_when_sync_worker_cannot_be_cancelled():
+    engine = BlockingEngine("adapted")
+    settings = Settings(request_timeout_seconds=0.01, shutdown_grace_seconds=0.01)
+    app = create_app(settings=settings, engine_factory=lambda: engine)
+
+    started = time.perf_counter()
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage", json={"incident_text": "無法取消的同步工作不應讓排空階段無限等待"}
+        )
+        assert "TIMEOUT_FALLBACK" in response.json()["validation_warnings"]
+        background_tasks = tuple(app.state.engine_tasks)
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < 0.3
+    assert background_tasks and not background_tasks[0].done()
+    engine.release.set()
+    await asyncio.wait_for(asyncio.gather(*background_tasks), timeout=1)
 
 
 async def test_capacity_queue_times_out_instead_of_growing_without_bound():

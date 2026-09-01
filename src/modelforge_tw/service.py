@@ -259,14 +259,25 @@ def create_app(
 ) -> FastAPI:
     selected_settings = settings or Settings()
     metrics = ServiceMetrics()
+    engine_tasks: set[asyncio.Task[Any]] = set()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.engine = engine_factory() if engine_factory else build_engine(selected_settings)
         app.state.semaphore = asyncio.Semaphore(selected_settings.max_concurrency)
+        engine_tasks.clear()
+        app.state.engine_tasks = engine_tasks
         app.state.ready = True
-        yield
-        app.state.ready = False
+        try:
+            yield
+        finally:
+            app.state.ready = False
+            unfinished = tuple(task for task in engine_tasks if not task.done())
+            if unfinished:
+                await asyncio.wait(
+                    unfinished,
+                    timeout=selected_settings.shutdown_grace_seconds,
+                )
 
     app = FastAPI(
         title="ModelForge-TW",
@@ -339,6 +350,8 @@ def create_app(
                 ) from None
             slot_acquired = True
             engine_task = asyncio.create_task(asyncio.to_thread(engine.generate, request))
+            engine_tasks.add(engine_task)
+            engine_task.add_done_callback(engine_tasks.discard)
             engine_job_gauge.inc()
             engine_job_started = True
             try:
@@ -440,6 +453,7 @@ def create_app(
             "evidence_kind": engine.evidence_kind,
             "max_concurrency": selected_settings.max_concurrency,
             "queue_timeout_seconds": selected_settings.queue_timeout_seconds,
+            "shutdown_grace_seconds": selected_settings.shutdown_grace_seconds,
             "max_request_body_bytes": selected_settings.max_request_body_bytes,
             "authentication_required": selected_settings.api_key is not None,
             "input_logging": selected_settings.log_inputs,

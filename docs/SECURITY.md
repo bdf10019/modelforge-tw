@@ -37,6 +37,8 @@
 - timeout 後仍保留同步模型的容量槽，直到不可取消的背景推論真正結束，避免資源耗盡。
 - 等待容量另有獨立 queue timeout；超時回 503／`Retry-After` 並記錄非原文 outcome，防止卡住的
   模型讓未執行請求在服務內無限累積。這不是跨 replica 的完整 rate limiter。
+- 關閉流程先撤除 readiness，追蹤並在有界寬限期內排空 timeout 後仍執行的模型工作；同步執行緒
+  無法安全強制取消，超過應用寬限後由較長的容器終止期限提供最後邊界。
 - `MODELFORGE_LOG_INPUTS` 唯一合法值為 `false`；誤設 `true` 時服務拒絕啟動，API 不提供事件原文
   logging。repository 也忽略模型、資料生成物與輸出報告。
 - llama.cpp 每-slot context 預設 2048；本機啟動腳本低於 1536 時 fail fast，避免輸出被靜默截斷。
