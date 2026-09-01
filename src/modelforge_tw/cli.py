@@ -346,6 +346,9 @@ def command_registry(args: argparse.Namespace) -> int:
     registry = FileRegistry(args.registry, artifact_root=PROJECT_ROOT)
     if args.registry_action == "show":
         state = registry.load()
+    elif args.registry_action == "anchor":
+        print(registry.anchor().model_dump_json(indent=2))
+        return 0
     elif args.registry_action == "add":
         if not args.manifest_id or not args.evaluation or not args.training_report:
             raise ValueError("registry add requires manifest id, evaluation, and training report")
@@ -662,7 +665,7 @@ def build_parser() -> argparse.ArgumentParser:
     registry = subparsers.add_parser("registry")
     registry.add_argument(
         "registry_action",
-        choices=["show", "add", "attest", "promote", "rollback", "block"],
+        choices=["show", "anchor", "add", "attest", "promote", "rollback", "block"],
     )
     registry.add_argument("manifest_id", nargs="?")
     registry.add_argument(

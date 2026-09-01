@@ -70,6 +70,8 @@ API、安全 gate、評測與 registry 機制，其數字不代表 LLM 品質，
 - 新版 registry mutation 會把 typed event 封入 SHA-256 前向鏈；線上服務也可選擇綁定完整 attestation
   的 `released`／`previous-good` runtime identity。現有實測 registry 是可相容讀取的 1.0 歷史資料，
   在受控的新 mutation 前不冒充已封鏈或已具新版線上綁定欄位。
+- `modelforge registry anchor` 可唯讀匯出已驗證快照的整檔 SHA-256 與事件鏈 head，交由外部 WORM／
+  稽核系統留存；本機 hash chain 本身不取代外部不可變錨定。
 
 ## 真實模型流程
 

@@ -193,6 +193,18 @@ class RegistryState(BaseModel):
         return self
 
 
+class RegistryAnchor(BaseModel):
+    """Portable digest record for externally anchoring one registry snapshot."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["1.0", "1.1", "1.2", "1.3", "1.4"]
+    registry_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    event_count: int = Field(ge=0)
+    event_chain_verified: bool
+    event_chain_head_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+
 class FileRegistry:
     def __init__(self, path: Path, *, artifact_root: Path | None = None) -> None:
         self.path = path
@@ -203,6 +215,20 @@ class FileRegistry:
         if not self.path.exists():
             return RegistryState()
         return RegistryState.model_validate_json(read_utf8_text_limited(self.path))
+
+    def anchor(self) -> RegistryAnchor:
+        """Validate and hash the exact snapshot read from the registry file."""
+        serialized = read_utf8_text_limited(self.path)
+        state = RegistryState.model_validate_json(serialized)
+        chain_verified = state.schema_version == "1.4"
+        chain_head = state.events[-1].event_sha256 if chain_verified and state.events else None
+        return RegistryAnchor(
+            schema_version=state.schema_version,
+            registry_sha256=sha256(serialized.encode("utf-8")).hexdigest(),
+            event_count=len(state.events),
+            event_chain_verified=chain_verified,
+            event_chain_head_sha256=chain_head,
+        )
 
     def _write(self, state: RegistryState) -> None:
         state = RegistryState.model_validate(state.model_dump(mode="json"))

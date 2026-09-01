@@ -59,7 +59,9 @@ Web / REST / OpenAI-compatible client
   Registry 1.4 將操作事件限制為 typed schema，並以 canonical JSON SHA-256 串接前一筆事件；
   1.0–1.3 可唯讀相容，下一次 mutation 才封入新鏈。這可偵測未同步重算的封存後改寫，但不是
   外部數位簽章或不可變 audit storage；能改寫檔案的攻擊者也能重算整條鏈。正式環境必須把 head digest／registry
-  副本送往獨立受控稽核系統，才能對抗事後重算。
+  副本送往獨立受控稽核系統，才能對抗事後重算。`modelforge registry anchor` 會先完整驗證
+  registry，再從同一次讀取匯出整份檔案 SHA-256、事件數、鏈驗證狀態與 head digest；舊版未封鏈
+  registry 會明確回報 `event_chain_verified: false`，不會把相容讀取誤稱為已驗證。
   Manifest 的 base revision 必須是 40–64 位 lowercase commit hash；事件 action 也限制可帶的欄位，
   例如 evaluation attestation 缺 report，或 promoted 事件夾帶 report，都會在載入時拒絕。
 

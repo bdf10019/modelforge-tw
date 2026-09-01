@@ -200,6 +200,42 @@ def test_registry_event_chain_detects_content_tampering(tmp_path):
         registry.load()
 
 
+def test_registry_anchor_binds_exact_snapshot_and_verified_event_head(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    state = registry.add(manifest("v1"))
+
+    anchor = registry.anchor()
+
+    assert anchor.schema_version == "1.4"
+    assert anchor.registry_sha256 == hashlib.sha256(registry.path.read_bytes()).hexdigest()
+    assert anchor.event_count == 1
+    assert anchor.event_chain_verified is True
+    assert anchor.event_chain_head_sha256 == state.events[-1].event_sha256
+
+
+def test_registry_anchor_marks_legacy_event_history_unverified(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    legacy = RegistryState(
+        schema_version="1.0",
+        manifests={"v1": manifest("v1")},
+        events=[
+            {
+                "at": "2026-01-01T00:00:00+00:00",
+                "action": "candidate_added",
+                "manifest_id": "v1",
+            }
+        ],
+    )
+    registry.path.write_text(legacy.model_dump_json(), encoding="utf-8")
+
+    anchor = registry.anchor()
+
+    assert anchor.registry_sha256 == hashlib.sha256(registry.path.read_bytes()).hexdigest()
+    assert anchor.event_count == 1
+    assert anchor.event_chain_verified is False
+    assert anchor.event_chain_head_sha256 is None
+
+
 def test_registry_event_chain_detects_broken_previous_pointer(tmp_path):
     registry = FileRegistry(tmp_path / "registry.json")
     registry.add(manifest("v1"))

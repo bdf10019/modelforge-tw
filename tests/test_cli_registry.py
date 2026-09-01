@@ -5,7 +5,7 @@ import json
 import pytest
 
 from modelforge_tw import cli
-from modelforge_tw.registry import FileRegistry
+from modelforge_tw.registry import FileRegistry, ModelManifest
 from modelforge_tw.schemas import EvaluationReport
 from modelforge_tw.training import TrainingConfig
 
@@ -151,3 +151,42 @@ def test_registry_cli_rejects_training_prompt_mismatch(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError, match="training prompt version"):
         cli.command_registry(registry_args(tmp_path, evaluation_path, training_path))
+
+
+def test_registry_cli_exports_validated_anchor(tmp_path, capsys):
+    registry_path = tmp_path / "registry.json"
+    FileRegistry(registry_path).add(
+        ModelManifest(
+            manifest_id="anchor-test",
+            base_model="fixture",
+            base_revision=HASH,
+            license="MIT",
+            prompt_version="optimized-v2",
+            dataset_manifest_sha256=HASH,
+            training_config_sha256=HASH,
+            release_gate_sha256=HASH,
+            engine="fixture",
+            quantization="none",
+            max_new_tokens=192,
+            structured_output_contract="json-schema-v2",
+            safety_policy_version="risk-precedence-v2",
+            evaluation_contract_version="release-metrics-v2",
+            evaluation_dataset_sha256=HASH,
+            evaluation_engine="fixture",
+            evaluation_model_id="fixture-model",
+            evaluation_model_version="1.0",
+            evaluation_evidence_kind="measured",
+            evaluation_report="evaluation.json",
+            evaluation_report_sha256=HASH,
+            training_report="training.json",
+            training_report_sha256=HASH,
+            release_passed=False,
+        )
+    )
+
+    assert cli.main(["registry", "anchor", "--registry", str(registry_path)]) == 0
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["registry_sha256"] == hashlib.sha256(registry_path.read_bytes()).hexdigest()
+    assert output["event_chain_verified"] is True
+    assert output["event_chain_head_sha256"]
