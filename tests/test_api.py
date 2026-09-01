@@ -26,6 +26,12 @@ def test_service_refuses_input_logging_configuration():
     assert Settings(log_inputs=False).log_inputs is False
 
 
+def test_request_body_limit_has_safe_bounds():
+    assert Settings().max_request_body_bytes == 32768
+    with pytest.raises(ValueError):
+        Settings(max_request_body_bytes=1023)
+
+
 @asynccontextmanager
 async def app_client(app):
     async with app.router.lifespan_context(app):
@@ -40,6 +46,7 @@ async def test_triage_health_metrics_and_no_input_echo():
         assert (await client.get("/healthz")).status_code == 200
         ready = (await client.get("/readyz")).json()
         assert ready["evidence_kind"] == "fixture"
+        assert (await client.get("/api/config")).json()["max_request_body_bytes"] == 32768
         response = await client.post(
             "/v1/triage",
             headers={"X-Request-ID": "test-request-1"},
@@ -90,6 +97,61 @@ async def test_invalid_request_id_and_extra_input_are_rejected():
                 },
             )
         ).status_code == 422
+
+
+@pytest.mark.parametrize("path", ["/v1/triage", "/v1/chat/completions"])
+async def test_oversized_declared_request_body_is_rejected_with_413(path):
+    app = create_app(
+        settings=Settings(max_request_body_bytes=1024),
+        engine_factory=lambda: FixtureEngine("adapted"),
+    )
+    async with app_client(app) as client:
+        response = await client.post(
+            path,
+            content=b"{" + (b"x" * 2048) + b"}",
+            headers={"Content-Type": "application/json"},
+        )
+
+    assert response.status_code == 413
+    assert response.json() == {"detail": "request body is too large"}
+
+
+async def test_chunked_request_body_is_counted_when_content_length_is_absent():
+    app = create_app(
+        settings=Settings(max_request_body_bytes=1024),
+        engine_factory=lambda: FixtureEngine("adapted"),
+    )
+
+    async def oversized_chunks():
+        yield b'{"incident_text":"'
+        yield b"x" * 1100
+        yield b'"}'
+
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage",
+            content=oversized_chunks(),
+            headers={"Content-Type": "application/json"},
+        )
+
+    assert response.status_code == 413
+
+
+async def test_multiple_content_length_headers_are_rejected():
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage",
+            content=b"{}",
+            headers=[
+                ("Content-Type", "application/json"),
+                ("Content-Length", "2"),
+                ("Content-Length", "2"),
+            ],
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "multiple Content-Length values"}
 
 
 async def test_openai_compatible_non_streaming_and_streaming():

@@ -14,6 +14,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from modelforge_tw.engines import FixtureEngine, InferenceEngine, OpenAIHTTPInferenceEngine
 from modelforge_tw.metrics import ServiceMetrics
@@ -22,6 +23,77 @@ from modelforge_tw.schemas import InferenceMetadata, TriageRequest, TriageRespon
 from modelforge_tw.settings import Settings
 
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,96}$")
+BODY_METHODS = frozenset({"POST", "PUT", "PATCH"})
+
+
+async def _send_body_error(send: Send, status: int, detail: str) -> None:
+    content = json.dumps({"detail": detail}, separators=(",", ":")).encode()
+    await send(
+        {
+            "type": "http.response.start",
+            "status": status,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(content)).encode()),
+            ],
+        }
+    )
+    await send({"type": "http.response.body", "body": content})
+
+
+class RequestBodyLimitMiddleware:
+    def __init__(self, app: ASGIApp, *, max_body_bytes: int) -> None:
+        self.app = app
+        self.max_body_bytes = max_body_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["method"] not in BODY_METHODS:
+            await self.app(scope, receive, send)
+            return
+
+        declared_lengths: list[int] = []
+        for name, value in scope["headers"]:
+            if name.lower() != b"content-length":
+                continue
+            if not value.isdigit():
+                await _send_body_error(send, 400, "invalid Content-Length")
+                return
+            declared_lengths.append(int(value))
+        if len(declared_lengths) > 1:
+            await _send_body_error(send, 400, "multiple Content-Length values")
+            return
+        if declared_lengths and declared_lengths[0] > self.max_body_bytes:
+            await _send_body_error(send, 413, "request body is too large")
+            return
+
+        body = bytearray()
+        while True:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                return
+            if message["type"] != "http.request":
+                continue
+            body.extend(message.get("body", b""))
+            if len(body) > self.max_body_bytes:
+                await _send_body_error(send, 413, "request body is too large")
+                return
+            if not message.get("more_body", False):
+                break
+
+        if declared_lengths and len(body) != declared_lengths[0]:
+            await _send_body_error(send, 400, "Content-Length does not match the request body")
+            return
+
+        delivered = False
+
+        async def replay_receive():
+            nonlocal delivered
+            if not delivered:
+                delivered = True
+                return {"type": "http.request", "body": bytes(body), "more_body": False}
+            return await receive()
+
+        await self.app(scope, replay_receive, send)
 
 
 class ChatMessage(BaseModel):
@@ -103,6 +175,10 @@ def create_app(
         version="0.1.0",
         description="Validated Traditional Chinese industrial-event model serving",
         lifespan=lifespan,
+    )
+    app.add_middleware(
+        RequestBodyLimitMiddleware,
+        max_body_bytes=selected_settings.max_request_body_bytes,
     )
     web_root = files("modelforge_tw").joinpath("web")
     app.mount("/static", StaticFiles(directory=str(web_root)), name="static")
@@ -232,6 +308,7 @@ def create_app(
             "safety_policy_version": engine.safety_policy_version,
             "evidence_kind": engine.evidence_kind,
             "max_concurrency": selected_settings.max_concurrency,
+            "max_request_body_bytes": selected_settings.max_request_body_bytes,
             "input_logging": selected_settings.log_inputs,
         }
 

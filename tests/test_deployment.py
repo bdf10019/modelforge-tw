@@ -14,6 +14,7 @@ def test_kubernetes_manifests_parse_and_default_to_q8_candidate():
     assert config["data"]["MODELFORGE_QUANTIZATION"] == "q8_0"
     assert config["data"]["MODELFORGE_CONTEXT_WINDOW_TOKENS"] == "2048"
     assert config["data"]["MODELFORGE_SAFETY_POLICY_VERSION"] == "risk-precedence-v2"
+    assert config["data"]["MODELFORGE_MAX_REQUEST_BODY_BYTES"] == "32768"
 
     model_deployment = next(
         item
@@ -47,6 +48,7 @@ def test_compose_baseline_is_non_privileged_and_does_not_log_inputs():
     compose = yaml.safe_load((PROJECT_ROOT / "compose.yaml").read_text("utf-8"))
     api = compose["services"]["api"]
     assert api["environment"]["MODELFORGE_LOG_INPUTS"] == "false"
+    assert api["environment"]["MODELFORGE_MAX_REQUEST_BODY_BYTES"] == "32768"
     assert api["read_only"] is True
     assert "/tmp" in api["tmpfs"]
     assert "no-new-privileges:true" in api["security_opt"]
@@ -94,6 +96,7 @@ def test_container_files_run_as_non_root_and_disable_input_logging():
     for dockerfile in (cpu, gpu):
         assert "USER appuser" in dockerfile
         assert "MODELFORGE_LOG_INPUTS=false" in dockerfile
+        assert "MODELFORGE_MAX_REQUEST_BODY_BYTES=32768" in dockerfile
         assert '"modelforge", "serve"' in dockerfile
 
 

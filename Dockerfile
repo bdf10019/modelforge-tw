@@ -13,7 +13,8 @@ RUN python -m pip install --no-cache-dir /tmp/*.whl && rm -f /tmp/*.whl
 USER appuser
 ENV MODELFORGE_ENGINE=fixture \
     MODELFORGE_LOG_INPUTS=false \
-    MODELFORGE_MAX_CONCURRENCY=2
+    MODELFORGE_MAX_CONCURRENCY=2 \
+    MODELFORGE_MAX_REQUEST_BODY_BYTES=32768
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
 ENTRYPOINT ["modelforge", "serve", "--host", "0.0.0.0", "--port", "8000"]

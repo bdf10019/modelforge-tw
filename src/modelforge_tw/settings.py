@@ -30,4 +30,5 @@ class Settings(BaseSettings):
     registry_path: Path = Path("outputs/model-registry.json")
     request_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     max_concurrency: int = Field(default=2, ge=1, le=64)
+    max_request_body_bytes: int = Field(default=32768, ge=1024, le=1048576)
     log_inputs: Literal[False] = False
