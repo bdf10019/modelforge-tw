@@ -34,7 +34,9 @@ Web / REST / OpenAI-compatible client
   hash、Python、Torch、CUDA、cuDNN、GPU capability、實體顯存與完整 ML 依賴版本，避免只鎖
   模型卻漏掉訓練 runtime 漂移。
 - `registry.py`：candidate、evaluation attestation、promote、previous-good 與 rollback 的原子檔案
-  registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住生成、安全與評分契約。
+  registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住評測資料 hash、引擎、
+  模型 identity、evidence kind、生成、安全與評分契約。新候選缺少任一 attestation 欄位都不能
+  加入；舊 manifest 缺少 identity 時只能讀取或沿用既有狀態，不能拿新版報告重新 attestation。
 
 OpenAI-compatible HTTP adapter 使用 strict JSON Schema：八個輸出欄位皆 required，分類、動作與
 reason code 使用有限允許清單。此約束在生成前套用；線上 bounded repair 與 fail-closed fallback

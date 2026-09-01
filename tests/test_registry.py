@@ -17,8 +17,18 @@ def manifest(manifest_id: str, passed: bool = True) -> ModelManifest:
         prompt_version="optimized-v1",
         dataset_manifest_sha256=HASH,
         training_config_sha256=HASH,
+        release_gate_sha256=HASH,
         engine="fixture",
         quantization="none",
+        max_new_tokens=192,
+        structured_output_contract="json-schema-v2",
+        safety_policy_version="risk-precedence-v2",
+        evaluation_contract_version="release-metrics-v2",
+        evaluation_dataset_sha256=HASH,
+        evaluation_engine="fixture",
+        evaluation_model_id="fixture",
+        evaluation_model_version="1",
+        evaluation_evidence_kind="fixture",
         evaluation_report="outputs/evaluation.json",
         release_passed=passed,
     )
@@ -86,6 +96,44 @@ def test_registry_rejects_mismatched_evaluation_metadata(tmp_path):
     )
     with pytest.raises(ValueError, match="quantization"):
         registry.validate_evaluation("v1", report)
+
+
+def test_registry_rejects_evaluation_from_a_different_dataset(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    registry.add(manifest("v1"))
+    report = EvaluationReport(
+        run_id="wrong-dataset",
+        engine="fixture",
+        model_id="fixture",
+        model_version="1",
+        quantization="none",
+        prompt_version="optimized-v1",
+        evidence_kind="fixture",
+        dataset_manifest_sha256=hashlib.sha256(b"different-dataset").hexdigest(),
+        case_count=0,
+        metrics={},
+        gates={},
+        release_passed=True,
+        latency_ms={},
+        cases=[],
+    )
+    with pytest.raises(ValueError, match="evaluation_dataset_sha256"):
+        registry.validate_evaluation("v1", report)
+
+
+def test_registry_rejects_new_manifest_without_evaluation_attestation(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    incomplete = manifest("legacy").model_copy(
+        update={
+            "evaluation_dataset_sha256": None,
+            "evaluation_engine": None,
+            "evaluation_model_id": None,
+            "evaluation_model_version": None,
+            "evaluation_evidence_kind": None,
+        }
+    )
+    with pytest.raises(ValueError, match="manifest lacks evaluation attestation"):
+        registry.add(incomplete)
 
 
 def test_registry_rechecks_artifact_before_promotion(tmp_path):

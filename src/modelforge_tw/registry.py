@@ -41,6 +41,11 @@ class ModelManifest(BaseModel):
     structured_output_contract: str | None = None
     safety_policy_version: str | None = None
     evaluation_contract_version: str | None = None
+    evaluation_dataset_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    evaluation_engine: str | None = None
+    evaluation_model_id: str | None = None
+    evaluation_model_version: str | None = None
+    evaluation_evidence_kind: Literal["fixture", "measured"] | None = None
     status: Literal["candidate", "released", "retired", "blocked"] = "candidate"
     evaluation_report: str
     release_passed: bool
@@ -51,7 +56,7 @@ class ModelManifest(BaseModel):
 class RegistryState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
     released: str | None = None
     previous_good: str | None = None
     manifests: dict[str, ModelManifest] = Field(default_factory=dict)
@@ -83,6 +88,24 @@ class FileRegistry:
         if not SAFE_ID.fullmatch(manifest_id):
             raise ValueError("manifest id contains unsupported characters")
 
+    @staticmethod
+    def _require_evaluation_attestation(manifest: ModelManifest) -> None:
+        attestation = {
+            "release_gate_sha256": manifest.release_gate_sha256,
+            "max_new_tokens": manifest.max_new_tokens,
+            "structured_output_contract": manifest.structured_output_contract,
+            "safety_policy_version": manifest.safety_policy_version,
+            "evaluation_contract_version": manifest.evaluation_contract_version,
+            "evaluation_dataset_sha256": manifest.evaluation_dataset_sha256,
+            "evaluation_engine": manifest.evaluation_engine,
+            "evaluation_model_id": manifest.evaluation_model_id,
+            "evaluation_model_version": manifest.evaluation_model_version,
+            "evaluation_evidence_kind": manifest.evaluation_evidence_kind,
+        }
+        missing = [name for name, value in attestation.items() if value is None]
+        if missing:
+            raise ValueError("manifest lacks evaluation attestation: " + ", ".join(sorted(missing)))
+
     def _verify_artifacts(self, manifest: ModelManifest) -> None:
         if self.artifact_root is None:
             return
@@ -109,7 +132,19 @@ class FileRegistry:
         if manifest_id not in state.manifests:
             raise KeyError(f"manifest not found: {manifest_id}")
         manifest = state.manifests[manifest_id]
+        self._require_evaluation_attestation(manifest)
         checks = {
+            "evaluation_dataset_sha256": (
+                manifest.evaluation_dataset_sha256 == evaluation.dataset_manifest_sha256
+            ),
+            "evaluation_engine": manifest.evaluation_engine == evaluation.engine,
+            "evaluation_model_id": manifest.evaluation_model_id == evaluation.model_id,
+            "evaluation_model_version": (
+                manifest.evaluation_model_version == evaluation.model_version
+            ),
+            "evaluation_evidence_kind": (
+                manifest.evaluation_evidence_kind == evaluation.evidence_kind
+            ),
             "prompt_version": manifest.prompt_version == evaluation.prompt_version,
             "release_gate_sha256": (manifest.release_gate_sha256 == evaluation.release_gate_sha256),
             "quantization": manifest.quantization == evaluation.quantization,
@@ -175,6 +210,7 @@ class FileRegistry:
 
     def add(self, manifest: ModelManifest) -> RegistryState:
         self._validate_id(manifest.manifest_id)
+        self._require_evaluation_attestation(manifest)
         state = self.load()
         if manifest.manifest_id in state.manifests:
             raise ValueError(f"manifest already exists: {manifest.manifest_id}")

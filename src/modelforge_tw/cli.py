@@ -300,6 +300,11 @@ def command_registry(args: argparse.Namespace) -> int:
             args.evaluation.read_text(encoding="utf-8")
         )
         training = json.loads(args.training_report.read_text(encoding="utf-8"))
+        if args.registry_quantization != evaluation.quantization:
+            raise ValueError(
+                "registry quantization does not match evaluation: "
+                f"{args.registry_quantization} != {evaluation.quantization}"
+            )
         artifact_refs: list[ArtifactRef] = []
         for specification in args.artifact:
             kind, separator, raw_path = specification.partition("=")
@@ -348,6 +353,11 @@ def command_registry(args: argparse.Namespace) -> int:
             structured_output_contract=evaluation.structured_output_contract,
             safety_policy_version=evaluation.safety_policy_version,
             evaluation_contract_version=evaluation.evaluation_contract_version,
+            evaluation_dataset_sha256=evaluation.dataset_manifest_sha256,
+            evaluation_engine=evaluation.engine,
+            evaluation_model_id=evaluation.model_id,
+            evaluation_model_version=evaluation.model_version,
+            evaluation_evidence_kind=evaluation.evidence_kind,
             evaluation_report=args.evaluation.resolve().relative_to(PROJECT_ROOT).as_posix(),
             release_passed=evaluation.release_passed,
             artifacts=artifact_refs,

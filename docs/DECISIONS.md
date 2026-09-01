@@ -64,3 +64,12 @@ event F1 降至 69.72%。因此 v5 不建立發布 manifest。候選必須以同
 4096 total context／4 parallel slots 的每-slot 1024 token 在外部輸入造成全數截斷。context 因此
 納入 inference metadata、評估報告、快取指紋與 Q4 相容性檢查；本機與 Kubernetes baseline 改為
 8192／4，每 slot 2048。本機啟動低於 1536 時 fail fast，避免把容量錯誤誤判成模型品質。
+
+## ADR-011：Attestation 必須鎖定評測資料與模型 identity
+
+training manifest hash 和 evaluation input hash 代表不同邊界，不能互相代替。registry schema 1.1
+把 evaluation dataset SHA-256、引擎、model ID、model version 與 evidence kind 列為新候選必填
+identity，再連同 prompt、量化、max tokens、structured output、安全政策、評分契約及 release gate
+逐項比對；新候選缺任一欄位就拒絕加入，CLI 也在寫入前核對量化名稱。既有 schema 1.0 manifest
+仍可讀取與維持既有狀態，但缺 identity 時 fail closed，不接受新的 attestation；避免不同資料集或
+fixture 報告在設定看似相同時被錯掛到正式候選。
