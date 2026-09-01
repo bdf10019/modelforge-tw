@@ -69,5 +69,15 @@ $report = [ordered]@{
     llama_cpp_tag = "b10665"
     files = $files
 }
-$report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $outputRoot "quantization-report.json") -Encoding utf8
+$reportPath = Join-Path $outputRoot "quantization-report.json"
+$reportTemporary = Join-Path $outputRoot (".quantization-report." + [guid]::NewGuid().ToString("N") + ".tmp")
+try {
+    $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reportTemporary -Encoding utf8
+    Move-Item -Force -LiteralPath $reportTemporary -Destination $reportPath
+}
+finally {
+    if (Test-Path -LiteralPath $reportTemporary) {
+        Remove-Item -Force -LiteralPath $reportTemporary
+    }
+}
 Write-Host "GGUF 轉換與量化完成：$outputRoot"

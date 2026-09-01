@@ -9,6 +9,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from modelforge_tw.io_utils import atomic_write_text
 from modelforge_tw.safety import CRITICAL_RISK_PATTERN, HIGH_RISK_PATTERN
 from modelforge_tw.schemas import (
     DatasetRecord,
@@ -562,9 +563,11 @@ def audit_records(records: Iterable[DatasetRecord]) -> dict[str, Any]:
 
 
 def _write_jsonl(path: Path, records: Iterable[DatasetRecord]) -> None:
-    with path.open("w", encoding="utf-8", newline="\n") as handle:
-        for record in records:
-            handle.write(record.model_dump_json() + "\n")
+    atomic_write_text(
+        path,
+        "".join(record.model_dump_json() + "\n" for record in records),
+        newline="\n",
+    )
 
 
 def sha256_file(path: Path) -> str:
@@ -622,9 +625,9 @@ def write_dataset(
         "audit": audit,
     }
     manifest_path = output_dir / "manifest.json"
-    manifest_path.write_text(
+    atomic_write_text(
+        manifest_path,
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
     )
     return manifest
 

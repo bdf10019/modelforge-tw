@@ -45,6 +45,10 @@ Web / REST / OpenAI-compatible client
   同樣採此規則；唯一相容例外是 schema 1.0 中五個新版 identity 欄位全部不存在、且早已被指定為
   previous-good 的既有狀態，避免安全升級反而切斷已驗證的舊回退路徑；部分遷移的資料不放行。
 
+資料 split／manifest、評測、比較、benchmark、訓練、merge、量化與 registry JSON 都先寫入同目錄
+的唯一暫存檔，完成後再原子替換；Python 路徑會先 flush + fsync。中斷或 replace 失敗會保留上一份
+完整檔案並清掉暫存檔。
+
 所有引擎的解析後 schema 都要求八個輸出欄位，並限制分類、動作與 reason code 為有限允許清單；
 OpenAI-compatible HTTP adapter 另用 strict JSON Schema 在生成前套用相同約束。線上 bounded repair
 與 fail-closed fallback 仍保留，但 raw 評測不把修補後結果算成原始格式成功。

@@ -19,6 +19,7 @@ from modelforge_tw.evaluation import (
     write_report,
 )
 from modelforge_tw.external_calibration import build_external_calibration
+from modelforge_tw.io_utils import atomic_write_text
 from modelforge_tw.prompts import (
     MINIMAL_PROMPT_VERSION,
     OPTIMIZED_PROMPT_V2_VERSION,
@@ -287,10 +288,9 @@ def command_compare(args: argparse.Namespace) -> int:
             candidate,
             gate_config["q4_relative_to_reference"],
         )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(
+    atomic_write_text(
+        args.output,
         json.dumps(comparison, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
     )
     print(json.dumps(comparison, ensure_ascii=False, indent=2))
     passed = comparison["dataset_match"]
@@ -467,10 +467,9 @@ def command_probe_model(args: argparse.Namespace) -> int:
     from modelforge_tw.engines.transformers_local import model_load_probe
 
     report = model_load_probe(args.model_id, load_in_4bit=args.load_in_4bit)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(
+    atomic_write_text(
+        args.output,
         json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from datetime import UTC, datetime
 from hashlib import sha256
@@ -10,6 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from modelforge_tw.io_utils import atomic_write_text
 from modelforge_tw.schemas import EvaluationReport
 
 SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
@@ -101,14 +101,11 @@ class FileRegistry:
         return RegistryState.model_validate_json(self.path.read_text(encoding="utf-8"))
 
     def _write(self, state: RegistryState) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
-        temporary.write_text(
+        atomic_write_text(
+            self.path,
             json.dumps(state.model_dump(mode="json"), ensure_ascii=False, indent=2, sort_keys=True)
             + "\n",
-            encoding="utf-8",
         )
-        os.replace(temporary, self.path)
 
     @staticmethod
     def _validate_id(manifest_id: str) -> None:

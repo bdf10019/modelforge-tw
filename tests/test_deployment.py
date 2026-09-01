@@ -118,3 +118,10 @@ def test_ci_uses_the_same_cross_platform_full_verification_entrypoint():
     assert "Get-Command python" in script
     assert "pip install --no-deps --target" in script
     assert "verify-local-evidence.ps1" in script
+
+
+def test_quantization_report_uses_same_directory_atomic_replacement():
+    script = (PROJECT_ROOT / "scripts" / "quantize.ps1").read_text(encoding="utf-8")
+    assert 'Join-Path $outputRoot (".quantization-report."' in script
+    assert "Move-Item -Force -LiteralPath $reportTemporary -Destination $reportPath" in script
+    assert "Remove-Item -Force -LiteralPath $reportTemporary" in script

@@ -15,6 +15,7 @@ from typing import Any
 import psutil
 
 from modelforge_tw.engines.base import InferenceEngine
+from modelforge_tw.io_utils import atomic_write_text
 from modelforge_tw.schemas import DatasetRecord, InferenceMetadata
 
 
@@ -247,8 +248,7 @@ def run_benchmark(
 
 
 def write_benchmark(report: dict[str, Any], path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    atomic_write_text(
+        path,
         json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
     )

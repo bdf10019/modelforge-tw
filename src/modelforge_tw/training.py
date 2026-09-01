@@ -14,6 +14,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from modelforge_tw.dataset import load_splits, sha256_file
+from modelforge_tw.io_utils import atomic_write_text
 from modelforge_tw.prompts import messages_for_version, training_messages
 
 TRAINING_DEPENDENCIES = (
@@ -339,9 +340,9 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
         },
     }
     report_path = output_dir / "training-report.json"
-    report_path.write_text(
+    atomic_write_text(
+        report_path,
         json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True, default=str) + "\n",
-        encoding="utf-8",
     )
     return report
 
@@ -401,8 +402,8 @@ def merge_adapter(
         ),
         "files": files,
     }
-    (output_dir / "merge-report.json").write_text(
+    atomic_write_text(
+        output_dir / "merge-report.json",
         json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
     )
     return report

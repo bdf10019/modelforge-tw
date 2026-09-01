@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from modelforge_tw.engines.base import InferenceEngine
+from modelforge_tw.io_utils import atomic_write_text
 from modelforge_tw.safety import (
     SAFETY_POLICY_VERSION,
     SUPPORTED_SAFETY_POLICY_VERSIONS,
@@ -322,11 +323,10 @@ def evaluate(
 
 
 def write_report(report: EvaluationReport, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    atomic_write_text(
+        path,
         json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2, sort_keys=True)
         + "\n",
-        encoding="utf-8",
     )
 
 

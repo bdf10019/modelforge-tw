@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from modelforge_tw.dataset import audit_records, sha256_file
+from modelforge_tw.io_utils import atomic_write_text
 from modelforge_tw.schemas import (
     DatasetRecord,
     EventType,
@@ -388,9 +389,9 @@ def _selection_manifest(
 
 
 def _write_records(output_path: Path, records: list[DatasetRecord]) -> dict[str, Any]:
-    output_path.write_text(
+    atomic_write_text(
+        output_path,
         "".join(record.model_dump_json() + "\n" for record in records),
-        encoding="utf-8",
         newline="\n",
     )
     return {
@@ -481,9 +482,9 @@ def build_external_calibration(
         },
     }
     manifest_path = output_dir / "manifest.json"
-    manifest_path.write_text(
+    atomic_write_text(
+        manifest_path,
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
         newline="\n",
     )
     return manifest
