@@ -23,6 +23,8 @@
 - 解析失敗、timeout、engine exception 都回 unknown + collect evidence + review required。
 - 所有引擎解析後都拒絕 allowlist 以外的 event、severity、safe action 與 reason code；llama.cpp
   路徑還會在生成前用 strict JSON Schema 約束同一份契約。
+- `incident_text`、asset 與 signal 文字都視為不可信資料並納入注入偵測；signal 字串限制 128 字，
+  數字必須是有限值且在明確範圍內，控制字元會在進入 prompt 前拒絕。
 - semaphore、timeout、request ID 驗證、Prometheus outcome 與 readiness 檢查。
 - timeout 後仍保留同步模型的容量槽，直到不可取消的背景推論真正結束，避免資源耗盡。
 - `MODELFORGE_LOG_INPUTS` 唯一合法值為 `false`；誤設 `true` 時服務拒絕啟動，API 不提供事件原文

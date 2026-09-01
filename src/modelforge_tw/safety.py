@@ -52,6 +52,19 @@ class ParseResult:
     repair_used: bool
 
 
+def contains_untrusted_instruction(request: TriageRequest) -> bool:
+    text_fields = [request.incident_text]
+    if request.asset_type:
+        text_fields.append(request.asset_type)
+    for signal in request.signals:
+        text_fields.append(signal.name)
+        if isinstance(signal.value, str):
+            text_fields.append(signal.value)
+        if signal.unit:
+            text_fields.append(signal.unit)
+    return bool(INJECTION_PATTERN.search("\n".join(text_fields)))
+
+
 def parse_output(raw_text: str, *, allow_bounded_repair: bool) -> ParseResult:
     text = raw_text.strip()
     try:
@@ -135,7 +148,7 @@ def apply_safety_policy(
             reason_codes.append("HIGH_SEVERITY")
         warnings.append("RISK_ESCALATED_BY_POLICY")
 
-    if INJECTION_PATTERN.search(request.incident_text):
+    if contains_untrusted_instruction(request):
         update["review_required"] = True
         if "UNTRUSTED_INSTRUCTION" not in reason_codes:
             reason_codes.append("UNTRUSTED_INSTRUCTION")

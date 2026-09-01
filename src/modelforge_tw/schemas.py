@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -58,14 +58,42 @@ ALLOWED_REASON_CODES: tuple[ReasonCode, ...] = (
     "SAFE_FALLBACK",
 )
 
+SignalValue = (
+    Annotated[int, Field(ge=-1_000_000_000_000, le=1_000_000_000_000, strict=True)]
+    | Annotated[
+        float,
+        Field(
+            ge=-1_000_000_000_000,
+            le=1_000_000_000_000,
+            allow_inf_nan=False,
+            strict=True,
+        ),
+    ]
+    | Annotated[str, Field(min_length=1, max_length=128, strict=True)]
+)
+
 
 class Signal(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     name: str = Field(min_length=1, max_length=64)
-    value: float | int | str
+    value: SignalValue
     unit: str | None = Field(default=None, max_length=24)
     status: Literal["normal", "warning", "critical", "unknown"] = "unknown"
+
+    @field_validator("name", "unit")
+    @classmethod
+    def reject_control_characters(cls, value: str | None) -> str | None:
+        if value is not None and any(ord(char) < 32 for char in value):
+            raise ValueError("signal text contains unsupported control characters")
+        return value
+
+    @field_validator("value")
+    @classmethod
+    def reject_controls_in_text_value(cls, value: SignalValue) -> SignalValue:
+        if isinstance(value, str) and any(ord(char) < 32 for char in value):
+            raise ValueError("signal value contains unsupported control characters")
+        return value
 
 
 class TriageRequest(BaseModel):
@@ -80,6 +108,13 @@ class TriageRequest(BaseModel):
     def reject_control_characters(cls, value: str) -> str:
         if any(ord(char) < 32 and char not in "\n\r\t" for char in value):
             raise ValueError("incident_text contains unsupported control characters")
+        return value
+
+    @field_validator("asset_type")
+    @classmethod
+    def reject_asset_control_characters(cls, value: str | None) -> str | None:
+        if value is not None and any(ord(char) < 32 for char in value):
+            raise ValueError("asset_type contains unsupported control characters")
         return value
 
 
