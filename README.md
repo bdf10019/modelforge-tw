@@ -46,6 +46,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
+.\scripts\verify.ps1
 modelforge generate-data
 modelforge evaluate --engine fixture-adapted
 modelforge serve
@@ -53,6 +54,8 @@ modelforge serve
 
 開啟 `http://127.0.0.1:8000`；OpenAPI 位於 `http://127.0.0.1:8000/docs`。fixture 僅驗證資料、
 API、安全 gate、評測與 registry 機制，其數字不代表 LLM 品質，也不能被 registry 正式發布。
+同一支 `verify.ps1` 會在 Windows venv 與 Linux CI 執行資料稽核、靜態檢查、測試、wheel 安裝冒煙、
+隱私掃描與可用的本機證據核對。
 
 ## 真實模型流程
 

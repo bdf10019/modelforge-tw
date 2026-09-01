@@ -3,7 +3,23 @@ param()
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$python = Join-Path $projectRoot ".venv\Scripts\python.exe"
+$python = $null
+$pythonCandidates = @(
+    (Join-Path $projectRoot ".venv\Scripts\python.exe"),
+    (Join-Path $projectRoot ".venv/bin/python")
+)
+foreach ($candidate in $pythonCandidates) {
+    if (Test-Path -LiteralPath $candidate) {
+        $python = $candidate
+        break
+    }
+}
+if ($null -eq $python) {
+    $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+    if ($null -eq $pythonCommand) { throw "找不到可用的 Python；請先建立 .venv 或安裝 Python 3.11" }
+    $python = $pythonCommand.Source
+}
+$wheelDirectory = Join-Path $projectRoot "build/verify-wheel"
 $checks = @(
     @("-m", "pip", "check"),
     @("-m", "modelforge_tw.cli", "generate-data"),
@@ -36,9 +52,9 @@ try {
         throw "PowerShell 語法驗證失敗：$($parseErrors[0].Message)"
     }
 
-    & $python -m pip wheel . --no-deps --wheel-dir build\verify-wheel
+    & $python -m pip wheel . --no-deps --wheel-dir $wheelDirectory
     if ($LASTEXITCODE -ne 0) { throw "wheel 建置失敗" }
-    $wheel = Get-ChildItem -LiteralPath (Join-Path $projectRoot "build\verify-wheel") `
+    $wheel = Get-ChildItem -LiteralPath $wheelDirectory `
         -Filter "modelforge_tw-*.whl" |
         Sort-Object LastWriteTimeUtc -Descending |
         Select-Object -First 1

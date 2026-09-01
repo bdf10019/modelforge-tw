@@ -103,3 +103,18 @@ def test_local_llama_launcher_has_measured_context_capacity_guard():
     assert "$minimumSlotContext = 1536" in script
     assert "$ContextSize / $Parallel" in script
     assert "低於最低" in script
+
+
+def test_ci_uses_the_same_cross_platform_full_verification_entrypoint():
+    workflow = yaml.safe_load(
+        (PROJECT_ROOT / ".github" / "workflows" / "verify.yml").read_text(encoding="utf-8")
+    )
+    runs = [step.get("run") for step in workflow["jobs"]["test"]["steps"] if step.get("run")]
+    assert runs[-1] == "pwsh -NoProfile -File scripts/verify.ps1"
+
+    script = (PROJECT_ROOT / "scripts" / "verify.ps1").read_text(encoding="utf-8")
+    assert ".venv\\Scripts\\python.exe" in script
+    assert ".venv/bin/python" in script
+    assert "Get-Command python" in script
+    assert "pip install --no-deps --target" in script
+    assert "verify-local-evidence.ps1" in script
