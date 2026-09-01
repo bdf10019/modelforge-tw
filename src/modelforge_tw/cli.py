@@ -158,6 +158,40 @@ def _evaluation_fingerprint(args: argparse.Namespace) -> str:
     ).hexdigest()
 
 
+def _load_evaluation_cache(
+    cache_path: Path,
+    *,
+    fingerprint: str,
+    record_hashes: dict[str, str],
+) -> tuple[dict[str, InferenceResult], int]:
+    cached_results: dict[str, InferenceResult] = {}
+    rejected_lines = 0
+    with cache_path.open("r", encoding="utf-8") as cache_reader:
+        for line in cache_reader:
+            if not line.strip():
+                continue
+            try:
+                cached = json.loads(line)
+                record_id = cached.get("record_id")
+                if (
+                    cached.get("fingerprint") == fingerprint
+                    and record_id in record_hashes
+                    and cached.get("record_sha256") == record_hashes[record_id]
+                ):
+                    cached_results[record_id] = InferenceResult.model_validate(cached["result"])
+            except (AttributeError, KeyError, TypeError, ValueError):
+                rejected_lines += 1
+    return cached_results, rejected_lines
+
+
+def _cache_needs_line_boundary(cache_path: Path) -> bool:
+    if not cache_path.exists() or cache_path.stat().st_size == 0:
+        return False
+    with cache_path.open("rb") as cache_reader:
+        cache_reader.seek(-1, 2)
+        return cache_reader.read(1) not in {b"\n", b"\r"}
+
+
 def command_evaluate(args: argparse.Namespace) -> int:
     records = load_splits(args.data, args.splits)
     if args.limit is not None:
@@ -170,22 +204,23 @@ def command_evaluate(args: argparse.Namespace) -> int:
     )
     record_hashes = {record.record_id: _record_sha256(record) for record in records}
     cached_results: dict[str, InferenceResult] = {}
+    rejected_cache_lines = 0
     if not args.no_resume_cache and cache_path.exists():
-        with cache_path.open("r", encoding="utf-8") as cache_reader:
-            for line in cache_reader:
-                if not line.strip():
-                    continue
-                cached = json.loads(line)
-                record_id = cached.get("record_id")
-                if (
-                    cached.get("fingerprint") == fingerprint
-                    and record_id in record_hashes
-                    and cached.get("record_sha256") == record_hashes[record_id]
-                ):
-                    cached_results[record_id] = InferenceResult.model_validate(cached["result"])
+        cached_results, rejected_cache_lines = _load_evaluation_cache(
+            cache_path,
+            fingerprint=fingerprint,
+            record_hashes=record_hashes,
+        )
     if cached_results:
         print(
             f"evaluation resume cache: {len(cached_results)}/{len(records)}",
+            file=sys.stderr,
+            flush=True,
+        )
+    if rejected_cache_lines:
+        print(
+            f"evaluation resume cache: ignored {rejected_cache_lines} invalid line(s); "
+            "affected records will be regenerated",
             file=sys.stderr,
             flush=True,
         )
@@ -199,6 +234,9 @@ def command_evaluate(args: argparse.Namespace) -> int:
     cache_writer = (
         None if args.no_resume_cache else cache_path.open("a", encoding="utf-8", newline="\n")
     )
+    if cache_writer is not None and _cache_needs_line_boundary(cache_path):
+        cache_writer.write("\n")
+        cache_writer.flush()
 
     def cache_result(record: DatasetRecord, result: InferenceResult) -> None:
         if cache_writer is None:
