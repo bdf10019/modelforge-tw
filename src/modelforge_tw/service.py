@@ -261,6 +261,21 @@ class JSONContentTypeMiddleware:
         if not values or not _is_json_content_type(values[0]):
             await _send_json_error(send, 415, "Content-Type must be application/json")
             return
+
+        content_encodings = [
+            value for name, value in scope["headers"] if name.lower() == b"content-encoding"
+        ]
+        if len(content_encodings) > 1:
+            await _send_json_error(send, 400, "multiple Content-Encoding values")
+            return
+        if content_encodings:
+            try:
+                content_encoding = content_encodings[0].decode("ascii").strip().lower()
+            except UnicodeDecodeError:
+                content_encoding = ""
+            if content_encoding != "identity":
+                await _send_json_error(send, 415, "request Content-Encoding is not supported")
+                return
         await self.app(scope, receive, send)
 
 

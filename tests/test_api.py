@@ -471,6 +471,56 @@ async def test_duplicate_content_type_headers_are_rejected():
     assert response.json() == {"detail": "multiple Content-Type values"}
 
 
+@pytest.mark.parametrize("path", ["/v1/triage", "/v1/chat/completions"])
+async def test_compressed_inference_requests_are_rejected(path):
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.post(
+            path,
+            content=b"compressed-request-placeholder",
+            headers={
+                "Content-Type": "application/json",
+                "Content-Encoding": "gzip",
+            },
+        )
+
+    assert response.status_code == 415
+    assert response.json() == {"detail": "request Content-Encoding is not supported"}
+    assert REQUEST_ID.fullmatch(response.headers["X-Request-ID"])
+
+
+async def test_duplicate_content_encoding_headers_are_rejected():
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage",
+            content=b"{}",
+            headers=[
+                ("Content-Type", "application/json"),
+                ("Content-Encoding", "identity"),
+                ("Content-Encoding", "identity"),
+            ],
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "multiple Content-Encoding values"}
+
+
+async def test_identity_content_encoding_reaches_schema_validation():
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage",
+            content=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Content-Encoding": "identity",
+            },
+        )
+
+    assert response.status_code == 422
+
+
 @pytest.mark.parametrize(
     "content_type", ["application/json; charset=utf-8", "application/vnd.modelforge+json"]
 )

@@ -30,7 +30,8 @@
   Transfer-Encoding 的歧義 framing 會在讀取前回 400；上限可設定但限制在 1 KiB 至 1 MiB。
 - 推論路由只接受單一 JSON `Content-Type`（`application/json` 或 `application/*+json`）；缺少、重複、
   非 JSON、畸形參數或非 UTF-8 charset 都在 body 解析前拒絕。啟用 bearer key 時仍先認證，避免未授權
-  呼叫端利用格式錯誤探測受保護路由。
+  呼叫端利用格式錯誤探測受保護路由。Request `Content-Encoding` 只接受省略或 `identity`；gzip 等壓縮
+  payload 在讀取前回 415，避免應用與前置代理對解壓前後 byte 上限有不同解讀。
 - llama.cpp 一般與 SSE 回應都以解碼後 bytes 計數，預設上限 256 KiB；`Content-Length` 超限會
   在讀 body 前拒絕，chunked／壓縮回應則依實收解碼內容停止，無換行事件也不能無界累積。
 - 模型 server 只接受具有 host、無內嵌帳密／query／fragment 的 HTTP(S) base URL；client 固定
