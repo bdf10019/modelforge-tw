@@ -361,3 +361,33 @@ async def test_timed_out_worker_keeps_concurrency_slot_until_it_finishes():
                 break
             await asyncio.sleep(0.01)
         assert engine.calls == 2
+
+
+async def test_capacity_queue_times_out_instead_of_growing_without_bound():
+    engine = BlockingEngine("adapted")
+    settings = Settings(
+        request_timeout_seconds=0.01,
+        queue_timeout_seconds=0.02,
+        max_concurrency=1,
+    )
+    app = create_app(settings=settings, engine_factory=lambda: engine)
+    async with app_client(app) as client:
+        first = await client.post(
+            "/v1/triage", json={"incident_text": "第一筆設備事件占用唯一推論容量"}
+        )
+        assert "TIMEOUT_FALLBACK" in first.json()["validation_warnings"]
+
+        started = time.perf_counter()
+        rejected = await client.post(
+            "/v1/triage", json={"incident_text": "第二筆設備事件不應無限等待容量"}
+        )
+        elapsed = time.perf_counter() - started
+
+        assert rejected.status_code == 503
+        assert rejected.headers["Retry-After"] == "1"
+        assert rejected.json() == {"detail": "inference capacity is temporarily unavailable"}
+        assert elapsed < 0.5
+        assert engine.calls == 1
+        metrics = (await client.get("/metrics")).text
+        assert 'outcome="capacity_rejected"' in metrics
+        engine.release.set()

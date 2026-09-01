@@ -7,6 +7,7 @@ services:
       MODELFORGE_ENGINE: fixture
       MODELFORGE_LOG_INPUTS: "false"
       MODELFORGE_MAX_REQUEST_BODY_BYTES: "32768"
+      MODELFORGE_QUEUE_TIMEOUT_SECONDS: "5"
       # Null means pass through only when the operator exports it; no value lives in this file.
       MODELFORGE_API_KEY:
     ports:

@@ -72,7 +72,9 @@ Transformers token-level streaming。
 只揭露是否啟用，不回傳 secret；這是內部服務基線，不宣稱取代正式 IAM 或細粒度授權。
 同步模型推論逾時時會立即回傳保守 fallback，但底層執行緒無法強制取消；該工作真正結束以前仍
 占用 concurrency slot，避免連續 timeout 繞過容量上限並堆積 GPU 工作。Prometheus 分開呈現
-尚未回應的 HTTP request 與仍在執行的 engine job，因此 timeout 後的背景負載仍可觀測。
+尚未回應的 HTTP request 與仍在執行的 engine job，因此 timeout 後的背景負載仍可觀測。等待
+semaphore 另有預設 5 秒 queue timeout；容量未釋放時回 503 + `Retry-After` 並記
+`capacity_rejected`，避免請求在應用層無限堆積。
 
 llama.cpp 的 `--ctx-size` 是所有 parallel slots 的總容量。部署設定把每-slot context 明確寫入 API
 metadata 與評估報告；本機預設 8192／4＝2048 tokens，低於實測最低值時啟動失敗，避免容量截斷

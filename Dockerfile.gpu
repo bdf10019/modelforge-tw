@@ -11,6 +11,7 @@ RUN python3 -m pip install --break-system-packages torch==2.13.0 --index-url htt
 RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
 USER appuser
 ENV MODELFORGE_ENGINE=transformers MODELFORGE_LOAD_IN_4BIT=true MODELFORGE_LOG_INPUTS=false \
+    MODELFORGE_QUEUE_TIMEOUT_SECONDS=5 \
     MODELFORGE_MAX_REQUEST_BODY_BYTES=32768
 EXPOSE 8000
 ENTRYPOINT ["modelforge", "serve", "--host", "0.0.0.0", "--port", "8000"]

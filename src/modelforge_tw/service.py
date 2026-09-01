@@ -278,7 +278,18 @@ def create_app(
                 task.exception()
 
         try:
-            await app.state.semaphore.acquire()
+            try:
+                await asyncio.wait_for(
+                    app.state.semaphore.acquire(),
+                    timeout=selected_settings.queue_timeout_seconds,
+                )
+            except TimeoutError:
+                outcome = "capacity_rejected"
+                raise HTTPException(
+                    status_code=503,
+                    detail="inference capacity is temporarily unavailable",
+                    headers={"Retry-After": "1"},
+                ) from None
             slot_acquired = True
             engine_task = asyncio.create_task(asyncio.to_thread(engine.generate, request))
             engine_job_gauge.inc()
@@ -381,6 +392,7 @@ def create_app(
             "safety_policy_version": engine.safety_policy_version,
             "evidence_kind": engine.evidence_kind,
             "max_concurrency": selected_settings.max_concurrency,
+            "queue_timeout_seconds": selected_settings.queue_timeout_seconds,
             "max_request_body_bytes": selected_settings.max_request_body_bytes,
             "authentication_required": selected_settings.api_key is not None,
             "input_logging": selected_settings.log_inputs,
