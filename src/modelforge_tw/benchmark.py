@@ -18,6 +18,20 @@ from modelforge_tw.engines.base import InferenceEngine
 from modelforge_tw.io_utils import atomic_write_text
 from modelforge_tw.schemas import DatasetRecord, InferenceMetadata
 
+BENCHMARK_IDENTITY_FIELDS = (
+    "engine",
+    "model_id",
+    "model_version",
+    "model_revision",
+    "quantization",
+    "prompt_version",
+    "max_new_tokens",
+    "context_window_tokens",
+    "structured_output_contract",
+    "safety_policy_version",
+    "evidence_kind",
+)
+
 
 def _percentile(values: list[float], percentile: float) -> float:
     if not values:
@@ -105,6 +119,8 @@ def run_benchmark(
         raise ValueError("benchmark requires at least one concurrency level")
     if requests_per_level < 1 or any(level < 1 for level in concurrency_levels):
         raise ValueError("concurrency and request counts must be positive")
+    if len(concurrency_levels) != len(set(concurrency_levels)):
+        raise ValueError("concurrency levels must be unique")
     if warmup_requests < 0:
         raise ValueError("warmup request count cannot be negative")
 
@@ -144,6 +160,18 @@ def run_benchmark(
                     with metadata_lock:
                         if not metadata_samples:
                             metadata_samples.append(result.metadata)
+                        else:
+                            identity_mismatches = [
+                                field
+                                for field in BENCHMARK_IDENTITY_FIELDS
+                                if getattr(result.metadata, field)
+                                != getattr(metadata_samples[0], field)
+                            ]
+                            if identity_mismatches:
+                                raise ValueError(
+                                    "inference metadata changed during benchmark: "
+                                    + ", ".join(identity_mismatches)
+                                )
                     latency_sink.append((time.perf_counter() - request_started) * 1000)
                     if result.metadata.output_tokens is not None:
                         token_sink.append(result.metadata.output_tokens)
@@ -181,6 +209,7 @@ def run_benchmark(
                         "mean": round(statistics.fmean(latencies), 4) if latencies else 0,
                     },
                     "output_tokens": sum(output_tokens) if output_tokens else None,
+                    "output_token_sample_count": len(output_tokens),
                     "output_tokens_per_second": (
                         round(sum(output_tokens) / wall_seconds, 4) if output_tokens else None
                     ),
@@ -193,10 +222,15 @@ def run_benchmark(
                         if ttfts
                         else None
                     ),
+                    "ttft_sample_count": len(ttfts),
                     "ttft_status": (
                         "measured_from_streaming_response"
-                        if ttfts
-                        else "not_available_for_non_streaming_adapter"
+                        if completed > 0 and len(ttfts) == completed
+                        else (
+                            "partially_available_from_streaming_response"
+                            if ttfts
+                            else "not_available_for_non_streaming_adapter"
+                        )
                     ),
                 }
             )
@@ -209,7 +243,7 @@ def run_benchmark(
         level["errors"] == 0 and level["completed"] == level["requests"] for level in levels
     )
     return {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "created_at": datetime.now(UTC).isoformat(),
         "passed": passed,
         "failure_reason": None if passed else "one_or_more_benchmark_requests_failed",
@@ -217,11 +251,22 @@ def run_benchmark(
         "engine": first.engine if first else engine.name,
         "model_id": first.model_id if first else engine.model_id,
         "model_version": first.model_version if first else engine.model_version,
+        "model_revision": first.model_revision
+        if first
+        else getattr(engine, "model_revision", None),
         "quantization": first.quantization if first else engine.quantization,
         "prompt_version": first.prompt_version if first else engine.prompt_version,
         "max_new_tokens": first.max_new_tokens if first else engine.max_new_tokens,
         "context_window_tokens": (
             first.context_window_tokens if first else getattr(engine, "context_window_tokens", None)
+        ),
+        "structured_output_contract": (
+            first.structured_output_contract
+            if first
+            else getattr(engine, "structured_output_contract", None)
+        ),
+        "safety_policy_version": (
+            first.safety_policy_version if first else getattr(engine, "safety_policy_version", None)
         ),
         "environment": {
             "platform": platform.platform(),
