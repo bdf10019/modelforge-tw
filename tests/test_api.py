@@ -326,6 +326,30 @@ async def test_multiple_content_length_headers_are_rejected():
     assert response.json() == {"detail": "multiple Content-Length values"}
 
 
+@pytest.mark.parametrize(
+    ("declared_length", "detail"),
+    [
+        ("invalid", "invalid Content-Length"),
+        ("3", "Content-Length does not match the request body"),
+    ],
+)
+async def test_invalid_or_mismatched_content_length_is_rejected(declared_length, detail):
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage",
+            content=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Content-Length": declared_length,
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": detail}
+    assert REQUEST_ID.fullmatch(response.headers["X-Request-ID"])
+
+
 async def test_openai_compatible_non_streaming_and_streaming():
     app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
     async with app_client(app) as client:

@@ -10,7 +10,19 @@ from modelforge_tw.schemas import TriageRequest
 ORIGINAL_HTTPX_CLIENT = httpx.Client
 
 
-def make_engine(base_url: str = "http://model.test/") -> OpenAIHTTPInferenceEngine:
+class ChunkStream(httpx.SyncByteStream):
+    def __init__(self, *chunks: bytes) -> None:
+        self.chunks = chunks
+
+    def __iter__(self):
+        yield from self.chunks
+
+
+def make_engine(
+    base_url: str = "http://model.test/",
+    *,
+    max_response_bytes: int = 262144,
+) -> OpenAIHTTPInferenceEngine:
     return OpenAIHTTPInferenceEngine(
         base_url=base_url,
         model_id="model-q8",
@@ -20,6 +32,7 @@ def make_engine(base_url: str = "http://model.test/") -> OpenAIHTTPInferenceEngi
         timeout_seconds=5,
         max_tokens=192,
         context_window_tokens=2048,
+        max_response_bytes=max_response_bytes,
     )
 
 
@@ -66,6 +79,11 @@ def install_transport(monkeypatch, handler) -> None:
 def test_model_server_base_url_rejects_ambiguous_or_credentialed_values(base_url):
     with pytest.raises(ValueError, match="base URL"):
         make_engine(base_url)
+
+
+def test_model_response_limit_rejects_unsafe_configuration():
+    with pytest.raises(ValueError, match="between 4096 and 4194304"):
+        make_engine(max_response_bytes=4194305)
 
 
 def test_ready_is_fail_closed_for_status_and_connection_errors(monkeypatch):
@@ -157,17 +175,92 @@ def test_non_streaming_response_is_rejected_before_oversized_body_is_loaded(monk
         engine.generate(TriageRequest(incident_text="泵浦持續異音且趨勢尚未停止。"))
 
 
+def test_chunked_non_streaming_response_stops_at_actual_byte_limit(monkeypatch):
+    engine = make_engine()
+    engine.max_response_bytes = 64
+
+    install_transport(
+        monkeypatch,
+        lambda request: httpx.Response(
+            200,
+            request=request,
+            stream=ChunkStream(b"x" * 32, b"x" * 33),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="exceeds byte limit"):
+        engine.generate(TriageRequest(incident_text="泵浦持續異音且趨勢尚未停止。"))
+
+
+def test_model_response_rejects_invalid_declared_length(monkeypatch):
+    engine = make_engine()
+    install_transport(
+        monkeypatch,
+        lambda request: httpx.Response(
+            200,
+            request=request,
+            headers={"Content-Length": "invalid"},
+            stream=ChunkStream(b"{}"),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="invalid Content-Length"):
+        engine.generate(TriageRequest(incident_text="泵浦持續異音且趨勢尚未停止。"))
+
+
 def test_streaming_response_rejects_oversized_unterminated_event(monkeypatch):
     engine = make_engine()
     engine.max_response_bytes = 64
 
     install_transport(
         monkeypatch,
-        lambda request: httpx.Response(200, request=request, content=b"data: " + b"x" * 59),
+        lambda request: httpx.Response(
+            200,
+            request=request,
+            stream=ChunkStream(b"data: ", b"x" * 59),
+        ),
     )
 
     with pytest.raises(ValueError, match="exceeds byte limit"):
         engine.generate_streaming(TriageRequest(incident_text="泵浦持續異音且趨勢尚未停止。"))
+
+
+def test_streaming_response_accepts_valid_final_event_without_newline(monkeypatch):
+    raw = valid_output_json()
+    event = json.dumps(
+        {"choices": [{"delta": {"content": raw}}]},
+        ensure_ascii=False,
+    ).encode()
+    install_transport(
+        monkeypatch,
+        lambda request: httpx.Response(
+            200,
+            request=request,
+            stream=ChunkStream(b"data: " + event),
+        ),
+    )
+
+    result = make_engine().generate_streaming(
+        TriageRequest(incident_text="泵浦持續異音且趨勢尚未停止。")
+    )
+
+    assert result.raw_text == raw
+
+
+def test_streaming_response_rejects_invalid_utf8(monkeypatch):
+    install_transport(
+        monkeypatch,
+        lambda request: httpx.Response(
+            200,
+            request=request,
+            stream=ChunkStream(b"data: \xff\n"),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="not valid UTF-8"):
+        make_engine().generate_streaming(
+            TriageRequest(incident_text="泵浦持續異音且趨勢尚未停止。")
+        )
 
 
 def test_invalid_model_output_returns_auditable_safe_fallback():

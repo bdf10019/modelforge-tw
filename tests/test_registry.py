@@ -200,6 +200,18 @@ def test_registry_event_chain_detects_content_tampering(tmp_path):
         registry.load()
 
 
+def test_registry_event_chain_detects_broken_previous_pointer(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    registry.add(manifest("v1"))
+    registry.promote("v1")
+    payload = json.loads(registry.path.read_text(encoding="utf-8"))
+    payload["events"][1]["previous_event_sha256"] = "b" * 64
+    registry.path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="broken previous hash"):
+        registry.load()
+
+
 def test_registry_mutation_seals_legacy_events_into_hash_chain(tmp_path):
     registry = FileRegistry(tmp_path / "registry.json")
     legacy = RegistryState(
@@ -221,6 +233,49 @@ def test_registry_mutation_seals_legacy_events_into_hash_chain(tmp_path):
     assert len(state.events) == 2
     assert all(event.event_sha256 is not None for event in state.events)
     assert state.events[1].previous_event_sha256 == state.events[0].event_sha256
+
+
+def test_registry_events_require_timezone_existing_manifest_and_chronology():
+    candidate = manifest("v1")
+    base_event = {
+        "at": "2026-01-02T00:00:00+00:00",
+        "action": "candidate_added",
+        "manifest_id": "v1",
+    }
+    with pytest.raises(ValidationError, match="timezone"):
+        RegistryState(
+            schema_version="1.0",
+            manifests={"v1": candidate},
+            events=[{**base_event, "at": "2026-01-01T00:00:00"}],
+        )
+    with pytest.raises(ValidationError, match="missing manifests"):
+        RegistryState(
+            schema_version="1.0",
+            manifests={"v1": candidate},
+            events=[{**base_event, "manifest_id": "missing"}],
+        )
+    with pytest.raises(ValidationError, match="not chronological"):
+        RegistryState(
+            schema_version="1.0",
+            manifests={"v1": candidate},
+            events=[base_event, {**base_event, "at": "2026-01-01T00:00:00+00:00"}],
+        )
+
+
+def test_registry_event_report_hash_requires_report_path():
+    with pytest.raises(ValidationError, match="requires a report path"):
+        RegistryState(
+            schema_version="1.0",
+            manifests={"v1": manifest("v1")},
+            events=[
+                {
+                    "at": "2026-01-01T00:00:00+00:00",
+                    "action": "blocked",
+                    "manifest_id": "v1",
+                    "evaluation_report_sha256": HASH,
+                }
+            ],
+        )
 
 
 def test_registry_state_rejects_inconsistent_release_pointers_and_ids():
@@ -401,6 +456,16 @@ def test_registry_rejects_new_manifest_without_evaluation_attestation(tmp_path):
         registry.add(incomplete)
 
 
+def test_registry_rejects_new_manifest_without_training_attestation(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    incomplete = manifest("missing-training").model_copy(
+        update={"training_report": None, "training_report_sha256": None}
+    )
+
+    with pytest.raises(ValueError, match="manifest lacks training attestation"):
+        registry.add(incomplete)
+
+
 def test_registry_never_promotes_fixture_evidence(tmp_path):
     registry = FileRegistry(tmp_path / "registry.json")
     fixture_candidate = manifest("fixture-only").model_copy(
@@ -458,6 +523,15 @@ def test_registry_allows_only_fully_legacy_previous_good_on_schema_1_rollback(tm
     )
     registry.path.write_text(partial_state.model_dump_json(indent=2), encoding="utf-8")
     with pytest.raises(ValueError, match="manifest lacks evaluation attestation"):
+        registry.rollback()
+
+
+def test_registry_rejects_rollback_without_previous_good(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    registry.add(manifest("v1"))
+    registry.promote("v1")
+
+    with pytest.raises(ValueError, match="no previous-good"):
         registry.rollback()
 
 
