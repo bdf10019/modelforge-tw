@@ -16,6 +16,17 @@ def validate_immutable_model_revision(value: str) -> str:
     return value
 
 
+def validate_resolved_model_revision(requested: str, resolved: object) -> str:
+    """Require the downloaded model to resolve to the exact requested commit."""
+    validate_immutable_model_revision(requested)
+    if not isinstance(resolved, str):
+        raise ValueError("model loader did not report a resolved immutable revision")
+    validate_immutable_model_revision(resolved)
+    if resolved != requested:
+        raise ValueError("resolved model revision does not match requested revision")
+    return resolved
+
+
 def validate_model_version(value: str) -> str:
     if value == "unversioned" or not MODEL_VERSION.fullmatch(value):
         raise ValueError("model version must be an explicit safe deployment identifier")

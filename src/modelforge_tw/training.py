@@ -19,6 +19,7 @@ from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_ID,
     DEFAULT_BASE_MODEL_REVISION,
     validate_immutable_model_revision,
+    validate_resolved_model_revision,
 )
 from modelforge_tw.prompts import (
     DEFAULT_PROMPT_VERSION,
@@ -91,6 +92,8 @@ class TrainingReportAttestation(BaseModel):
             mismatches.append("model_id")
         if config.model_revision != self.model_revision:
             mismatches.append("model_revision")
+        if self.resolved_model_revision != self.model_revision:
+            mismatches.append("resolved_model_revision")
         if _stable_hash(self.config) != self.training_config_sha256:
             mismatches.append("training_config_sha256")
         if mismatches:
@@ -254,7 +257,10 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
     else:
         load_options["torch_dtype"] = torch.bfloat16
     model: Any = AutoModelForCausalLM.from_pretrained(config.model_id, **load_options)
-    resolved_model_revision = getattr(model.config, "_commit_hash", None)
+    resolved_model_revision = validate_resolved_model_revision(
+        config.model_revision,
+        getattr(model.config, "_commit_hash", None),
+    )
     if config.use_4bit:
         model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
     else:
@@ -407,7 +413,10 @@ def merge_adapter(
         low_cpu_mem_usage=True,
         trust_remote_code=False,
     )
-    resolved_model_revision = getattr(base.config, "_commit_hash", None)
+    resolved_model_revision = validate_resolved_model_revision(
+        model_revision,
+        getattr(base.config, "_commit_hash", None),
+    )
     model = PeftModel.from_pretrained(base, str(adapter_path))
     merged = model.merge_and_unload(safe_merge=True)
     merged.save_pretrained(output_dir, safe_serialization=True, max_shard_size="4GB")

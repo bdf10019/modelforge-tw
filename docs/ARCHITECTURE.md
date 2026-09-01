@@ -41,6 +41,8 @@ Web / REST / OpenAI-compatible client
   正式發布另要求至少一個已雜湊模型 artifact，不能發布只有 metadata 的空候選。
   訓練、評測、合併、載入探針與 Transformers 服務共用同一個已驗證 base-model commit 預設；
   revision 必須是 40–64 位 lowercase commit hash，`main`／tag 會在匯入大型 ML runtime 前 fail fast。
+  訓練與合併在模型載入後還要求 Hugging Face 回報的 resolved commit 逐字相等，報告驗證也重做
+  同一比較，不能只因 requested／resolved 各自長得像 hash 就接受。
   未指定時的實測評估與訓練也統一使用現行 attestation 的 `optimized-v2`／192-token 生成契約；歷史
   A/B 實驗的 v1 標記只保留在既有證據與顯式選擇中。
   Transformers／llama-http 評測另強制提供安全格式的 `--model-version`；保留值 `unversioned` 不能

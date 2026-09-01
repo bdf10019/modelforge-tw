@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 import pytest
 from pydantic import ValidationError
 
@@ -7,14 +10,25 @@ from modelforge_tw.engines.transformers_local import (
     TransformersInferenceEngine,
     model_load_probe,
 )
-from modelforge_tw.model_identity import DEFAULT_BASE_MODEL_REVISION, DEFAULT_MAX_NEW_TOKENS
+from modelforge_tw.model_identity import (
+    DEFAULT_BASE_MODEL_REVISION,
+    DEFAULT_MAX_NEW_TOKENS,
+    validate_resolved_model_revision,
+)
 from modelforge_tw.prompts import DEFAULT_PROMPT_VERSION
 from modelforge_tw.training import (
     TRAINING_DEPENDENCIES,
     TrainingConfig,
+    TrainingReportAttestation,
     installed_dependency_versions,
     merge_adapter,
 )
+
+
+def _stable_hash(payload: dict[str, object]) -> str:
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
 
 
 def test_training_dependency_snapshot_is_complete_and_versioned():
@@ -46,6 +60,32 @@ def test_training_config_rejects_floating_model_revision():
         TrainingConfig(model_revision="main")
     with pytest.raises(ValidationError, match="prompt_version"):
         TrainingConfig(prompt_version="minimal-v1")
+
+
+def test_resolved_model_revision_must_exactly_match_request():
+    assert (
+        validate_resolved_model_revision(DEFAULT_BASE_MODEL_REVISION, DEFAULT_BASE_MODEL_REVISION)
+        == DEFAULT_BASE_MODEL_REVISION
+    )
+    with pytest.raises(ValueError, match="did not report"):
+        validate_resolved_model_revision(DEFAULT_BASE_MODEL_REVISION, None)
+    with pytest.raises(ValueError, match="does not match"):
+        validate_resolved_model_revision(DEFAULT_BASE_MODEL_REVISION, "b" * 40)
+
+
+def test_training_attestation_rejects_resolved_revision_drift():
+    config = TrainingConfig().model_dump(mode="json")
+    with pytest.raises(ValidationError, match="resolved_model_revision"):
+        TrainingReportAttestation(
+            schema_version="1.1",
+            evidence_kind="measured",
+            model_id=config["model_id"],
+            model_revision=config["model_revision"],
+            resolved_model_revision="b" * 40,
+            config=config,
+            training_config_sha256=_stable_hash(config),
+            dataset_manifest_sha256="a" * 64,
+        )
 
 
 def test_cli_rejects_floating_model_revision():
