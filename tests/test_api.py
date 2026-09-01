@@ -8,7 +8,7 @@ import pytest
 
 from modelforge_tw.engines import FixtureEngine
 from modelforge_tw.registry import ArtifactRef, FileRegistry, ModelManifest
-from modelforge_tw.service import create_app
+from modelforge_tw.service import REQUEST_ID, create_app
 from modelforge_tw.settings import Settings
 
 
@@ -127,6 +127,7 @@ async def test_triage_health_metrics_and_no_input_echo():
             json={"incident_text": "泵浦軸承持續異音，需要人員確認。", "signals": []},
         )
         assert response.status_code == 200
+        assert response.headers["X-Request-ID"] == "test-request-1"
         assert response.headers["Cache-Control"] == "no-store"
         assert response.headers["X-Content-Type-Options"] == "nosniff"
         body = response.json()
@@ -135,6 +136,20 @@ async def test_triage_health_metrics_and_no_input_echo():
         assert "incident_text" not in body
         metrics = await client.get("/metrics")
         assert "modelforge_requests_total" in metrics.text
+
+
+async def test_all_http_responses_receive_a_server_trace_id():
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    async with app_client(app) as client:
+        health = await client.get("/healthz")
+        invalid_body = await client.post(
+            "/v1/triage",
+            json={"incident_text": "太短"},
+        )
+
+    assert REQUEST_ID.fullmatch(health.headers["X-Request-ID"])
+    assert REQUEST_ID.fullmatch(invalid_body.headers["X-Request-ID"])
+    assert health.headers["X-Request-ID"] != invalid_body.headers["X-Request-ID"]
 
 
 async def test_service_can_bind_runtime_identity_to_released_registry(tmp_path):
@@ -239,6 +254,21 @@ async def test_invalid_request_id_and_extra_input_are_rejected():
                 },
             )
         ).status_code == 422
+
+
+async def test_duplicate_request_id_is_rejected_without_echoing_untrusted_value():
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage",
+            headers=[("X-Request-ID", "first"), ("X-Request-ID", "second")],
+            json={"incident_text": "泵浦持續出現異音"},
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "invalid X-Request-ID"}
+    assert response.headers["X-Request-ID"] not in {"first", "second"}
+    assert REQUEST_ID.fullmatch(response.headers["X-Request-ID"])
 
 
 @pytest.mark.parametrize("path", ["/v1/triage", "/v1/chat/completions"])

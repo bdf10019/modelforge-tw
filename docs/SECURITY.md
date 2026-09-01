@@ -35,6 +35,8 @@
 - 推論／config 回應與認證錯誤都帶 `Cache-Control: no-store`；展示頁限制同源 script／style／連線，
   禁止 object、base URI 與 frame ancestor，所有 HTTP 回應另加 nosniff、deny framing、
   no-referrer 與 camera／microphone／geolocation 權限限制。
+- `X-Request-ID` 在 JSON 解析前限制為 1–96 字元安全字元；重複或非法值回 400 且不回顯。所有 HTTP
+  response 都由 server 附追蹤 ID，便於關聯失敗而不需要記錄事件原文。
 - semaphore、timeout、request ID 驗證、Prometheus outcome 與 readiness 檢查。
 - timeout 後仍保留同步模型的容量槽，直到不可取消的背景推論真正結束，避免資源耗盡。
 - 等待容量另有獨立 queue timeout；超時回 503／`Retry-After` 並記錄非原文 outcome，防止卡住的

@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from importlib.resources import files
 from typing import Any, Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Security
+from fastapi import Depends, FastAPI, HTTPException, Request, Security
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
@@ -74,6 +74,50 @@ class SecurityHeadersMiddleware:
             await send(message)
 
         await self.app(scope, receive, send_with_security_headers)
+
+
+class RequestIdMiddleware:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        values = [value for name, value in scope["headers"] if name.lower() == b"x-request-id"]
+        request_id: str | None = None
+        if len(values) == 1:
+            try:
+                candidate = values[0].decode("ascii")
+            except UnicodeDecodeError:
+                candidate = ""
+            if REQUEST_ID.fullmatch(candidate):
+                request_id = candidate
+        if len(values) > 1 or (values and request_id is None):
+            rejection_id = str(uuid.uuid4())
+            await _send_json_error(
+                send,
+                400,
+                "invalid X-Request-ID",
+                extra_headers=[(b"x-request-id", rejection_id.encode())],
+            )
+            return
+
+        request_id = request_id or str(uuid.uuid4())
+        scope.setdefault("state", {})["request_id"] = request_id
+
+        async def send_with_request_id(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = _set_response_header(
+                    list(message.get("headers", [])),
+                    b"x-request-id",
+                    request_id.encode(),
+                )
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_request_id)
 
 
 async def _send_json_error(
@@ -328,14 +372,10 @@ def create_app(
         selected_settings.api_key.get_secret_value() if selected_settings.api_key else None
     )
     app.add_middleware(BearerAuthMiddleware, api_key=configured_api_key)
+    app.add_middleware(RequestIdMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     web_root = files("modelforge_tw").joinpath("web")
     app.mount("/static", StaticFiles(directory=str(web_root)), name="static")
-
-    def resolve_request_id(value: str | None) -> str:
-        if value is not None and not REQUEST_ID.fullmatch(value):
-            raise HTTPException(status_code=400, detail="invalid X-Request-ID")
-        return value or str(uuid.uuid4())
 
     bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -520,10 +560,10 @@ def create_app(
     @app.post("/v1/triage", response_model=TriageResponse)
     async def triage(
         payload: TriageRequest,
-        x_request_id: str | None = Header(default=None),
+        request: Request,
         _authentication: None = Depends(require_api_key),
     ) -> TriageResponse:
-        return await infer(payload, resolve_request_id(x_request_id))
+        return await infer(payload, request.state.request_id)
 
     @app.post("/v1/chat/completions")
     async def chat(
@@ -541,7 +581,7 @@ def create_app(
                 detail=f"max_tokens must be at least {deployed_max_tokens} for this schema",
             )
         triage_request = TriageRequest(incident_text=payload.messages[0].content)
-        request_id = resolve_request_id(request.headers.get("X-Request-ID"))
+        request_id = request.state.request_id
         result = await infer(triage_request, request_id)
         content = json.dumps(result.output.model_dump(mode="json"), ensure_ascii=False)
         body: dict[str, Any] = {
