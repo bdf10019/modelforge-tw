@@ -18,6 +18,11 @@
 `0a67dff1892ecc33b85f7492537752f0b92a51e0aecc8e53b1d02f4cc543752b`；adapter safetensors SHA-256
 為 `07ce2d7ee13a1f8a9cdd3f3c4509caa99e349c502a14449157601cb77ab61a6b`。
 
+這份歷史 training report schema 1.0 保存 Python、Torch、CUDA、Transformers 與 GPU。程式目前的
+schema 1.1 會在下一次真實訓練／merge 另外保存 Accelerate、bitsandbytes、Datasets、PEFT、
+safetensors、sentencepiece、cuDNN、GPU compute capability 與實體顯存；不以目前環境版本回填
+過去未記錄的欄位。
+
 ## 完整評測
 
 2026-08-29 本機 210 test + 14 challenge 的真實執行結果：

@@ -30,6 +30,9 @@ Web / REST / OpenAI-compatible client
   並輸出 calibration／holdout manifest 與 combined leakage audit。
 - `benchmark.py`：併發、P50/P95/P99、吞吐、RAM／整卡 VRAM 峰值取樣；HTTP streaming 可量
   TTFT，不支援時明確記 `null`。
+- `training.py`：固定 seed 的 completion-only QLoRA 與 merge；新版報告保存資料／設定／adapter
+  hash、Python、Torch、CUDA、cuDNN、GPU capability、實體顯存與完整 ML 依賴版本，避免只鎖
+  模型卻漏掉訓練 runtime 漂移。
 - `registry.py`：candidate、evaluation attestation、promote、previous-good 與 rollback 的原子檔案
   registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住生成、安全與評分契約。
 

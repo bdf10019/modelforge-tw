@@ -7,6 +7,7 @@ import platform
 import random
 import time
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Literal
 
@@ -14,6 +15,16 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from modelforge_tw.dataset import load_splits, sha256_file
 from modelforge_tw.prompts import messages_for_version, training_messages
+
+TRAINING_DEPENDENCIES = (
+    "accelerate",
+    "bitsandbytes",
+    "datasets",
+    "peft",
+    "safetensors",
+    "sentencepiece",
+    "transformers",
+)
 
 
 class TrainingConfig(BaseModel):
@@ -59,6 +70,32 @@ def _stable_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
     ).hexdigest()
+
+
+def installed_dependency_versions(names: tuple[str, ...] = TRAINING_DEPENDENCIES) -> dict[str, str]:
+    versions: dict[str, str] = {}
+    for name in names:
+        try:
+            versions[name] = version(name)
+        except PackageNotFoundError:
+            versions[name] = "not-installed"
+    return versions
+
+
+def _torch_environment(torch: Any) -> dict[str, Any]:
+    device = torch.cuda.get_device_properties(0)
+    major, minor = torch.cuda.get_device_capability(0)
+    return {
+        "platform": platform.platform(),
+        "python": platform.python_version(),
+        "torch": torch.__version__,
+        "torch_cuda": torch.version.cuda,
+        "cudnn": torch.backends.cudnn.version(),
+        "gpu": device.name,
+        "gpu_compute_capability": f"{major}.{minor}",
+        "gpu_total_memory_bytes": device.total_memory,
+        "dependencies": installed_dependency_versions(),
+    }
 
 
 def _render_chat_template(tokenizer: Any, messages: list[dict[str, str]], **kwargs: Any) -> str:
@@ -265,7 +302,7 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
         json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else None
     )
     report = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "evidence_kind": "measured",
         "model_id": config.model_id,
         "model_revision": config.model_revision,
@@ -293,14 +330,7 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
         "eval_metrics": evaluation,
         "peak_vram_allocated_bytes": torch.cuda.max_memory_allocated(),
         "peak_vram_reserved_bytes": torch.cuda.max_memory_reserved(),
-        "environment": {
-            "platform": platform.platform(),
-            "python": platform.python_version(),
-            "torch": torch.__version__,
-            "torch_cuda": torch.version.cuda,
-            "transformers": transformers.__version__,
-            "gpu": torch.cuda.get_device_name(0),
-        },
+        "environment": _torch_environment(torch),
         "final_adapter": str(final_dir.relative_to(Path.cwd())),
         "final_adapter_files": {
             path.name: {"bytes": path.stat().st_size, "sha256": sha256_file(path)}
@@ -348,7 +378,7 @@ def merge_adapter(
         if path.is_file()
     }
     report = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "evidence_kind": "measured",
         "model_id": model_id,
         "model_revision": model_revision,
@@ -359,6 +389,16 @@ def merge_adapter(
         "adapter_path": str(adapter_path),
         "output_dir": str(output_dir),
         "duration_seconds": round(time.perf_counter() - started, 3),
+        "environment": (
+            _torch_environment(torch)
+            if use_cuda
+            else {
+                "platform": platform.platform(),
+                "python": platform.python_version(),
+                "torch": torch.__version__,
+                "dependencies": installed_dependency_versions(),
+            }
+        ),
         "files": files,
     }
     (output_dir / "merge-report.json").write_text(
