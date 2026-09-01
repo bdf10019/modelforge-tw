@@ -5,6 +5,7 @@ $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $projectRoot ".venv\Scripts\python.exe"
 $checks = @(
+    @("-m", "pip", "check"),
     @("-m", "modelforge_tw.cli", "generate-data"),
     @("-m", "modelforge_tw.cli", "audit-data"),
     @("-m", "ruff", "format", "--check", "."),
