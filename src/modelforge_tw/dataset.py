@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from modelforge_tw.io_utils import atomic_write_text
+from modelforge_tw.io_utils import MAX_JSONL_LINE_BYTES, atomic_write_text, iter_utf8_lines_limited
 from modelforge_tw.safety import CRITICAL_RISK_PATTERN, HIGH_RISK_PATTERN
 from modelforge_tw.schemas import (
     DatasetRecord,
@@ -474,14 +474,18 @@ def generate_records(
 
 def read_jsonl(path: Path) -> list[DatasetRecord]:
     records: list[DatasetRecord] = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, start=1):
-            if not line.strip():
-                continue
-            try:
-                records.append(DatasetRecord.model_validate_json(line))
-            except Exception as error:
-                raise ValueError(f"invalid record at {path}:{line_number}: {error}") from error
+    for bounded_line in iter_utf8_lines_limited(path, max_line_bytes=MAX_JSONL_LINE_BYTES):
+        if bounded_line.error is not None:
+            raise ValueError(
+                f"invalid record at {path}:{bounded_line.number}: {bounded_line.error}"
+            )
+        line = bounded_line.text or ""
+        if not line.strip():
+            continue
+        try:
+            records.append(DatasetRecord.model_validate_json(line))
+        except Exception as error:
+            raise ValueError(f"invalid record at {path}:{bounded_line.number}: {error}") from error
     return records
 
 

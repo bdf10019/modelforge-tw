@@ -7,9 +7,16 @@ from contextlib import contextmanager
 from importlib import import_module
 from pathlib import Path
 from time import monotonic, sleep
-from typing import BinaryIO, Protocol, cast
+from typing import BinaryIO, Literal, NamedTuple, Protocol, cast
 
 MAX_CONTROL_FILE_BYTES = 16 * 1024 * 1024
+MAX_JSONL_LINE_BYTES = 1024 * 1024
+
+
+class LimitedTextLine(NamedTuple):
+    number: int
+    text: str | None
+    error: Literal["too_large", "invalid_utf8"] | None
 
 
 class _FcntlModule(Protocol):
@@ -106,3 +113,28 @@ def read_utf8_text_limited(
         return content.decode("utf-8")
     except UnicodeDecodeError as error:
         raise ValueError(f"file is not valid UTF-8: {path.name}") from error
+
+
+def iter_utf8_lines_limited(
+    path: Path,
+    *,
+    max_line_bytes: int = MAX_JSONL_LINE_BYTES,
+) -> Iterator[LimitedTextLine]:
+    """Yield bounded UTF-8 lines and recover after an invalid physical line."""
+    if max_line_bytes <= 0:
+        raise ValueError("line size limit must be positive")
+    with path.open("rb") as handle:
+        line_number = 0
+        while raw := handle.readline(max_line_bytes + 1):
+            line_number += 1
+            if len(raw) > max_line_bytes:
+                while raw and not raw.endswith(b"\n"):
+                    raw = handle.readline(max_line_bytes + 1)
+                yield LimitedTextLine(line_number, None, "too_large")
+                continue
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                yield LimitedTextLine(line_number, None, "invalid_utf8")
+                continue
+            yield LimitedTextLine(line_number, text, None)

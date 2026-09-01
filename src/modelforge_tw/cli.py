@@ -19,7 +19,12 @@ from modelforge_tw.evaluation import (
     write_report,
 )
 from modelforge_tw.external_calibration import build_external_calibration
-from modelforge_tw.io_utils import atomic_write_text, read_utf8_text_limited
+from modelforge_tw.io_utils import (
+    MAX_JSONL_LINE_BYTES,
+    atomic_write_text,
+    iter_utf8_lines_limited,
+    read_utf8_text_limited,
+)
 from modelforge_tw.prompts import (
     MINIMAL_PROMPT_VERSION,
     OPTIMIZED_PROMPT_V2_VERSION,
@@ -167,21 +172,27 @@ def _load_evaluation_cache(
 ) -> tuple[dict[str, InferenceResult], int]:
     cached_results: dict[str, InferenceResult] = {}
     rejected_lines = 0
-    with cache_path.open("r", encoding="utf-8") as cache_reader:
-        for line in cache_reader:
-            if not line.strip():
-                continue
-            try:
-                cached = json.loads(line)
-                record_id = cached.get("record_id")
-                if (
-                    cached.get("fingerprint") == fingerprint
-                    and record_id in record_hashes
-                    and cached.get("record_sha256") == record_hashes[record_id]
-                ):
-                    cached_results[record_id] = InferenceResult.model_validate(cached["result"])
-            except (AttributeError, KeyError, TypeError, ValueError):
-                rejected_lines += 1
+    for bounded_line in iter_utf8_lines_limited(
+        cache_path,
+        max_line_bytes=MAX_JSONL_LINE_BYTES,
+    ):
+        line = bounded_line.text
+        if bounded_line.error is not None:
+            rejected_lines += 1
+            continue
+        if line is None or not line.strip():
+            continue
+        try:
+            cached = json.loads(line)
+            record_id = cached.get("record_id")
+            if (
+                cached.get("fingerprint") == fingerprint
+                and record_id in record_hashes
+                and cached.get("record_sha256") == record_hashes[record_id]
+            ):
+                cached_results[record_id] = InferenceResult.model_validate(cached["result"])
+        except (AttributeError, KeyError, TypeError, ValueError):
+            rejected_lines += 1
     return cached_results, rejected_lines
 
 

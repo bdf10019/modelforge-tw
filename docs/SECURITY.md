@@ -41,6 +41,8 @@
   無法安全強制取消，超過應用寬限後由較長的容器終止期限提供最後邊界。
 - CLI 與 registry 對設定、manifest、評測與訓練 JSON 採 16 MiB byte 上限並要求合法 UTF-8；
   異常大的控制面檔案不會先被無界載入記憶體。大型模型 artifact 仍以串流方式計算 SHA-256。
+- 資料與續跑快取 JSONL 的單行上限為 1 MiB；正式資料超限或非 UTF-8 時 fail closed，快取則只
+  丟棄損壞行並重新產生受影響案例，不讓一行殘片破壞後續可恢復結果。
 - `MODELFORGE_LOG_INPUTS` 唯一合法值為 `false`；誤設 `true` 時服務拒絕啟動，API 不提供事件原文
   logging。repository 也忽略模型、資料生成物與輸出報告。
 - llama.cpp 每-slot context 預設 2048；本機啟動腳本低於 1536 時 fail fast，避免輸出被靜默截斷。

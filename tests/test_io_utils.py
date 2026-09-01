@@ -8,6 +8,7 @@ import pytest
 from modelforge_tw.io_utils import (
     atomic_write_text,
     exclusive_file_lock,
+    iter_utf8_lines_limited,
     read_utf8_text_limited,
 )
 
@@ -82,3 +83,22 @@ def test_limited_text_reader_rejects_invalid_utf8_and_invalid_limit(tmp_path):
         read_utf8_text_limited(target)
     with pytest.raises(ValueError, match="must be positive"):
         read_utf8_text_limited(target, max_bytes=0)
+
+
+def test_limited_line_reader_recovers_after_oversized_and_invalid_lines(tmp_path):
+    target = tmp_path / "records.jsonl"
+    target.write_bytes((b"x" * 9) + b"\n\xff\n{}\n")
+
+    lines = list(iter_utf8_lines_limited(target, max_line_bytes=8))
+
+    assert lines[0].error == "too_large"
+    assert lines[1].error == "invalid_utf8"
+    assert lines[2].text == "{}\n"
+
+
+def test_limited_line_reader_rejects_invalid_limit(tmp_path):
+    target = tmp_path / "records.jsonl"
+    target.write_bytes(b"{}\n")
+
+    with pytest.raises(ValueError, match="must be positive"):
+        list(iter_utf8_lines_limited(target, max_line_bytes=0))

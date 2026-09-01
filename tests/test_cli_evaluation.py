@@ -32,6 +32,21 @@ def test_evaluation_cache_skips_truncated_tail_and_keeps_valid_result(tmp_path):
     assert cli._cache_needs_line_boundary(cache_path) is True
 
 
+def test_evaluation_cache_skips_oversized_line_and_recovers(tmp_path, monkeypatch):
+    cache_path = tmp_path / "evaluation.partial.jsonl"
+    cache_path.write_text(("x" * 33) + "\n{}\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "MAX_JSONL_LINE_BYTES", 32)
+
+    cached, rejected = cli._load_evaluation_cache(
+        cache_path,
+        fingerprint="expected",
+        record_hashes={},
+    )
+
+    assert cached == {}
+    assert rejected == 1
+
+
 def test_evaluation_cache_line_boundary_separates_future_entries(tmp_path):
     cache_path = tmp_path / "evaluation.partial.jsonl"
     cache_path.write_text('{"truncated":', encoding="utf-8")

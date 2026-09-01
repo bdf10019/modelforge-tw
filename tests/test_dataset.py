@@ -1,6 +1,9 @@
 from collections import Counter
 from pathlib import Path
 
+import pytest
+
+import modelforge_tw.dataset as dataset_module
 from modelforge_tw.dataset import (
     audit_records,
     generate_records,
@@ -10,6 +13,15 @@ from modelforge_tw.dataset import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_dataset_reader_rejects_oversized_physical_line(tmp_path, monkeypatch):
+    path = tmp_path / "oversized.jsonl"
+    path.write_bytes((b"x" * 33) + b"\n")
+    monkeypatch.setattr(dataset_module, "MAX_JSONL_LINE_BYTES", 32)
+
+    with pytest.raises(ValueError, match="too_large"):
+        read_jsonl(path)
 
 
 def test_curated_challenge_is_valid_and_evidence_is_grounded():
