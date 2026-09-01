@@ -23,6 +23,7 @@ def test_service_defaults_to_attested_safety_policy_v2():
 
 def test_registry_deployment_binding_is_optional():
     assert Settings(registry_deployment_role="").registry_deployment_role is None
+    assert Settings(registry_artifact_root="").registry_artifact_root is None
 
 
 def test_service_refuses_input_logging_configuration():
@@ -176,6 +177,119 @@ async def test_service_can_bind_runtime_identity_to_released_registry(tmp_path):
 
     assert config["registry_deployment_role"] == "released"
     assert config["registry_manifest_id"] == "measured-v1"
+    assert config["registry_file_verification"] is False
+
+
+async def test_registry_file_verification_is_startup_only(tmp_path, monkeypatch):
+    engine = FixtureEngine("adapted")
+    engine.name = "openai-http"
+    engine.model_id = "deployed-model"
+    engine.model_version = "measured-v1"
+    engine.quantization = "q8_0"
+    engine.max_new_tokens = 192
+    engine.structured_output_contract = "json-schema-v2"
+    engine.evidence_kind = "measured"
+    registry_path = tmp_path / "registry.json"
+    write_runtime_registry(registry_path, engine)
+    original_resolve = FileRegistry.resolve_deployment
+    observed_roots = []
+    startup_order = []
+
+    def observe_artifact_root(registry, role):
+        observed_roots.append(registry.artifact_root)
+        startup_order.append("file-verification" if registry.artifact_root else "metadata")
+        return original_resolve(FileRegistry(registry.path), role)
+
+    def build_test_engine():
+        startup_order.append("engine")
+        return engine
+
+    monkeypatch.setattr(FileRegistry, "resolve_deployment", observe_artifact_root)
+    app = create_app(
+        settings=Settings(
+            registry_path=registry_path,
+            registry_deployment_role="released",
+            registry_artifact_root=tmp_path,
+        ),
+        engine_factory=build_test_engine,
+    )
+
+    async with app_client(app) as client:
+        assert (await client.get("/readyz")).status_code == 200
+        config = (await client.get("/api/config")).json()
+
+    assert observed_roots == [tmp_path.resolve(), None, None]
+    assert startup_order == ["file-verification", "engine", "metadata", "metadata"]
+    assert config["registry_file_verification"] is True
+
+
+async def test_registry_file_verification_fails_startup_when_evidence_is_missing(tmp_path):
+    engine = FixtureEngine("adapted")
+    engine.name = "openai-http"
+    engine.model_id = "deployed-model"
+    engine.model_version = "measured-v1"
+    engine.quantization = "q8_0"
+    engine.max_new_tokens = 192
+    engine.structured_output_contract = "json-schema-v2"
+    engine.evidence_kind = "measured"
+    registry_path = tmp_path / "registry.json"
+    write_runtime_registry(registry_path, engine)
+    engine_initialized = False
+
+    def build_test_engine():
+        nonlocal engine_initialized
+        engine_initialized = True
+        return engine
+
+    app = create_app(
+        settings=Settings(
+            registry_path=registry_path,
+            registry_deployment_role="released",
+            registry_artifact_root=tmp_path,
+        ),
+        engine_factory=build_test_engine,
+    )
+
+    with pytest.raises(FileNotFoundError):
+        async with app.router.lifespan_context(app):
+            pass
+    assert engine_initialized is False
+
+
+async def test_registry_file_verification_rejects_pointer_change_during_startup(
+    tmp_path, monkeypatch
+):
+    engine = FixtureEngine("adapted")
+    engine.name = "openai-http"
+    engine.model_id = "deployed-model"
+    engine.model_version = "measured-v1"
+    engine.quantization = "q8_0"
+    engine.max_new_tokens = 192
+    engine.structured_output_contract = "json-schema-v2"
+    engine.evidence_kind = "measured"
+    registry_path = tmp_path / "registry.json"
+    write_runtime_registry(registry_path, engine)
+    original_resolve = FileRegistry.resolve_deployment
+
+    def switch_after_file_verification(registry, role):
+        manifest = original_resolve(FileRegistry(registry.path), role)
+        if registry.artifact_root is None:
+            return manifest.model_copy(update={"manifest_id": "measured-v2"})
+        return manifest
+
+    monkeypatch.setattr(FileRegistry, "resolve_deployment", switch_after_file_verification)
+    app = create_app(
+        settings=Settings(
+            registry_path=registry_path,
+            registry_deployment_role="released",
+            registry_artifact_root=tmp_path,
+        ),
+        engine_factory=lambda: engine,
+    )
+
+    with pytest.raises(ValueError, match="changed during startup verification"):
+        async with app.router.lifespan_context(app):
+            pass
 
 
 async def test_readiness_fails_closed_after_registry_pointer_changes(tmp_path):

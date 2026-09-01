@@ -425,8 +425,24 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        verified_manifest_id: str | None = None
+        if (
+            selected_settings.registry_deployment_role is not None
+            and selected_settings.registry_artifact_root is not None
+        ):
+            verified_manifest_id = (
+                FileRegistry(
+                    selected_settings.registry_path,
+                    artifact_root=selected_settings.registry_artifact_root,
+                )
+                .resolve_deployment(selected_settings.registry_deployment_role)
+                .manifest_id
+            )
         engine = engine_factory() if engine_factory else build_engine(selected_settings)
-        app.state.registry_manifest_id = validate_registry_deployment(selected_settings, engine)
+        registry_manifest_id = validate_registry_deployment(selected_settings, engine)
+        if verified_manifest_id is not None and verified_manifest_id != registry_manifest_id:
+            raise ValueError("registry deployment changed during startup verification")
+        app.state.registry_manifest_id = registry_manifest_id
         app.state.engine = engine
         app.state.semaphore = asyncio.Semaphore(selected_settings.max_concurrency)
         app.state.queued_requests = 0
@@ -654,6 +670,10 @@ def create_app(
             "authentication_required": selected_settings.api_key is not None,
             "registry_deployment_role": selected_settings.registry_deployment_role,
             "registry_manifest_id": app.state.registry_manifest_id,
+            "registry_file_verification": (
+                selected_settings.registry_deployment_role is not None
+                and selected_settings.registry_artifact_root is not None
+            ),
             "input_logging": selected_settings.log_inputs,
         }
 

@@ -50,3 +50,6 @@ registry manifest ID；不回傳 bearer key、事件原文或本機路徑。
 未來用新版完整 training／evaluation attestation 加入候選時，mutation 會升級事件 hash chain，且可
 用 `MODELFORGE_REGISTRY_DEPLOYMENT_ROLE=released` 或 `previous-good` 讓服務啟動時 fail closed 核對
 runtime identity。fixture 或缺少新版欄位的舊 manifest 不會通過這項綁定。
+若 registry 的報告與模型 artifact 也已唯讀掛載，可再設定
+`MODELFORGE_REGISTRY_ARTIFACT_ROOT=<掛載根目錄>`，讓每個服務實例在啟動時重算檔案大小與 SHA-256；
+這驗證的是掛載證據副本，不宣稱能遠端證明另一個模型 server 已載入同一份實體檔案。

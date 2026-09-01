@@ -31,7 +31,9 @@ API baseline 每 replica 最多同時送出 4 筆推論、等待區 16 筆、que
 範例沒有把 Git 忽略的 `outputs/model-registry.json` 打進 image 或掛入 Pod，因此刻意不設定
 `MODELFORGE_REGISTRY_DEPLOYMENT_ROLE`，不能宣稱已做線上 registry binding。正式環境若要啟用，
 應從受控來源唯讀掛載具完整新版 training／evaluation attestation 的 registry，再選 `released` 或
-`previous-good`；現有 schema 1.0 實測歷史只供相容讀取，缺欄位時服務會拒絕綁定。
+`previous-good`。若同時掛載報告與模型 artifact 根目錄，設定 `MODELFORGE_REGISTRY_ARTIFACT_ROOT`
+可在 Pod 啟動時重算全部檔案；這驗證 API Pod 的掛載副本，不代表遠端 llama.cpp 記憶體 attestation。
+現有 schema 1.0 實測歷史只供相容讀取，缺欄位時服務會拒絕綁定。
 
 ## 套用前檢查
 

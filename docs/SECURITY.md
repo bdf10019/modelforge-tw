@@ -60,6 +60,9 @@
 - 安全政策不可因程式更新靜默漂移；部署預設鎖定 registry 已 attested 的 v2，實驗 v3 必須顯式選擇。
 - 掛載新版 registry 後可設定 `MODELFORGE_REGISTRY_DEPLOYMENT_ROLE`，將 runtime metadata 綁定
   `released` 或 `previous-good`；缺少完整 measured attestation 或任一契約欄位不符即拒絕啟動。
+  另設定 `MODELFORGE_REGISTRY_ARTIFACT_ROOT` 時，啟動會串流重算掛載的 evaluation／training report
+  與所有模型 artifact 大小及 SHA-256，而且在引擎初始化前完成；初始化後會重驗 pointer／metadata，
+  防止兩階段之間切版。readiness 只重驗 metadata，避免探針反覆讀取 GB 級檔案。
 
 ## Secret and privacy checks
 
