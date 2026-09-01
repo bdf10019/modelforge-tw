@@ -51,6 +51,7 @@ required = {
     "modelforge_tw/web/index.html",
     "modelforge_tw/web/styles.css",
     "modelforge_tw/web/app.js",
+    "modelforge_tw/web/favicon.svg",
 }
 with zipfile.ZipFile(sys.argv[1]) as archive:
     missing = sorted(required - set(archive.namelist()))

@@ -51,7 +51,7 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-modelforge_tw = ["web/*.html", "web/*.css", "web/*.js"]
+modelforge_tw = ["web/*.html", "web/*.css", "web/*.js", "web/*.svg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

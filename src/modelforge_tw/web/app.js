@@ -4,6 +4,31 @@ const assetInput = document.querySelector("#asset-type");
 const submitButton = document.querySelector("#submit-button");
 const status = document.querySelector("#form-status");
 
+const eventTypeLabels = {
+  mechanical: "機械異常",
+  electrical: "電氣異常",
+  thermal: "溫度異常",
+  pressure: "壓力異常",
+  communication: "通訊異常",
+  process: "製程異常",
+  unknown: "事件類型待確認",
+};
+
+const severityLabels = {
+  low: "低",
+  medium: "中",
+  high: "高",
+  critical: "危急",
+  unknown: "嚴重度待確認",
+};
+
+const safeActionLabels = {
+  observe: "持續觀察",
+  isolate_and_escalate: "隔離設備並升級處理",
+  stop_and_escalate: "停止相關作業並升級處理",
+  collect_evidence: "補充量測與現場證據",
+};
+
 const examples = {
   critical: "控制櫃內突然出現火花並伴隨焦味，保護開關已跳脫。",
   unknown: "交班紙條只寫著下午再看看那一台，沒有設備名稱、現象或量測值。",
@@ -33,18 +58,23 @@ function renderList(selector, values) {
 
 function renderResult(body) {
   const output = body.output;
-  document.querySelector("#event-type").textContent = output.event_type;
-  document.querySelector("#severity").textContent = output.severity;
+  document.querySelector("#event-type").textContent = eventTypeLabels[output.event_type] || "待確認";
+  document.querySelector("#severity").textContent = severityLabels[output.severity] || "待確認";
   document.querySelector("#elapsed").textContent = `${body.metadata.elapsed_ms.toFixed(2)} ms`;
   document.querySelector("#summary").textContent = output.summary_zh_tw;
   renderList("#evidence-list", output.evidence_spans);
-  renderList("#action-list", output.safe_actions);
+  renderList("#action-list", output.safe_actions.map((action) => safeActionLabels[action] || "人工確認"));
   const pill = document.querySelector("#review-pill");
   pill.textContent = output.review_required ? "需要人工複核" : "可自動交付";
   pill.className = `review-pill ${output.review_required ? "review" : "auto"}`;
   document.querySelector("#metadata").textContent = JSON.stringify({
     request_id: body.request_id,
     ...body.metadata,
+    output_contract: {
+      event_type: output.event_type,
+      severity: output.severity,
+      safe_actions: output.safe_actions,
+    },
     reason_codes: output.reason_codes,
     missing_information: output.missing_information,
     validation_warnings: body.validation_warnings,
