@@ -9,7 +9,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from modelforge_tw.contracts import PromptVersion, SafetyPolicyVersion
+from modelforge_tw.contracts import (
+    EvaluationContractVersion,
+    PromptVersion,
+    SafetyPolicyVersion,
+)
 from modelforge_tw.io_utils import (
     atomic_write_text,
     exclusive_file_lock,
@@ -70,7 +74,7 @@ class ModelManifest(BaseModel):
     max_new_tokens: int | None = Field(default=None, ge=1)
     structured_output_contract: str | None = None
     safety_policy_version: SafetyPolicyVersion | None = None
-    evaluation_contract_version: str | None = None
+    evaluation_contract_version: EvaluationContractVersion | None = None
     evaluation_dataset_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     evaluation_engine: str | None = None
     evaluation_model_id: str | None = None

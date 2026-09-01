@@ -6,7 +6,12 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from modelforge_tw.contracts import PromptVersion, SafetyPolicyVersion
+from modelforge_tw.contracts import (
+    EvaluationContractVersion,
+    EvaluationSchemaVersion,
+    PromptVersion,
+    SafetyPolicyVersion,
+)
 from modelforge_tw.model_identity import (
     validate_immutable_model_revision,
     validate_model_version,
@@ -260,7 +265,7 @@ class CaseResult(BaseModel):
 class EvaluationReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: str = "1.5"
+    schema_version: EvaluationSchemaVersion = "1.5"
     run_id: str
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     engine: str
@@ -273,7 +278,7 @@ class EvaluationReport(BaseModel):
     context_window_tokens: int | None = Field(default=None, ge=1)
     structured_output_contract: str | None = None
     safety_policy_version: SafetyPolicyVersion | None = None
-    evaluation_contract_version: str | None = None
+    evaluation_contract_version: EvaluationContractVersion | None = None
     evidence_kind: Literal["fixture", "measured"]
     dataset_manifest_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     release_gate_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")

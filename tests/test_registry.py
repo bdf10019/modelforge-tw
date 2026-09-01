@@ -373,6 +373,10 @@ def test_model_manifest_rejects_unknown_contract_versions():
         ModelManifest.model_validate({**payload, "prompt_version": "optimized-v99"})
     with pytest.raises(ValidationError, match="safety_policy_version"):
         ModelManifest.model_validate({**payload, "safety_policy_version": "policy-typo"})
+    with pytest.raises(ValidationError, match="evaluation_contract_version"):
+        ModelManifest.model_validate(
+            {**payload, "evaluation_contract_version": "release-metrics-v99"}
+        )
 
 
 def test_registry_state_rejects_inconsistent_release_pointers_and_ids():

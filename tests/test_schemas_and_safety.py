@@ -55,6 +55,12 @@ def test_runtime_evidence_rejects_unknown_contract_versions():
         EvaluationReport.model_validate({**report, "prompt_version": "optimized-v99"})
     with pytest.raises(ValidationError, match="safety_policy_version"):
         EvaluationReport.model_validate({**report, "safety_policy_version": "policy-typo"})
+    with pytest.raises(ValidationError, match="schema_version"):
+        EvaluationReport.model_validate({**report, "schema_version": "9.9"})
+    with pytest.raises(ValidationError, match="evaluation_contract_version"):
+        EvaluationReport.model_validate(
+            {**report, "evaluation_contract_version": "release-metrics-v99"}
+        )
 
 
 def valid_output(**updates):
