@@ -121,3 +121,6 @@ def test_interview_walkthrough_preserves_claim_boundaries():
     assert "16.33%" in walkthrough
     assert "內部 224 筆時 event F1 降到 69.72%" in walkthrough
     assert "不宣稱叢集部署實績" in walkthrough
+    assert "request／model-response bytes" in walkthrough
+    assert "現有 1.0 實測 registry" in walkthrough
+    assert "外部不可變稽核" in walkthrough

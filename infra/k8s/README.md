@@ -22,6 +22,14 @@ NVIDIA device plugin；目前只完成多文件 YAML 解析與設定一致性檢
 會連帶檢查 llama.cpp `/health`，因此模型尚未載入或服務中斷時不會接收流量。
 設定 Secret 時，兩個 `/v1` 推論路由在解析 JSON 前要求 bearer key；health、readiness 與 config
 保留給叢集探針。這個 shared key 是最低部署基線，不等同企業 IAM、每使用者授權或 key rotation。
+API baseline 每 replica 最多同時送出 4 筆推論、等待區 16 筆、queue timeout 5 秒；request body 與
+模型回應分別限制 32 KiB／256 KiB。關閉時應用最多排空 65 秒，Pod 終止期限為 75 秒，讓 60 秒
+下游 timeout 有完成空間；超期同步工作最終仍須由容器平台終止。
+
+範例沒有把 Git 忽略的 `outputs/model-registry.json` 打進 image 或掛入 Pod，因此刻意不設定
+`MODELFORGE_REGISTRY_DEPLOYMENT_ROLE`，不能宣稱已做線上 registry binding。正式環境若要啟用，
+應從受控來源唯讀掛載具完整新版 training／evaluation attestation 的 registry，再選 `released` 或
+`previous-good`；現有 schema 1.0 實測歷史只供相容讀取，缺欄位時服務會拒絕綁定。
 
 ## 套用前檢查
 

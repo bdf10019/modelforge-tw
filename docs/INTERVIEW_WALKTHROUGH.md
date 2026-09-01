@@ -72,6 +72,10 @@
 - 公開快照保存去識別指標、run ID、資料／gate hash 與完整推論契約。
 - 本機若有 Git 忽略的原始報告，`verify-local-evidence.ps1` 會逐欄核對 6 份報告與外部 manifest。
 - registry 的 released、previous-good、blocked 與 rollback 都是驗證 artifact hash 後的狀態轉移。
+- 線上層同時限制 request／model-response bytes、等待秒數與 queue 筆數；timeout 背景工作仍占容量，
+  shutdown 只做有界排空、不假裝能取消同步 GPU 工作。
+- 新 mutation 使用 typed hash-chained registry event；完整新版 attestation 可在服務啟動時綁定 runtime
+  identity。現有 1.0 實測 registry 只宣稱相容讀取，不倒填成已在當時產生的 1.4 證據。
 - Docker／Kubernetes 只有靜態設定與測試，本機沒有可用 runtime，因此不宣稱叢集部署實績。
 
 最後一句：下一個可發布版本需要新的有授權資料或 adapter 訓練，並讓同一 prompt 同時通過內部集與
@@ -85,7 +89,7 @@
 | 為何 NF4 比 Q8 慢？ | NF4 走 Transformers adapter 路徑，Q8 走 llama.cpp；跨引擎速度可描述，但品質 relative gate 只在相容契約下比較。 |
 | holdout 100% 為何不發？ | 是政策後結果，且有 16.33% 介入；更重要的是內部回歸失敗，顯示資料來源專用化。 |
 | 為何保留 Q4？ | 保留 blocked 證據能證明 gate 真有否決權，也建立後續量化改進的可比較基線。 |
-| 能否直接上產線？ | 不能；shared bearer key 不等同企業 IAM，仍缺真實去識別驗證集、領域專家簽核、TLS、集中稽核與實際叢集壓測。 |
+| 能否直接上產線？ | 不能；雖有 bytes／queue／drain 邊界與 shared bearer key，仍缺真實去識別驗證集、領域專家簽核、企業 IAM、TLS、跨 replica rate limit、外部不可變稽核與實際叢集壓測。 |
 
 ## 展示禁區
 

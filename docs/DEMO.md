@@ -26,6 +26,8 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/triage -ContentType
 ```
 
 展示時說明三點：原始模型輸出不可信、證據必須落在輸入、high/critical/unknown 一律人工複核。
+`/api/config` 只顯示非敏感 runtime 契約，例如並發、queue 與 bytes 上限、是否需要認證及綁定的
+registry manifest ID；不回傳 bearer key、事件原文或本機路徑。
 
 ## GGUF + llama.cpp
 
@@ -43,3 +45,8 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/triage -ContentType
 低於 1536 的 slot。若硬體不同，應調整 parallel／context 或 GPU layers，再重新執行 benchmark，
 不可沿用本機數字。Q8
 通過完整絕對門檻；Q4_K_M 僅供展示量化退化與 blocked 流程，不應作為預設 demo。
+
+現有正式 registry 是保留真實操作歷史的 schema 1.0，可由新版程式唯讀驗證；不要為了展示而改寫。
+未來用新版完整 training／evaluation attestation 加入候選時，mutation 會升級事件 hash chain，且可
+用 `MODELFORGE_REGISTRY_DEPLOYMENT_ROLE=released` 或 `previous-good` 讓服務啟動時 fail closed 核對
+runtime identity。fixture 或缺少新版欄位的舊 manifest 不會通過這項綁定。

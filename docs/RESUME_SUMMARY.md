@@ -19,7 +19,8 @@ prompt-only、QLoRA、合併權重到 GGUF 量化，以同一封存資料與安�
 - 完成 llama.cpp Q8／Q4 實測：Q8 平均延遲 1.060 秒、四路 2.116 req/s 與 201.9 output tok/s；
   Q4 平均延遲 0.825 秒，但 event macro-F1 74.43%，由自動門檻封鎖。
 - 實作 FastAPI、OpenAI-compatible API、真正 streaming TTFT、嚴格 JSON Schema、原文證據驗證、
-  逾時 fallback、Prometheus、artifact SHA-256、registry promote 與 previous-good rollback。
+  逾時 fallback、有限 queue／request／response bytes、背景工作排空與 Prometheus；發布面包含 artifact
+  SHA-256、完整評測／訓練 lineage、registry promote、previous-good rollback 與新事件 hash chain。
 - 建立 Windows、Docker、Compose、Kubernetes、測試、隱私掃描與本機 Git 流程；模型權重、生成
   資料與實測輸出均排除於 Git。
 
@@ -52,10 +53,13 @@ prompt-only、QLoRA、合併權重到 GGUF 量化，以同一封存資料與安�
 - 為什麼 strict JSON Schema 還需要 reason-code 白名單，以及如何維持歷史報告相容性。
 - TTFT 如何從 streaming 第一個內容 chunk 量測，而不以 0 或總延遲冒充。
 - registry 如何驗證 artifact 路徑、SHA-256、release gate、previous-good 與 rollback 狀態。
+- 為何 timeout 不能等同取消同步 GPU 工作，以及如何同時限制 queue 時間、筆數與關閉排空期限。
+- registry runtime binding 為何要求完整 measured identity，且舊 1.0 證據不能倒填成新版 attestation。
 
 ## 誠實邊界
 
 本作品沒有連接真實工廠、沒有設備控制權；shared bearer key 只是內部服務基線，不宣稱具備
-生產環境的企業 IAM、細粒度授權、TLS、集中稽核與事故應變。Docker／Kubernetes 是可部署基線，
+生產環境的企業 IAM、細粒度授權、TLS、跨 replica rate limit、外部不可變稽核與事故應變。
+內建 hash chain 只能偵測封存後改寫，不能取代外部簽章或 WORM storage。Docker／Kubernetes 是可部署基線，
 尚未在本機叢集執行；品質結果來自原創合成資料、
 開發 challenge 與第三方合成 AI4I，不代表外部真實工廠分布。
