@@ -61,12 +61,29 @@ async def test_triage_health_metrics_and_no_input_echo():
             json={"incident_text": "泵浦軸承持續異音，需要人員確認。", "signals": []},
         )
         assert response.status_code == 200
+        assert response.headers["Cache-Control"] == "no-store"
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
         body = response.json()
         assert body["request_id"] == "test-request-1"
         assert body["output"]["review_required"] is True
         assert "incident_text" not in body
         metrics = await client.get("/metrics")
         assert "modelforge_requests_total" in metrics.text
+
+
+async def test_demo_page_uses_restrictive_browser_security_headers():
+    app = create_app(engine_factory=lambda: FixtureEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.get("/")
+
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert response.headers["Permissions-Policy"] == "camera=(), microphone=(), geolocation=()"
+    policy = response.headers["Content-Security-Policy"]
+    assert "default-src 'self'" in policy
+    assert "frame-ancestors 'none'" in policy
 
 
 @pytest.mark.parametrize("ready_behavior", [False, RuntimeError("private dependency detail")])
@@ -215,6 +232,7 @@ async def test_configured_bearer_key_protects_inference_routes(path):
 
     assert missing.status_code == 401
     assert missing.headers["WWW-Authenticate"] == "Bearer"
+    assert missing.headers["Cache-Control"] == "no-store"
     assert wrong.status_code == 401
     assert accepted.status_code == 200
     assert config["authentication_required"] is True

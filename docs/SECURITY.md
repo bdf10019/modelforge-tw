@@ -30,6 +30,9 @@
 - 設定 `MODELFORGE_API_KEY` 後，兩個推論路由都要求標準 `Authorization: Bearer ...`；key 至少
   32 字元、以 constant-time 比對、不出現在 config response。Kubernetes 由可選 Secret 注入，
   repository 不保存值；未設定時保留 loopback 本機 demo 相容性。
+- 推論／config 回應與認證錯誤都帶 `Cache-Control: no-store`；展示頁限制同源 script／style／連線，
+  禁止 object、base URI 與 frame ancestor，所有 HTTP 回應另加 nosniff、deny framing、
+  no-referrer 與 camera／microphone／geolocation 權限限制。
 - semaphore、timeout、request ID 驗證、Prometheus outcome 與 readiness 檢查。
 - timeout 後仍保留同步模型的容量槽，直到不可取消的背景推論真正結束，避免資源耗盡。
 - 等待容量另有獨立 queue timeout；超時回 503／`Retry-After` 並記錄非原文 outcome，防止卡住的

@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from modelforge_tw.engines import FixtureEngine, InferenceEngine, OpenAIHTTPInferenceEngine
 from modelforge_tw.metrics import ServiceMetrics
@@ -27,6 +27,52 @@ from modelforge_tw.settings import Settings
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,96}$")
 BODY_METHODS = frozenset({"POST", "PUT", "PATCH"})
 PROTECTED_API_PATHS = frozenset({"/v1/triage", "/v1/chat/completions"})
+NO_STORE_PATHS = PROTECTED_API_PATHS | {"/", "/api/config"}
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; connect-src 'self'; img-src 'self' data:; "
+    "style-src 'self'; script-src 'self'; object-src 'none'; "
+    "base-uri 'none'; frame-ancestors 'none'"
+)
+
+
+def _set_response_header(
+    headers: list[tuple[bytes, bytes]], name: bytes, value: bytes
+) -> list[tuple[bytes, bytes]]:
+    return [(key, item) for key, item in headers if key.lower() != name] + [(name, value)]
+
+
+class SecurityHeadersMiddleware:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_security_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers = _set_response_header(headers, b"x-content-type-options", b"nosniff")
+                headers = _set_response_header(headers, b"x-frame-options", b"DENY")
+                headers = _set_response_header(headers, b"referrer-policy", b"no-referrer")
+                headers = _set_response_header(
+                    headers,
+                    b"permissions-policy",
+                    b"camera=(), microphone=(), geolocation=()",
+                )
+                if scope["path"] in NO_STORE_PATHS:
+                    headers = _set_response_header(headers, b"cache-control", b"no-store")
+                if scope["path"] == "/":
+                    headers = _set_response_header(
+                        headers,
+                        b"content-security-policy",
+                        CONTENT_SECURITY_POLICY.encode(),
+                    )
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_security_headers)
 
 
 async def _send_json_error(
@@ -236,6 +282,7 @@ def create_app(
         selected_settings.api_key.get_secret_value() if selected_settings.api_key else None
     )
     app.add_middleware(BearerAuthMiddleware, api_key=configured_api_key)
+    app.add_middleware(SecurityHeadersMiddleware)
     web_root = files("modelforge_tw").joinpath("web")
     app.mount("/static", StaticFiles(directory=str(web_root)), name="static")
 
