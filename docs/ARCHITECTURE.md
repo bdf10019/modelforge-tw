@@ -54,7 +54,8 @@ Web / REST / OpenAI-compatible client
   部分遷移的資料不放行。Registry 載入時另驗證 manifest key／ID、唯一 released status、released
   pointer、通過結果與 retired previous-good pointer 一致；人工改壞的狀態不能進入後續操作。
   線上服務可選擇綁定 `released` 或 `previous-good` 指標；啟用後會在啟動時逐欄比對實際引擎的
-  measured identity、模型版本、量化、prompt、生成上限、輸出契約與安全政策，漂移即拒絕啟動。
+  measured identity、模型版本、量化、prompt、生成上限、輸出契約與安全政策，漂移即拒絕啟動；
+  `/readyz` 也會重讀 pointer 與相同契約，運行中 registry 改版會先撤除此 Pod 流量，等待明確重啟。
   Registry 1.4 將操作事件限制為 typed schema，並以 canonical JSON SHA-256 串接前一筆事件；
   1.0–1.3 可唯讀相容，下一次 mutation 才封入新鏈。這可偵測未同步重算的封存後改寫，但不是
   外部數位簽章或不可變 audit storage；能改寫檔案的攻擊者也能重算整條鏈。正式環境必須把 head digest／registry

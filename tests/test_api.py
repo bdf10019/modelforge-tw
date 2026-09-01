@@ -178,6 +178,35 @@ async def test_service_can_bind_runtime_identity_to_released_registry(tmp_path):
     assert config["registry_manifest_id"] == "measured-v1"
 
 
+async def test_readiness_fails_closed_after_registry_pointer_changes(tmp_path):
+    engine = FixtureEngine("adapted")
+    engine.name = "openai-http"
+    engine.model_id = "deployed-model"
+    engine.model_version = "measured-v1"
+    engine.quantization = "q8_0"
+    engine.max_new_tokens = 192
+    engine.structured_output_contract = "json-schema-v2"
+    engine.evidence_kind = "measured"
+    registry_path = tmp_path / "registry.json"
+    write_runtime_registry(registry_path, engine)
+    app = create_app(
+        settings=Settings(
+            registry_path=registry_path,
+            registry_deployment_role="released",
+        ),
+        engine_factory=lambda: engine,
+    )
+
+    async with app_client(app) as client:
+        assert (await client.get("/readyz")).status_code == 200
+        FileRegistry(registry_path).block("measured-v1")
+        drifted = await client.get("/readyz")
+
+    assert drifted.status_code == 503
+    assert drifted.json() == {"detail": "registry deployment binding is not ready"}
+    assert str(registry_path) not in drifted.text
+
+
 async def test_service_fails_startup_when_runtime_drifted_from_registry(tmp_path):
     attested_engine = FixtureEngine("adapted")
     attested_engine.name = "openai-http"
