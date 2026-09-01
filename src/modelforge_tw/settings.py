@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     registry_deployment_role: Literal["released", "previous-good"] | None = None
     registry_artifact_root: Path | None = None
     request_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
+    readiness_timeout_seconds: float = Field(default=4.0, ge=0.1, le=10)
     queue_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
     max_queue_depth: int = Field(default=8, ge=0, le=1024)
     shutdown_grace_seconds: float = Field(default=35.0, ge=0, le=300)

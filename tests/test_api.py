@@ -44,6 +44,14 @@ def test_model_response_limit_has_safe_bounds():
         Settings(max_model_response_bytes=4095)
 
 
+def test_readiness_timeout_has_safe_bounds():
+    assert Settings().readiness_timeout_seconds == 4
+    with pytest.raises(ValueError):
+        Settings(readiness_timeout_seconds=0)
+    with pytest.raises(ValueError):
+        Settings(readiness_timeout_seconds=11)
+
+
 def test_shutdown_grace_period_has_safe_bounds():
     assert Settings().shutdown_grace_seconds == 35
     with pytest.raises(ValueError):
@@ -376,6 +384,43 @@ async def test_readiness_maps_dependency_failures_to_sanitized_503(ready_behavio
     assert response.status_code == 503
     assert response.json()["detail"] == "model engine dependency is not ready"
     assert "private dependency detail" not in response.text
+
+
+async def test_readiness_timeout_reuses_one_inflight_dependency_check():
+    class BlockingReadinessEngine(FixtureEngine):
+        def __post_init__(self):
+            super().__post_init__()
+            self.calls = 0
+            self.release = threading.Event()
+
+        def ready(self):
+            self.calls += 1
+            self.release.wait(timeout=1)
+            return self.release.is_set()
+
+    engine = BlockingReadinessEngine("adapted")
+    app = create_app(
+        settings=Settings(readiness_timeout_seconds=0.1),
+        engine_factory=lambda: engine,
+    )
+    async with app_client(app) as client:
+        started = time.perf_counter()
+        first = await client.get("/readyz")
+        second = await client.get("/readyz")
+        elapsed = time.perf_counter() - started
+
+        assert first.status_code == 503
+        assert second.status_code == 503
+        assert first.json() == {"detail": "model engine dependency is not ready"}
+        assert engine.calls == 1
+        assert elapsed < 0.5
+
+        engine.release.set()
+        await asyncio.wait_for(app.state.readiness_task, timeout=1)
+        recovered = await client.get("/readyz")
+
+    assert recovered.status_code == 200
+    assert engine.calls == 2
 
 
 async def test_invalid_request_id_and_extra_input_are_rejected():

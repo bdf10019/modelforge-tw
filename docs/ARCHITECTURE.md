@@ -89,7 +89,8 @@ Transformers token-level streaming。
 
 服務不執行設備控制、不讀任意 URL 或用戶指定模型路徑，也預設不記錄事件原文。Kubernetes
 範例把 API 與模型伺服器分開，讓 GPU server 可獨立縮放；`/readyz` 會檢查下游模型健康狀態，
-下游回報未就緒或健康檢查本身拋錯都會轉成不含內部細節的 503。
+下游回報未就緒、健康檢查拋錯或超過預設 4 秒都會轉成不含內部細節的 503。同一個尚未完成的
+健康工作會由後續探針共用，不因連續 probe 無界建立背景執行緒；Kubernetes timeout 略長於應用上限。
 所有 HTTP 請求在 body 解析前取得或驗證 `X-Request-ID`；重複、非 ASCII 或格式錯誤的值不回顯，
 而以新 server ID 回覆 400。成功、認證失敗、body 超限與 schema 錯誤都在 response header 帶同一
 追蹤 ID，推論 body 內的 ID 也與 header 一致。

@@ -43,6 +43,11 @@ def _set_response_header(
     return [(key, item) for key, item in headers if key.lower() != name] + [(name, value)]
 
 
+def _consume_task_exception(task: asyncio.Task[Any]) -> None:
+    if not task.cancelled():
+        task.exception()
+
+
 class SecurityHeadersMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -463,6 +468,7 @@ def create_app(
         app.state.queued_requests = 0
         engine_tasks.clear()
         app.state.engine_tasks = engine_tasks
+        app.state.readiness_task = None
         app.state.ready = True
         try:
             yield
@@ -651,7 +657,15 @@ def create_app(
                     detail="registry deployment binding is not ready",
                 )
         try:
-            dependency_ready = await asyncio.to_thread(engine.ready)
+            readiness_task: asyncio.Task[bool] | None = app.state.readiness_task
+            if readiness_task is None or readiness_task.done():
+                readiness_task = asyncio.create_task(asyncio.to_thread(engine.ready))
+                readiness_task.add_done_callback(_consume_task_exception)
+                app.state.readiness_task = readiness_task
+            dependency_ready = await asyncio.wait_for(
+                asyncio.shield(readiness_task),
+                timeout=selected_settings.readiness_timeout_seconds,
+            )
         except Exception:
             raise HTTPException(
                 status_code=503, detail="model engine dependency is not ready"
@@ -679,6 +693,7 @@ def create_app(
             "evidence_kind": engine.evidence_kind,
             "max_concurrency": selected_settings.max_concurrency,
             "queue_timeout_seconds": selected_settings.queue_timeout_seconds,
+            "readiness_timeout_seconds": selected_settings.readiness_timeout_seconds,
             "max_queue_depth": selected_settings.max_queue_depth,
             "shutdown_grace_seconds": selected_settings.shutdown_grace_seconds,
             "max_request_body_bytes": selected_settings.max_request_body_bytes,

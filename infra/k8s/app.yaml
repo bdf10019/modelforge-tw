@@ -9,6 +9,7 @@ data:
   MODELFORGE_MODEL_VERSION: qwen3-1.7b-merged-v5-q8_0-policy-v2
   MODELFORGE_QUANTIZATION: q8_0
   MODELFORGE_REQUEST_TIMEOUT_SECONDS: "60"
+  MODELFORGE_READINESS_TIMEOUT_SECONDS: "4"
   MODELFORGE_QUEUE_TIMEOUT_SECONDS: "5"
   MODELFORGE_MAX_QUEUE_DEPTH: "16"
   MODELFORGE_SHUTDOWN_GRACE_SECONDS: "65"
@@ -159,6 +160,7 @@ spec:
             httpGet:
               path: /readyz
               port: http
+            timeoutSeconds: 5
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
