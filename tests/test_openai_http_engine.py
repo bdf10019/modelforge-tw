@@ -81,6 +81,17 @@ def test_model_server_base_url_rejects_ambiguous_or_credentialed_values(base_url
         make_engine(base_url)
 
 
+def test_model_server_rejects_unversioned_runtime_identity():
+    with pytest.raises(ValueError, match="model version"):
+        OpenAIHTTPInferenceEngine(
+            base_url="http://model.test",
+            model_id="model-q8",
+            model_version="unversioned",
+            quantization="q8_0",
+            prompt_version="optimized-v2",
+        )
+
+
 def test_model_response_limit_rejects_unsafe_configuration():
     with pytest.raises(ValueError, match="between 4096 and 4194304"):
         make_engine(max_response_bytes=4194305)

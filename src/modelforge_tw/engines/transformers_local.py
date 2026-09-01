@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import threading
 import time
-from pathlib import Path
 from typing import Any, Literal
 
 from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_REVISION,
     DEFAULT_MAX_NEW_TOKENS,
     validate_immutable_model_revision,
+    validate_model_version,
 )
 from modelforge_tw.prompts import DEFAULT_PROMPT_VERSION, PromptVersion, messages_for_version
 from modelforge_tw.safety import (
@@ -32,11 +32,12 @@ class TransformersInferenceEngine:
         prompt_version: PromptVersion,
         model_revision: str = DEFAULT_BASE_MODEL_REVISION,
         load_in_4bit: bool = False,
-        model_version: str = "unversioned",
+        model_version: str,
         max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
         safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,
     ) -> None:
         validate_immutable_model_revision(model_revision)
+        validate_model_version(model_version)
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
@@ -83,9 +84,6 @@ class TransformersInferenceEngine:
             from peft import PeftModel
 
             model = PeftModel.from_pretrained(model, adapter_path)
-            if self.model_version == "unversioned":
-                adapter = Path(adapter_path)
-                self.model_version = adapter.parent.name if adapter.parent.name else adapter.name
         self.model: Any = model
         self.model.eval()
 
@@ -190,6 +188,7 @@ def model_load_probe(
     load_in_4bit: bool,
 ) -> dict[str, Any]:
     validate_immutable_model_revision(model_revision)
+    model_version = f"base-{model_revision[:12]}"
     import torch
 
     before = torch.cuda.memory_allocated() if torch.cuda.is_available() else 0
@@ -199,6 +198,7 @@ def model_load_probe(
         model_revision=model_revision,
         adapter_path=None,
         prompt_version=DEFAULT_PROMPT_VERSION,
+        model_version=model_version,
         load_in_4bit=load_in_4bit,
     )
     load_seconds = time.perf_counter() - started
@@ -206,6 +206,7 @@ def model_load_probe(
     return {
         "model_id": model_id,
         "model_revision": model_revision,
+        "model_version": model_version,
         "quantization": engine.quantization,
         "load_seconds": round(load_seconds, 4),
         "cuda_available": torch.cuda.is_available(),

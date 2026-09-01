@@ -8,6 +8,7 @@ from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_ID,
     DEFAULT_BASE_MODEL_REVISION,
     DEFAULT_MAX_NEW_TOKENS,
+    validate_model_version,
 )
 from modelforge_tw.prompts import DEFAULT_PROMPT_VERSION, PromptVersion
 from modelforge_tw.safety import SAFETY_POLICY_VERSION, SafetyPolicyVersion
@@ -61,6 +62,11 @@ class Settings(BaseSettings):
     @classmethod
     def empty_registry_artifact_root_disables_file_verification(cls, value: object) -> object:
         return None if value == "" else value
+
+    @field_validator("model_version")
+    @classmethod
+    def model_version_is_explicit(cls, value: str) -> str:
+        return validate_model_version(value)
 
     @field_validator("api_key")
     @classmethod

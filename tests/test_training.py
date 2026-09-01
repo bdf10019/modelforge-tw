@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
+from modelforge_tw import cli
 from modelforge_tw.cli import build_parser
 from modelforge_tw.engines.transformers_local import (
     TransformersInferenceEngine,
@@ -61,6 +62,7 @@ def test_model_operations_reject_floating_revision_before_loading_ml_runtime(tmp
             model_revision="main",
             adapter_path=None,
             prompt_version="optimized-v2",
+            model_version="test-v1",
         )
     with pytest.raises(ValueError, match="commit hash"):
         model_load_probe("Qwen/Qwen3-1.7B", model_revision="main", load_in_4bit=True)
@@ -73,3 +75,13 @@ def test_model_operations_reject_floating_revision_before_loading_ml_runtime(tmp
             output_dir=output,
         )
     assert not output.exists()
+
+
+def test_measured_cli_requires_explicit_model_version():
+    args = build_parser().parse_args(["evaluate", "--engine", "transformers"])
+    with pytest.raises(ValueError, match="--model-version"):
+        cli._engine_from_args(args)
+
+    with pytest.raises(SystemExit) as error:
+        build_parser().parse_args(["evaluate", "--model-version", "unversioned"])
+    assert error.value.code == 2

@@ -59,6 +59,8 @@
   異常大的控制面檔案不會先被無界載入記憶體。大型模型 artifact 仍以串流方式計算 SHA-256。
 - 訓練、評測、合併、probe 與 Transformers serving 的 base revision 必須是 40–64 位 lowercase
   commit hash；預設統一鎖定已驗證 commit，浮動的 `main`／tag 在載入模型或 ML runtime 前拒絕。
+- Measured evaluate／benchmark 必須顯式提供 `--model-version`；`unversioned`、控制字元與不安全識別字
+  不能進入引擎、推論 metadata、評測報告或 registry，避免不同 artifact 共用模糊身份。
 - 資料與續跑快取 JSONL 的單行上限為 1 MiB；正式資料超限或非 UTF-8 時 fail closed，快取則只
   丟棄損壞行並重新產生受影響案例，不讓一行殘片破壞後續可恢復結果。
 - `MODELFORGE_LOG_INPUTS` 唯一合法值為 `false`；誤設 `true` 時服務拒絕啟動，API 不提供事件原文

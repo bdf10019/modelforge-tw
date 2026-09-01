@@ -6,6 +6,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from modelforge_tw.model_identity import validate_model_version
+
 
 class EventType(StrEnum):
     MECHANICAL = "mechanical"
@@ -166,7 +168,7 @@ class InferenceMetadata(BaseModel):
 
     engine: str
     model_id: str
-    model_version: str = "unversioned"
+    model_version: str
     model_revision: str | None = None
     quantization: str = "unknown"
     prompt_version: str
@@ -180,6 +182,11 @@ class InferenceMetadata(BaseModel):
     structured_output_contract: str | None = None
     safety_policy_version: str | None = None
     evidence_kind: Literal["fixture", "measured"]
+
+    @field_validator("model_version")
+    @classmethod
+    def model_version_is_explicit(cls, value: str) -> str:
+        return validate_model_version(value)
 
 
 class InferenceResult(BaseModel):
@@ -262,6 +269,11 @@ class EvaluationReport(BaseModel):
     latency_ms: dict[str, NonnegativeFiniteFloat]
     validation_warning_counts: dict[str, NonnegativeInteger] = Field(default_factory=dict)
     cases: list[CaseResult]
+
+    @field_validator("model_version")
+    @classmethod
+    def model_version_is_explicit(cls, value: str) -> str:
+        return validate_model_version(value)
 
     @model_validator(mode="after")
     def validate_report_consistency(self) -> EvaluationReport:

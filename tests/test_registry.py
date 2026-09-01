@@ -351,6 +351,14 @@ def test_model_manifest_requires_immutable_base_revision():
         ModelManifest.model_validate(payload)
 
 
+def test_model_manifest_rejects_unversioned_evaluation_identity():
+    payload = manifest("v1").model_dump(mode="json")
+    payload["evaluation_model_version"] = "unversioned"
+
+    with pytest.raises(ValidationError, match="evaluation_model_version"):
+        ModelManifest.model_validate(payload)
+
+
 def test_registry_state_rejects_inconsistent_release_pointers_and_ids():
     candidate = manifest("v1")
     with pytest.raises(ValidationError, match="released pointer"):

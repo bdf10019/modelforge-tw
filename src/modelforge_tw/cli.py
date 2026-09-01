@@ -30,6 +30,7 @@ from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_REVISION,
     DEFAULT_MAX_NEW_TOKENS,
     validate_immutable_model_revision,
+    validate_model_version,
 )
 from modelforge_tw.prompts import (
     DEFAULT_PROMPT_VERSION,
@@ -55,6 +56,8 @@ def _engine_from_args(args: argparse.Namespace):
             safety_policy_version=args.safety_policy_version,
         )
     if args.engine == "llama-http":
+        if args.model_version is None:
+            raise ValueError("measured engines require --model-version")
         return OpenAIHTTPInferenceEngine(
             base_url=args.base_url,
             model_id=args.model_id,
@@ -68,6 +71,8 @@ def _engine_from_args(args: argparse.Namespace):
             safety_policy_version=args.safety_policy_version,
         )
     if args.engine == "transformers":
+        if args.model_version is None:
+            raise ValueError("measured engines require --model-version")
         from modelforge_tw.engines.transformers_local import TransformersInferenceEngine
 
         return TransformersInferenceEngine(
@@ -594,7 +599,7 @@ def build_parser() -> argparse.ArgumentParser:
             type=validate_immutable_model_revision,
             default=DEFAULT_BASE_MODEL_REVISION,
         )
-        command.add_argument("--model-version", default="unversioned")
+        command.add_argument("--model-version", type=validate_model_version)
         command.add_argument("--quantization", default="unknown")
         command.add_argument("--timeout", type=float, default=60)
         command.add_argument(

@@ -20,6 +20,7 @@ def test_kubernetes_manifests_parse_and_default_to_q8_candidate():
     assert config["data"]["MODELFORGE_QUEUE_TIMEOUT_SECONDS"] == "5"
     assert config["data"]["MODELFORGE_MAX_QUEUE_DEPTH"] == "16"
     assert config["data"]["MODELFORGE_SHUTDOWN_GRACE_SECONDS"] == "65"
+    assert config["data"]["MODELFORGE_READINESS_TIMEOUT_SECONDS"] == "4"
 
     model_deployment = next(
         item
@@ -91,6 +92,7 @@ def test_kubernetes_runtime_security_and_probe_contracts():
     assert api_pod["automountServiceAccountToken"] is False
     assert api_pod["terminationGracePeriodSeconds"] == 75
     assert api["readinessProbe"]["httpGet"]["path"] == "/readyz"
+    assert api["readinessProbe"]["timeoutSeconds"] == 5
     assert api["livenessProbe"]["httpGet"]["path"] == "/healthz"
     assert api["securityContext"]["allowPrivilegeEscalation"] is False
     assert api["securityContext"]["readOnlyRootFilesystem"] is True

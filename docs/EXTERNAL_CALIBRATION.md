@@ -78,7 +78,10 @@ blocked。下一個可發布版本需要新的訓練資料或 adapter，使同�
 .\scripts\prepare-external-calibration.ps1
 .\.venv\Scripts\modelforge.exe evaluate `
   --data data\external\generated --splits external `
-  --engine llama-http --prompt-version optimized-v2 `
+  --engine llama-http --base-url http://127.0.0.1:8081 `
+  --model-id modelforge-tw-q8_0 `
+  --model-version qwen3-1.7b-merged-v5-q8_0-policy-v2 --quantization q8_0 `
+  --prompt-version optimized-v2 `
   --max-new-tokens 192 --context-window-tokens 2048 `
   --safety-policy-version risk-precedence-v3
 ```

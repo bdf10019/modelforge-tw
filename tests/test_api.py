@@ -21,6 +21,8 @@ def test_settings_reject_context_capacity_below_measured_minimum():
 def test_service_rejects_floating_model_revision():
     with pytest.raises(ValueError, match="model_revision"):
         Settings(model_revision="main")
+    with pytest.raises(ValueError, match="model_version"):
+        Settings(model_version="unversioned")
 
 
 def test_service_defaults_to_attested_safety_policy_v2():

@@ -14,6 +14,7 @@ from modelforge_tw.io_utils import (
     exclusive_file_lock,
     read_utf8_text_limited,
 )
+from modelforge_tw.model_identity import validate_model_version
 from modelforge_tw.schemas import EvaluationReport
 from modelforge_tw.training import TrainingReportAttestation
 
@@ -87,6 +88,11 @@ class ModelManifest(BaseModel):
     @classmethod
     def report_path_is_safe(cls, value: str | None) -> str | None:
         return _validate_portable_relative_path(value) if value is not None else None
+
+    @field_validator("evaluation_model_version")
+    @classmethod
+    def evaluation_model_version_is_explicit(cls, value: str | None) -> str | None:
+        return validate_model_version(value) if value is not None else None
 
 
 class RegistryEvent(BaseModel):
