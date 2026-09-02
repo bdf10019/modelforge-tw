@@ -83,6 +83,8 @@ Web / REST / OpenAI-compatible client
   commit 與乾淨的 working tree；實際 quantizer executable 必須符合鎖定的 SHA-256，量化報告再保存 merge
   report hash、來源檔清單、commit 與 quantizer hash。Merge 與量化路徑的既有父層及來源檔拒絕
   symlink／Windows reparse point，量化來源與 output 也不能逃出專案目錄。
+  llama.cpp 準備腳本另比對兩個鎖定壓縮檔與完整解壓目錄清單，拒絕殘留／缺失檔；啟動
+  server 使用固定路徑與 executable hash，並對選定 GGUF 重做 quantization report 大小／hash 驗證。
   既有 schema 1.0 實測報告保持唯讀，不以新欄位回填歷史執行。
 - `registry.py`：candidate、evaluation attestation、promote、previous-good 與 rollback 的原子檔案
   registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住評測資料 hash、引擎、

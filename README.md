@@ -102,7 +102,8 @@ modelforge merge --adapter artifacts\qwen3-1.7b-triage-lora-v5\final-adapter `
 `merge --output` 必須是不存在或空目錄；為避免混入上一次殘留 shard，不會覆寫既有 merged artifact。
 量化的來源與 `-OutputDirectory` 必須位於專案目錄內，output 同樣必須是全新或空的 regular
 directory；現有 GGUF 不會被重跑命令覆寫。腳本也會要求鎖定的 llama.cpp source tree 乾淨，並核對
-quantizer executable SHA-256 後才開始轉檔。
+quantizer executable SHA-256 後才開始轉檔。啟動本機 llama-server 前還會核對固定的 server hash，並重算
+選定 GGUF 的大小與 SHA-256。
 
 另開終端機啟動統一 API：
 

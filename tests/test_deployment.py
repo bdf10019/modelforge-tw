@@ -136,6 +136,24 @@ def test_local_llama_launcher_has_measured_context_capacity_guard():
     assert "$minimumSlotContext = 1536" in script
     assert "$ContextSize / $Parallel" in script
     assert "低於最低" in script
+    assert '$serverPath = Join-Path $projectRoot "tools\\llama.cpp-bin\\llama-server.exe"' in script
+    assert "$serverHash -ne $ExpectedServerSha256.ToLowerInvariant()" in script
+    assert "quantization-report.json" in script
+    assert "GGUF 與 quantization report 不符" in script
+    assert "Assert-NoReparsePointInPath -LiteralPath $model" in script
+    assert "$workspaceRoot = Split-Path -Parent $projectRoot" in script
+    assert "Split-Path -Parent (Split-Path -Parent $projectRoot)" not in script
+
+
+def test_llama_preparation_rejects_stale_or_wrong_runtime_files():
+    script = (PROJECT_ROOT / "scripts" / "prepare-llama.ps1").read_text(encoding="utf-8")
+    assert "[IO.Compression.ZipFile]::OpenRead" in script
+    assert "Compare-Object -ReferenceObject $expectedFiles -DifferenceObject $actualFiles" in script
+    assert "binary directory 與鎖定壓縮檔清單不符" in script
+    assert '$quantizer = Join-Path $binaryRoot "llama-quantize.exe"' in script
+    assert '$server = Join-Path $binaryRoot "llama-server.exe"' in script
+    assert "$quantizerHash -ne $ExpectedQuantizerSha256.ToLowerInvariant()" in script
+    assert "$serverHash -ne $ExpectedServerSha256.ToLowerInvariant()" in script
 
 
 def test_ci_uses_the_same_cross_platform_full_verification_entrypoint():
@@ -171,6 +189,7 @@ def test_quantization_revalidates_source_and_records_tool_lineage():
     assert "量化 output directory 必須為空" in script
     assert "[IO.FileAttributes]::ReparsePoint" in script
     assert '$sourceRoot = Join-Path $projectRoot "tools\\llama.cpp-src"' in script
+    assert '$quantizerPath = Join-Path $binaryRoot "llama-quantize.exe"' in script
     assert "Assert-NoReparsePointInPath -LiteralPath $mergedPath" in script
     assert "Assert-NoReparsePointInPath -LiteralPath $outputRoot" in script
     assert "git -C $sourceRoot rev-parse HEAD" in script
