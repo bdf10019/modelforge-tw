@@ -9,6 +9,8 @@ from modelforge_tw.model_identity import (
     DEFAULT_MAX_NEW_TOKENS,
     validate_immutable_model_revision,
     validate_model_version,
+    validate_resolved_model_revision,
+    validate_tokenizer_snapshot_revision,
 )
 from modelforge_tw.prompts import DEFAULT_PROMPT_VERSION, PromptVersion, messages_for_version
 from modelforge_tw.safety import (
@@ -58,6 +60,7 @@ class TransformersInferenceEngine:
             revision=model_revision,
             use_fast=True,
         )
+        validate_tokenizer_snapshot_revision(model_revision, self.tokenizer.init_kwargs)
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -80,6 +83,10 @@ class TransformersInferenceEngine:
             )
 
         model: Any = AutoModelForCausalLM.from_pretrained(model_id, **load_options)
+        validate_resolved_model_revision(
+            model_revision,
+            getattr(model.config, "_commit_hash", None),
+        )
         if adapter_path:
             from peft import PeftModel
 

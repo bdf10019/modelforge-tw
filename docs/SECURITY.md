@@ -63,6 +63,9 @@
   不相等都停止，training attestation 載入時也會再次核對，避免快取或下載層漂移被報告掩蓋。
 - Merge 必須顯式提供 training report；載入 ML runtime 前逐項核對 base identity 與 adapter regular
   files 的集合、大小及 SHA-256，不接受額外檔、缺檔、symlink 或被替換的 adapter。
+- 本機 Transformers 的 tokenizer assets 必須全部來自指定 Hugging Face snapshot commit；訓練、merge
+  與 serving 都執行此檢查，serving 並核對載入後模型 config 的 `_commit_hash`，防止權重／tokenizer
+  或服務快取來源分裂。
 - Measured evaluate／benchmark 必須顯式提供 `--model-version`；`unversioned`、控制字元與不安全識別字
   不能進入引擎、推論 metadata、評測報告或 registry，避免不同 artifact 共用模糊身份。
 - llama-http measured 流程另強制顯式量化格式；`unknown` 或不安全識別字不能進入 runtime metadata、

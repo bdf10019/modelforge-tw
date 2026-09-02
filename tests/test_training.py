@@ -14,6 +14,7 @@ from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_REVISION,
     DEFAULT_MAX_NEW_TOKENS,
     validate_resolved_model_revision,
+    validate_tokenizer_snapshot_revision,
 )
 from modelforge_tw.prompts import DEFAULT_PROMPT_VERSION
 from modelforge_tw.training import (
@@ -109,6 +110,50 @@ def test_resolved_model_revision_must_exactly_match_request():
         validate_resolved_model_revision(DEFAULT_BASE_MODEL_REVISION, None)
     with pytest.raises(ValueError, match="does not match"):
         validate_resolved_model_revision(DEFAULT_BASE_MODEL_REVISION, "b" * 40)
+
+
+def test_tokenizer_assets_must_resolve_from_requested_snapshot():
+    snapshot = f"C:/cache/snapshots/{DEFAULT_BASE_MODEL_REVISION}"
+    assert (
+        validate_tokenizer_snapshot_revision(
+            DEFAULT_BASE_MODEL_REVISION,
+            {
+                "vocab_file": f"{snapshot}/vocab.json",
+                "merges_file": f"{snapshot}/merges.txt",
+            },
+        )
+        == DEFAULT_BASE_MODEL_REVISION
+    )
+    with pytest.raises(ValueError, match="did not report"):
+        validate_tokenizer_snapshot_revision(DEFAULT_BASE_MODEL_REVISION, {})
+    with pytest.raises(ValueError, match="multiple snapshot"):
+        validate_tokenizer_snapshot_revision(
+            DEFAULT_BASE_MODEL_REVISION,
+            {
+                "vocab_file": f"{snapshot}/vocab.json",
+                "merges_file": f"C:/cache/snapshots/{'b' * 40}/merges.txt",
+            },
+        )
+    with pytest.raises(ValueError, match="does not match"):
+        validate_tokenizer_snapshot_revision(
+            DEFAULT_BASE_MODEL_REVISION,
+            {"vocab_file": f"C:/cache/snapshots/{'b' * 40}/vocab.json"},
+        )
+
+
+def test_training_attestation_v12_requires_tokenizer_revision():
+    config = TrainingConfig().model_dump(mode="json")
+    with pytest.raises(ValidationError, match="resolved_tokenizer_revision"):
+        TrainingReportAttestation(
+            schema_version="1.2",
+            evidence_kind="measured",
+            model_id=config["model_id"],
+            model_revision=config["model_revision"],
+            resolved_model_revision=config["model_revision"],
+            config=config,
+            training_config_sha256=_stable_hash(config),
+            dataset_manifest_sha256="a" * 64,
+        )
 
 
 def test_training_attestation_rejects_resolved_revision_drift():

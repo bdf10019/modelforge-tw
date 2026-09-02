@@ -20,6 +20,7 @@ from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_REVISION,
     validate_immutable_model_revision,
     validate_resolved_model_revision,
+    validate_tokenizer_snapshot_revision,
 )
 from modelforge_tw.prompts import (
     DEFAULT_PROMPT_VERSION,
@@ -82,11 +83,12 @@ class TrainingReportAttestation(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    schema_version: Literal["1.0", "1.1"]
+    schema_version: Literal["1.0", "1.1", "1.2"]
     evidence_kind: Literal["measured"]
     model_id: str = Field(min_length=1, max_length=256)
     model_revision: str = Field(pattern=r"^[a-f0-9]{40,64}$")
     resolved_model_revision: str = Field(pattern=r"^[a-f0-9]{40,64}$")
+    resolved_tokenizer_revision: str | None = Field(default=None, pattern=r"^[a-f0-9]{40,64}$")
     config: dict[str, Any]
     training_config_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     dataset_manifest_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -102,6 +104,13 @@ class TrainingReportAttestation(BaseModel):
             mismatches.append("model_revision")
         if self.resolved_model_revision != self.model_revision:
             mismatches.append("resolved_model_revision")
+        if self.schema_version == "1.2" and self.resolved_tokenizer_revision is None:
+            mismatches.append("resolved_tokenizer_revision")
+        elif (
+            self.resolved_tokenizer_revision is not None
+            and self.resolved_tokenizer_revision != self.model_revision
+        ):
+            mismatches.append("resolved_tokenizer_revision")
         if _stable_hash(self.config) != self.training_config_sha256:
             mismatches.append("training_config_sha256")
         if mismatches:
@@ -251,6 +260,10 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
         use_fast=True,
         trust_remote_code=False,
     )
+    resolved_tokenizer_revision = validate_tokenizer_snapshot_revision(
+        config.model_revision,
+        tokenizer.init_kwargs,
+    )
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -394,11 +407,12 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
         json.loads(read_utf8_text_limited(manifest_path)) if manifest_path.exists() else None
     )
     report = {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "evidence_kind": "measured",
         "model_id": config.model_id,
         "model_revision": config.model_revision,
         "resolved_model_revision": resolved_model_revision,
+        "resolved_tokenizer_revision": resolved_tokenizer_revision,
         "training_method": "qlora-nf4" if config.use_4bit else "lora-bf16",
         "config": config_payload,
         "training_config_sha256": config_hash,
@@ -480,6 +494,10 @@ def merge_adapter(
     merged = model.merge_and_unload(safe_merge=True)
     merged.save_pretrained(output_dir, safe_serialization=True, max_shard_size="4GB")
     tokenizer = AutoTokenizer.from_pretrained(model_id, revision=model_revision, use_fast=True)
+    resolved_tokenizer_revision = validate_tokenizer_snapshot_revision(
+        model_revision,
+        tokenizer.init_kwargs,
+    )
     tokenizer.save_pretrained(output_dir)
     files = {
         path.name: {"bytes": path.stat().st_size, "sha256": sha256_file(path)}
@@ -492,6 +510,7 @@ def merge_adapter(
         "model_id": model_id,
         "model_revision": model_revision,
         "resolved_model_revision": resolved_model_revision,
+        "resolved_tokenizer_revision": resolved_tokenizer_revision,
         "source_training_report": str(training_report_path),
         "source_training_report_sha256": training_report_sha256,
         "training_config_sha256": training_report.training_config_sha256,
