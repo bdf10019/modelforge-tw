@@ -107,6 +107,8 @@ modelforge merge --adapter artifacts\qwen3-1.7b-triage-lora-v5\final-adapter `
 
 大型權重與實測輸出皆位於 Git 忽略目錄；模型 revision、資料 manifest、設定與 artifact SHA-256
 會寫入報告。長時間評測逐筆落盤，可在指紋完全一致時安全續跑。
+訓練會在載入 NumPy／Torch／Transformers 前先驗證 dataset manifest、audit 結果，以及所有列出
+JSONL 的大小、SHA-256 與筆數；資料缺失或漂移不會浪費一次 GPU 訓練後才被發現。
 
 ## 實測矩陣
 

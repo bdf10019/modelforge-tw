@@ -57,6 +57,8 @@
   無法安全強制取消，超過應用寬限後由較長的容器終止期限提供最後邊界。
 - CLI 與 registry 對設定、manifest、評測與訓練 JSON 採 16 MiB byte 上限並要求合法 UTF-8；
   異常大的控制面檔案不會先被無界載入記憶體。大型模型 artifact 仍以串流方式計算 SHA-256。
+- 訓練在匯入 ML runtime 前 fail closed 驗證 dataset manifest：audit 必須通過、combined hash 與
+  split counts 必須一致，所有 JSONL 必須是具名 regular file 且大小、SHA-256、筆數完全相符。
 - 訓練、評測、合併、probe 與 Transformers serving 的 base revision 必須是 40–64 位 lowercase
   commit hash；預設統一鎖定已驗證 commit，浮動的 `main`／tag 在載入模型或 ML runtime 前拒絕。
 - 訓練與 merge 載入模型後會把 loader 回報的 resolved commit 與要求值逐字比對；缺失、格式錯誤或

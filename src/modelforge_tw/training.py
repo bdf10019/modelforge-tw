@@ -13,7 +13,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from modelforge_tw.dataset import load_splits, sha256_file
+from modelforge_tw.dataset import load_splits, read_jsonl, sha256_file
 from modelforge_tw.io_utils import atomic_write_text, read_utf8_text_limited
 from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_ID,
@@ -78,6 +78,48 @@ class AdapterFileAttestation(BaseModel):
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
+class DatasetFileAttestation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    records: int = Field(ge=1)
+    bytes: int = Field(ge=1)
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class TrainingDatasetManifestAttestation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["1.0"]
+    generator_version: str = Field(min_length=1, max_length=128)
+    seed: int
+    license: str = Field(min_length=1, max_length=128)
+    source_kind: str = Field(min_length=1, max_length=128)
+    files: dict[str, DatasetFileAttestation]
+    dataset_manifest_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    audit: dict[str, Any]
+
+    @model_validator(mode="after")
+    def validate_manifest_summary(self) -> TrainingDatasetManifestAttestation:
+        if self.audit.get("passed") is not True:
+            raise ValueError("dataset manifest audit did not pass")
+        if not self.files:
+            raise ValueError("dataset manifest has no files")
+        combined = hashlib.sha256(
+            "\n".join(
+                f"{name}:{evidence.sha256}" for name, evidence in sorted(self.files.items())
+            ).encode()
+        ).hexdigest()
+        if combined != self.dataset_manifest_sha256:
+            raise ValueError("dataset manifest combined hash is inconsistent")
+        if self.audit.get("record_count") != sum(item.records for item in self.files.values()):
+            raise ValueError("dataset manifest audit record count is inconsistent")
+        split_counts = self.audit.get("split_counts")
+        expected_counts = {Path(name).stem: item.records for name, item in self.files.items()}
+        if split_counts != expected_counts:
+            raise ValueError("dataset manifest audit split counts are inconsistent")
+        return self
+
+
 class TrainingReportAttestation(BaseModel):
     """Minimum verified lineage required before a training run enters the registry."""
 
@@ -120,6 +162,30 @@ class TrainingReportAttestation(BaseModel):
 
 def load_training_config(path: Path) -> TrainingConfig:
     return TrainingConfig.model_validate_json(read_utf8_text_limited(path))
+
+
+def verify_training_dataset_manifest(data_dir: Path) -> TrainingDatasetManifestAttestation:
+    manifest_path = data_dir / "manifest.json"
+    if not manifest_path.is_file() or manifest_path.is_symlink():
+        raise FileNotFoundError(f"dataset manifest not found as a regular file: {manifest_path}")
+    manifest = TrainingDatasetManifestAttestation.model_validate_json(
+        read_utf8_text_limited(manifest_path)
+    )
+    required = {"train.jsonl", "validation.jsonl"}
+    missing = sorted(required - manifest.files.keys())
+    if missing:
+        raise ValueError("dataset manifest lacks training splits: " + ", ".join(missing))
+    for name, expected in manifest.files.items():
+        if Path(name).name != name or not name.endswith(".jsonl"):
+            raise ValueError("dataset manifest contains an unsafe file name")
+        path = data_dir / name
+        if not path.is_file() or path.is_symlink():
+            raise FileNotFoundError(f"dataset file not found as a regular file: {path}")
+        if path.stat().st_size != expected.bytes or sha256_file(path) != expected.sha256:
+            raise ValueError(f"dataset file does not match manifest: {name}")
+        if len(read_jsonl(path)) != expected.records:
+            raise ValueError(f"dataset record count does not match manifest: {name}")
+    return manifest
 
 
 def verify_adapter_training_lineage(
@@ -227,6 +293,7 @@ class CompletionOnlyCollator:
 
 
 def run_training(config: TrainingConfig) -> dict[str, Any]:
+    dataset_manifest = verify_training_dataset_manifest(config.data_dir)
     import numpy as np
     import torch
     import transformers
@@ -402,10 +469,6 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
 
     config_payload = config.model_dump(mode="json")
     config_hash = _stable_hash(config_payload)
-    manifest_path = config.data_dir / "manifest.json"
-    dataset_manifest = (
-        json.loads(read_utf8_text_limited(manifest_path)) if manifest_path.exists() else None
-    )
     report = {
         "schema_version": "1.2",
         "evidence_kind": "measured",
@@ -417,17 +480,11 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
         "config": config_payload,
         "training_config_sha256": config_hash,
         "resumed_from_checkpoint": last_checkpoint,
-        "dataset_manifest_sha256": (
-            dataset_manifest["dataset_manifest_sha256"] if dataset_manifest else None
-        ),
-        "dataset_generator_version": (
-            dataset_manifest["generator_version"] if dataset_manifest else None
-        ),
-        "dataset_file_sha256": (
-            {name: details["sha256"] for name, details in dataset_manifest["files"].items()}
-            if dataset_manifest
-            else None
-        ),
+        "dataset_manifest_sha256": dataset_manifest.dataset_manifest_sha256,
+        "dataset_generator_version": dataset_manifest.generator_version,
+        "dataset_file_sha256": {
+            name: details.sha256 for name, details in dataset_manifest.files.items()
+        },
         "duration_seconds": round(duration_seconds, 3),
         "trainable_parameters": trainable,
         "total_parameters": total,

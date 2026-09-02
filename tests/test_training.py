@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from modelforge_tw import cli
 from modelforge_tw.cli import build_parser
+from modelforge_tw.dataset import write_dataset
 from modelforge_tw.engines.transformers_local import (
     TransformersInferenceEngine,
     model_load_probe,
@@ -23,7 +24,9 @@ from modelforge_tw.training import (
     TrainingReportAttestation,
     installed_dependency_versions,
     merge_adapter,
+    run_training,
     verify_adapter_training_lineage,
+    verify_training_dataset_manifest,
 )
 
 
@@ -67,6 +70,27 @@ def test_training_dependency_snapshot_is_complete_and_versioned():
     versions = installed_dependency_versions(("pip", "modelforge-definitely-missing"))
     assert versions["pip"] and versions["pip"][0].isdigit()
     assert versions["modelforge-definitely-missing"] == "not-installed"
+
+
+def test_training_dataset_manifest_is_verified_before_ml_runtime(tmp_path):
+    with pytest.raises(FileNotFoundError, match="dataset manifest"):
+        run_training(TrainingConfig(data_dir=tmp_path, output_dir=tmp_path / "output"))
+    assert not (tmp_path / "output").exists()
+
+    write_dataset(
+        tmp_path,
+        train_per_type=1,
+        validation_per_type=1,
+        test_per_type=1,
+    )
+    manifest = verify_training_dataset_manifest(tmp_path)
+    assert manifest.audit["passed"] is True
+    assert {"train.jsonl", "validation.jsonl"} <= manifest.files.keys()
+
+    with (tmp_path / "train.jsonl").open("ab") as handle:
+        handle.write(b"\n")
+    with pytest.raises(ValueError, match="does not match manifest"):
+        verify_training_dataset_manifest(tmp_path)
 
 
 def test_model_workflows_default_to_one_immutable_base_revision(tmp_path):

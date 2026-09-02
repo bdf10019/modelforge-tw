@@ -42,6 +42,9 @@ Web / REST / OpenAI-compatible client
   模型卻漏掉訓練 runtime 漂移。候選加入 registry 前會驗證報告 schema、measured evidence、
   immutable resolved revision、內嵌 config 雜湊、模型 identity、prompt 契約及本機資料 manifest；
   正式發布另要求至少一個已雜湊模型 artifact，不能發布只有 metadata 的空候選。
+  訓練進入任何 ML runtime 前，會先解析 dataset manifest、要求 audit passed、重算 combined hash，
+  並逐一核對所有列出的 JSONL regular file 大小、SHA-256、可解析筆數與 audit split counts；train／
+  validation 缺一不可。
   訓練、評測、合併、載入探針與 Transformers 服務共用同一個已驗證 base-model commit 預設；
   revision 必須是 40–64 位 lowercase commit hash，`main`／tag 會在匯入大型 ML runtime 前 fail fast。
   訓練與合併在模型載入後還要求 Hugging Face 回報的 resolved commit 逐字相等，報告驗證也重做
