@@ -662,8 +662,10 @@ def merge_adapter(
     adapter_files = training_report.final_adapter_files
     if adapter_files is None:  # validated by verify_adapter_training_lineage
         raise RuntimeError("validated training report lost adapter attestations")
+    if _first_linked_path_component(output_dir) is not None:
+        raise ValueError("merge output path must not contain links or reparse points")
     if output_dir.exists():
-        if not output_dir.is_dir() or output_dir.is_symlink():
+        if not output_dir.is_dir() or _is_link_or_reparse_point(output_dir):
             raise ValueError("merge output must be a regular directory")
         if any(output_dir.iterdir()):
             raise ValueError("merge output directory must be empty")

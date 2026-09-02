@@ -170,5 +170,8 @@ def test_quantization_revalidates_source_and_records_tool_lineage():
     assert "quantizer_sha256 = $quantizerHash" in script
     assert "量化 output directory 必須為空" in script
     assert "[IO.FileAttributes]::ReparsePoint" in script
+    assert '$sourceRoot = Join-Path $projectRoot "tools\\llama.cpp-src"' in script
+    assert "Assert-NoReparsePointInPath -LiteralPath $outputRoot" in script
+    assert "git -C $sourceRoot rev-parse HEAD" in script
     assert "Move-Item -LiteralPath $bridgeQ8 -Destination $q8" in script
     assert "Move-Item -Force -LiteralPath $bridgeQ8" not in script

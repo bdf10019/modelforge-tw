@@ -78,6 +78,8 @@ Web / REST / OpenAI-compatible client
   驗證 prompt tokens 加生成上限不超過宣告的 context window；不靜默截斷超額輸入。
 - `quantize.ps1`：轉換前依 merge report 重算每個來源檔的大小與 SHA-256，並核對 llama.cpp source
   commit；新版量化報告保存 merge report hash、來源檔清單、commit 與實際 quantizer executable hash。
+  Merge 與量化輸出路徑的既有父層也拒絕 symlink／Windows reparse point，不能藉 junction 改寫
+  artifact 落點。
   既有 schema 1.0 實測報告保持唯讀，不以新欄位回填歷史執行。
 - `registry.py`：candidate、evaluation attestation、promote、previous-good 與 rollback 的原子檔案
   registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住評測資料 hash、引擎、

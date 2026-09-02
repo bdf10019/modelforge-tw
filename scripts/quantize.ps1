@@ -9,7 +9,8 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $projectRoot ".venv\Scripts\python.exe"
-$converter = Join-Path $projectRoot "tools\llama.cpp-src\convert_hf_to_gguf.py"
+$sourceRoot = Join-Path $projectRoot "tools\llama.cpp-src"
+$converter = Join-Path $sourceRoot "convert_hf_to_gguf.py"
 $binaryRoot = Join-Path $projectRoot "tools\llama.cpp-bin"
 $quantizer = Get-ChildItem -LiteralPath $binaryRoot -Filter "llama-quantize.exe" -Recurse | Select-Object -First 1
 $mergedPath = Join-Path $projectRoot $MergedModel
@@ -19,10 +20,27 @@ $q8 = Join-Path $outputRoot "modelforge-tw-q8_0.gguf"
 $q4 = Join-Path $outputRoot "modelforge-tw-q4_k_m.gguf"
 $mergeReportPath = Join-Path $mergedPath "merge-report.json"
 
+function Assert-NoReparsePointInPath {
+    param([string]$LiteralPath)
+    $current = [IO.Path]::GetFullPath($LiteralPath)
+    while (-not [string]::IsNullOrEmpty($current)) {
+        if (Test-Path -LiteralPath $current) {
+            $item = Get-Item -LiteralPath $current -Force
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                throw "量化 output 路徑不能包含 reparse point：$current"
+            }
+        }
+        $parent = Split-Path -Parent $current
+        if ([string]::IsNullOrEmpty($parent) -or $parent -eq $current) { break }
+        $current = $parent
+    }
+}
+
 if (-not (Test-Path -LiteralPath $converter)) { throw "請先執行 scripts\prepare-llama.ps1" }
 if (-not $quantizer) { throw "找不到 llama-quantize.exe" }
 if (-not (Test-Path -LiteralPath $mergedPath)) { throw "找不到 merged model：$mergedPath" }
 if (-not (Test-Path -LiteralPath $mergeReportPath)) { throw "找不到 merge report：$mergeReportPath" }
+Assert-NoReparsePointInPath -LiteralPath $outputRoot
 if (Test-Path -LiteralPath $outputRoot) {
     $outputItem = Get-Item -LiteralPath $outputRoot
     if (-not $outputItem.PSIsContainer -or ($outputItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
