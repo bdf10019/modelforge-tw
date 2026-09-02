@@ -23,6 +23,18 @@ if (-not (Test-Path -LiteralPath $converter)) { throw "請先執行 scripts\prep
 if (-not $quantizer) { throw "找不到 llama-quantize.exe" }
 if (-not (Test-Path -LiteralPath $mergedPath)) { throw "找不到 merged model：$mergedPath" }
 if (-not (Test-Path -LiteralPath $mergeReportPath)) { throw "找不到 merge report：$mergeReportPath" }
+if (Test-Path -LiteralPath $outputRoot) {
+    $outputItem = Get-Item -LiteralPath $outputRoot
+    if (-not $outputItem.PSIsContainer -or ($outputItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw "量化 output 必須是 regular directory"
+    }
+    if (@(Get-ChildItem -LiteralPath $outputRoot -Force).Count -ne 0) {
+        throw "量化 output directory 必須為空，不能覆寫既有 artifact"
+    }
+}
+else {
+    New-Item -ItemType Directory -Path $outputRoot | Out-Null
+}
 
 $mergeReport = Get-Content -LiteralPath $mergeReportPath -Raw | ConvertFrom-Json
 $sourceFiles = @()
@@ -53,7 +65,6 @@ if ($LASTEXITCODE -ne 0 -or $sourceCommit -ne $ExpectedLlamaCommit.ToLowerInvari
     throw "llama.cpp source commit 不符"
 }
 $quantizerHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $quantizer.FullName).Hash.ToLowerInvariant()
-New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 
 & $python $converter $mergedPath --outfile $f16 --outtype f16
 if ($LASTEXITCODE -ne 0) { throw "HF → GGUF 轉換失敗" }
@@ -73,11 +84,11 @@ try {
 
     & $quantizer.FullName $bridgeF16 $bridgeQ8 Q8_0
     if ($LASTEXITCODE -ne 0) { throw "Q8_0 量化失敗" }
-    Move-Item -Force -LiteralPath $bridgeQ8 -Destination $q8
+    Move-Item -LiteralPath $bridgeQ8 -Destination $q8
 
     & $quantizer.FullName $bridgeF16 $bridgeQ4 Q4_K_M
     if ($LASTEXITCODE -ne 0) { throw "Q4_K_M 量化失敗" }
-    Move-Item -Force -LiteralPath $bridgeQ4 -Destination $q4
+    Move-Item -LiteralPath $bridgeQ4 -Destination $q4
 }
 finally {
     foreach ($temporaryFile in @($bridgeF16, $bridgeQ8, $bridgeQ4)) {

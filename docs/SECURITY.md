@@ -89,6 +89,8 @@
   並要求 `passed` 與 errors 一致；發布通過時不接受缺少 actual output 的案例。
 - 新量化流程在轉檔前會重驗 merge report 與其每個來源檔，並把 llama.cpp commit、merge report hash
   及 quantizer executable hash 寫入報告；來源或工具漂移會在產生 GGUF 前停止。
+- 量化 output 必須是全新或空的 regular directory，不接受 reparse point；Q8／Q4 移入正式名稱時
+  不使用強制覆寫，既有實測 GGUF 不會被一次重跑悄悄取代。
 - 資料與續跑快取 JSONL 的單行上限為 1 MiB；正式資料超限或非 UTF-8 時 fail closed，快取則只
   丟棄損壞行並重新產生受影響案例，不讓一行殘片破壞後續可恢復結果。
 - `MODELFORGE_LOG_INPUTS` 唯一合法值為 `false`；誤設 `true` 時服務拒絕啟動，API 不提供事件原文

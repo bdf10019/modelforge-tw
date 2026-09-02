@@ -99,6 +99,7 @@ modelforge merge --adapter artifacts\qwen3-1.7b-triage-lora-v5\final-adapter `
 ```
 
 `merge --output` 必須是不存在或空目錄；為避免混入上一次殘留 shard，不會覆寫既有 merged artifact。
+量化的 `-OutputDirectory` 同樣必須是全新或空的 regular directory；現有 GGUF 不會被重跑命令覆寫。
 
 另開終端機啟動統一 API：
 
