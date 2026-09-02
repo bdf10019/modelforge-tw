@@ -289,6 +289,22 @@ def test_adapter_lineage_verification_rejects_file_or_identity_drift(tmp_path):
         )
 
 
+def test_merge_rejects_nonempty_output_before_ml_runtime(tmp_path):
+    adapter, report = _write_attested_adapter(tmp_path)
+    output = tmp_path / "merged"
+    output.mkdir()
+    (output / "stale-model.safetensors").write_bytes(b"stale")
+
+    with pytest.raises(ValueError, match="must be empty"):
+        merge_adapter(
+            model_id="Qwen/Qwen3-1.7B",
+            model_revision=DEFAULT_BASE_MODEL_REVISION,
+            adapter_path=adapter,
+            training_report_path=report,
+            output_dir=output,
+        )
+
+
 def test_cli_rejects_floating_model_revision():
     with pytest.raises(SystemExit) as error:
         build_parser().parse_args(["evaluate", "--model-revision", "main"])

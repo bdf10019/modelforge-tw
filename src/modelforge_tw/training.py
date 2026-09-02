@@ -631,11 +631,17 @@ def merge_adapter(
     adapter_files = training_report.final_adapter_files
     if adapter_files is None:  # validated by verify_adapter_training_lineage
         raise RuntimeError("validated training report lost adapter attestations")
+    if output_dir.exists():
+        if not output_dir.is_dir() or output_dir.is_symlink():
+            raise ValueError("merge output must be a regular directory")
+        if any(output_dir.iterdir()):
+            raise ValueError("merge output directory must be empty")
+    else:
+        output_dir.mkdir(parents=True)
     import torch
     from peft import PeftModel
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    output_dir.mkdir(parents=True, exist_ok=True)
     started = time.perf_counter()
     use_cuda = torch.cuda.is_available()
     if use_cuda:

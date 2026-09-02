@@ -98,6 +98,8 @@ modelforge merge --adapter artifacts\qwen3-1.7b-triage-lora-v5\final-adapter `
 .\scripts\serve-gguf.ps1 -Quantization q8_0 -Port 8081
 ```
 
+`merge --output` 必須是不存在或空目錄；為避免混入上一次殘留 shard，不會覆寫既有 merged artifact。
+
 另開終端機啟動統一 API：
 
 ```powershell
