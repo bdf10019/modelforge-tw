@@ -91,6 +91,43 @@ def test_runtime_metadata_rejects_non_finite_performance_values(field, value):
         InferenceMetadata.model_validate(metadata)
 
 
+@pytest.mark.parametrize(
+    ("updates", "message"),
+    [
+        ({"prompt_tokens": "10"}, "prompt_tokens"),
+        ({"output_tokens": True}, "output_tokens"),
+        ({"max_new_tokens": "192"}, "max_new_tokens"),
+        ({"context_window_tokens": 2048.0}, "context_window_tokens"),
+        ({"elapsed_ms": 10, "ttft_ms": 11}, "TTFT"),
+        ({"output_tokens": 193, "max_new_tokens": 192}, "generation budget"),
+        (
+            {
+                "prompt_tokens": 1900,
+                "output_tokens": 149,
+                "max_new_tokens": 192,
+                "context_window_tokens": 2048,
+            },
+            "context window",
+        ),
+    ],
+)
+def test_runtime_metadata_rejects_inconsistent_performance_evidence(updates, message):
+    metadata = {
+        "engine": "fixture",
+        "model_id": "fixture",
+        "model_version": "fixture-v1",
+        "quantization": "none",
+        "prompt_version": "optimized-v2",
+        "elapsed_ms": 10,
+        "safety_policy_version": "risk-precedence-v2",
+        "evidence_kind": "fixture",
+        **updates,
+    }
+
+    with pytest.raises(ValidationError, match=message):
+        InferenceMetadata.model_validate(metadata)
+
+
 def valid_output(**updates):
     payload = {
         "event_type": EventType.MECHANICAL,

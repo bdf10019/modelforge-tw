@@ -208,12 +208,12 @@ class InferenceMetadata(BaseModel):
     quantization: str
     prompt_version: PromptVersion
     elapsed_ms: NonnegativeFiniteFloat
-    prompt_tokens: int | None = Field(default=None, ge=0)
-    output_tokens: int | None = Field(default=None, ge=0)
+    prompt_tokens: int | None = Field(default=None, ge=0, strict=True)
+    output_tokens: int | None = Field(default=None, ge=0, strict=True)
     generation_tokens_per_second: NonnegativeFiniteFloat | None = None
     ttft_ms: NonnegativeFiniteFloat | None = None
-    max_new_tokens: int | None = Field(default=None, ge=1)
-    context_window_tokens: int | None = Field(default=None, ge=1)
+    max_new_tokens: int | None = Field(default=None, ge=1, strict=True)
+    context_window_tokens: int | None = Field(default=None, ge=1, strict=True)
     structured_output_contract: str | None = None
     safety_policy_version: SafetyPolicyVersion | None = None
     evidence_kind: Literal["fixture", "measured"]
@@ -232,6 +232,25 @@ class InferenceMetadata(BaseModel):
     @classmethod
     def model_revision_is_immutable(cls, value: str | None) -> str | None:
         return validate_immutable_model_revision(value) if value is not None else None
+
+    @model_validator(mode="after")
+    def performance_measurements_are_consistent(self) -> InferenceMetadata:
+        if self.ttft_ms is not None and self.ttft_ms > self.elapsed_ms:
+            raise ValueError("TTFT cannot exceed total inference latency")
+        if (
+            self.output_tokens is not None
+            and self.max_new_tokens is not None
+            and self.output_tokens > self.max_new_tokens
+        ):
+            raise ValueError("output token count exceeds generation budget")
+        if (
+            self.prompt_tokens is not None
+            and self.output_tokens is not None
+            and self.context_window_tokens is not None
+            and self.prompt_tokens + self.output_tokens > self.context_window_tokens
+        ):
+            raise ValueError("measured token counts exceed context window")
+        return self
 
 
 class InferenceResult(BaseModel):
