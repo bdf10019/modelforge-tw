@@ -875,6 +875,17 @@ async def test_openai_compatible_rejects_unsupported_or_misleading_parameters():
         assert (
             await client.post(
                 "/v1/chat/completions",
+                json={"model": "released", "messages": messages, "max_tokens": 512},
+            )
+        ).status_code == 400
+        exact_budget = await client.post(
+            "/v1/chat/completions",
+            json={"model": "released", "messages": messages, "max_tokens": 192},
+        )
+        assert exact_budget.status_code == 200
+        assert (
+            await client.post(
+                "/v1/chat/completions",
                 json={"model": "released", "messages": [{"role": "user", "content": "太短"}]},
             )
         ).status_code == 422

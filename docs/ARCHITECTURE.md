@@ -122,7 +122,7 @@ OpenAI-compatible HTTP adapter 另用 strict JSON Schema 在生成前套用相�
 
 對外 `/v1/chat/completions` 是刻意縮小的 OpenAI-compatible 子集：接受 `model`、恰好一筆
 `user` message、`temperature=0`、`max_tokens` 與 `stream`。多輪或 system／assistant／tool 訊息、
-未知欄位、未部署模型、非零 temperature，以及小於部署結構化輸出預算的 `max_tokens` 都明確
+未知欄位、未部署模型、非零 temperature，以及不等於部署結構化輸出預算的 `max_tokens` 都明確
 拒絕，避免表面接受卻忽略參數。推論路由在認證後只接受單一合法 JSON media type；所有寫入型
 HTTP request 會先經過 byte-level body 上限，包含
 沒有 `Content-Length` 的 chunked 傳輸；串流在完整 schema 與安全驗證後送出，並不宣稱是

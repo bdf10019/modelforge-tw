@@ -749,10 +749,10 @@ def create_app(
         if payload.model not in {None, "released", engine.model_id}:
             raise HTTPException(status_code=404, detail="requested model is not deployed")
         deployed_max_tokens = engine.max_new_tokens or selected_settings.max_new_tokens
-        if payload.max_tokens is not None and payload.max_tokens < deployed_max_tokens:
+        if payload.max_tokens is not None and payload.max_tokens != deployed_max_tokens:
             raise HTTPException(
                 status_code=400,
-                detail=f"max_tokens must be at least {deployed_max_tokens} for this schema",
+                detail=f"max_tokens must equal the deployed budget of {deployed_max_tokens}",
             )
         triage_request = TriageRequest(incident_text=payload.messages[0].content)
         request_id = request.state.request_id
