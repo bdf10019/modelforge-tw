@@ -243,13 +243,26 @@ def test_evaluation_rejects_mixed_inference_identity_before_caching():
 
     newly_cached: list[str] = []
 
-    with pytest.raises(ValueError, match="inference metadata changed.*model_version"):
+    with pytest.raises(ValueError, match="does not match configured engine.*model_version"):
         evaluate(
             DriftingEngine("adapted"),
             records,
             result_callback=lambda record, _result: newly_cached.append(record.record_id),
         )
     assert newly_cached == [records[0].record_id]
+
+
+def test_evaluation_rejects_consistently_misreported_engine_identity():
+    records = [record for record in generate_records(1, 1, 1) if record.split == "test"][:1]
+
+    class MisreportingEngine(FixtureEngine):
+        def generate(self, request):
+            result = super().generate(request)
+            result.metadata = result.metadata.model_copy(update={"model_id": "wrong-model"})
+            return result
+
+    with pytest.raises(ValueError, match="does not match configured engine.*model_id"):
+        evaluate(MisreportingEngine("adapted"), records)
 
 
 def test_invalid_raw_output_keeps_required_fallback_and_injection_policy():

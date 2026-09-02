@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from modelforge_tw.contracts import EvaluationContractVersion
-from modelforge_tw.engines.base import InferenceEngine
+from modelforge_tw.engines.base import InferenceEngine, validate_inference_metadata_identity
 from modelforge_tw.io_utils import atomic_write_text
 from modelforge_tw.safety import (
     SAFETY_POLICY_VERSION,
@@ -157,6 +157,7 @@ def evaluate(
         generated = result is None
         if result is None:
             result = engine.generate(record.input)
+        validate_inference_metadata_identity(engine, result.metadata)
         if first_metadata is None:
             first_metadata = result.metadata
         else:

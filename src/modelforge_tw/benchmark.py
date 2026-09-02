@@ -14,7 +14,11 @@ from typing import Any
 
 import psutil
 
-from modelforge_tw.engines.base import InferenceEngine
+from modelforge_tw.engines.base import (
+    InferenceEngine,
+    InferenceIdentityMismatchError,
+    validate_inference_metadata_identity,
+)
 from modelforge_tw.io_utils import atomic_write_text
 from modelforge_tw.schemas import DatasetRecord, InferenceMetadata
 
@@ -33,12 +37,8 @@ BENCHMARK_IDENTITY_FIELDS = (
 )
 
 
-class _InferenceIdentityMismatchError(Exception):
-    pass
-
-
 def _benchmark_error_sample(error: Exception) -> dict[str, str]:
-    if isinstance(error, _InferenceIdentityMismatchError):
+    if isinstance(error, InferenceIdentityMismatchError):
         return {
             "code": "inference_identity_mismatch",
             "exception_type": "InferenceIdentityMismatchError",
@@ -170,6 +170,7 @@ def run_benchmark(
                 request_started = time.perf_counter()
                 try:
                     result = benchmark_generate(records[index % len(records)].input)
+                    validate_inference_metadata_identity(engine, result.metadata)
                     with metadata_lock:
                         if not metadata_samples:
                             metadata_samples.append(result.metadata)
@@ -181,7 +182,7 @@ def run_benchmark(
                                 != getattr(metadata_samples[0], field)
                             ]
                             if identity_mismatches:
-                                raise _InferenceIdentityMismatchError(
+                                raise InferenceIdentityMismatchError(
                                     "inference metadata changed during benchmark: "
                                     + ", ".join(identity_mismatches)
                                 )

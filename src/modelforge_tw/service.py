@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from modelforge_tw.engines import FixtureEngine, InferenceEngine, OpenAIHTTPInferenceEngine
+from modelforge_tw.engines.base import validate_inference_metadata_identity
 from modelforge_tw.metrics import ServiceMetrics
 from modelforge_tw.registry import FileRegistry
 from modelforge_tw.safety import conservative_fallback
@@ -581,6 +582,7 @@ def create_app(
                     asyncio.shield(engine_task),
                     timeout=selected_settings.request_timeout_seconds,
                 )
+                validate_inference_metadata_identity(engine, result.metadata)
                 outcome = "success"
                 for warning in result.validation_warnings:
                     metrics.validation_warnings.labels(code=warning).inc()

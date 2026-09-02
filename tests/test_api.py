@@ -880,6 +880,13 @@ class SlowFailingEngine(FixtureEngine):
         raise RuntimeError("do not expose this internal error")
 
 
+class MisreportingEngine(FixtureEngine):
+    def generate(self, request):
+        result = super().generate(request)
+        result.metadata = result.metadata.model_copy(update={"model_id": "unattested-model"})
+        return result
+
+
 class BlockingEngine(FixtureEngine):
     def __post_init__(self):
         super().__post_init__()
@@ -902,6 +909,20 @@ async def test_failure_returns_conservative_fallback_without_error_detail():
         assert body["output"]["event_type"] == "unknown"
         assert body["output"]["review_required"] is True
         assert "internal error" not in response.text
+
+
+async def test_misreported_engine_identity_returns_conservative_fallback():
+    app = create_app(engine_factory=lambda: MisreportingEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage", json={"incident_text": "設備狀態無法確認且需人工複核"}
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metadata"]["model_id"] == "deterministic-fixture"
+    assert body["output"]["event_type"] == "unknown"
+    assert "ERROR_FALLBACK" in body["validation_warnings"]
 
 
 async def test_timed_out_worker_keeps_concurrency_slot_until_it_finishes():
