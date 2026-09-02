@@ -1,5 +1,6 @@
 import hashlib
 import json
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -22,6 +23,7 @@ from modelforge_tw.training import (
     TRAINING_DEPENDENCIES,
     TrainingConfig,
     TrainingReportAttestation,
+    _is_link_or_reparse_point,
     installed_dependency_versions,
     merge_adapter,
     prepare_training_run,
@@ -30,6 +32,17 @@ from modelforge_tw.training import (
     verify_training_dataset_manifest,
     verify_training_run_contract,
 )
+
+
+def test_windows_reparse_attribute_is_treated_as_link(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        type(tmp_path),
+        "lstat",
+        lambda _path: SimpleNamespace(st_file_attributes=1024),
+    )
+    monkeypatch.setattr(type(tmp_path), "is_symlink", lambda _path: False)
+
+    assert _is_link_or_reparse_point(tmp_path) is True
 
 
 def _stable_hash(payload: dict[str, object]) -> str:
@@ -156,6 +169,44 @@ def test_legacy_checkpoint_is_not_silently_attested(tmp_path):
             TrainingConfig(data_dir=data_dir, output_dir=output_dir),
             manifest,
         )
+
+
+def test_training_output_rejects_linked_directory_components(tmp_path):
+    data_dir = tmp_path / "data"
+    write_dataset(data_dir, train_per_type=1, validation_per_type=1, test_per_type=1)
+    manifest = verify_training_dataset_manifest(data_dir)
+    real_output = tmp_path / "real-output"
+    real_output.mkdir()
+    linked_output = tmp_path / "linked-output"
+    try:
+        linked_output.symlink_to(real_output, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"directory symlinks are unavailable: {error}")
+
+    with pytest.raises(ValueError, match="links or reparse points"):
+        prepare_training_run(
+            TrainingConfig(data_dir=data_dir, output_dir=linked_output),
+            manifest,
+        )
+
+
+def test_checkpoint_resume_rejects_linked_checkpoint(tmp_path):
+    data_dir = tmp_path / "data"
+    write_dataset(data_dir, train_per_type=1, validation_per_type=1, test_per_type=1)
+    manifest = verify_training_dataset_manifest(data_dir)
+    output_dir = tmp_path / "training-output"
+    config = TrainingConfig(data_dir=data_dir, output_dir=output_dir)
+    prepare_training_run(config, manifest)
+    real_checkpoint = tmp_path / "real-checkpoint"
+    real_checkpoint.mkdir()
+    linked_checkpoint = output_dir / "checkpoint-10"
+    try:
+        linked_checkpoint.symlink_to(real_checkpoint, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"directory symlinks are unavailable: {error}")
+
+    with pytest.raises(ValueError, match="malformed checkpoints"):
+        prepare_training_run(config, manifest)
 
 
 def test_model_workflows_default_to_one_immutable_base_revision(tmp_path):

@@ -6,6 +6,7 @@ import os
 import platform
 import random
 import re
+import stat
 import time
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
@@ -39,6 +40,25 @@ TRAINING_DEPENDENCIES = (
     "sentencepiece",
     "transformers",
 )
+
+
+def _is_link_or_reparse_point(path: Path) -> bool:
+    try:
+        attributes = getattr(path.lstat(), "st_file_attributes", 0)
+    except OSError:
+        return False
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    return path.is_symlink() or bool(attributes & reparse_flag)
+
+
+def _first_linked_path_component(path: Path) -> Path | None:
+    absolute = path.absolute()
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if _is_link_or_reparse_point(current):
+            return current
+    return None
 
 
 class TrainingConfig(BaseModel):
@@ -207,7 +227,10 @@ def prepare_training_run(
     dataset_manifest: TrainingDatasetManifestAttestation,
 ) -> tuple[Path, str | None, str]:
     """Create or verify the immutable contract governing checkpoint resume."""
-    output_dir = config.output_dir.resolve()
+    linked_component = _first_linked_path_component(config.output_dir)
+    if linked_component is not None:
+        raise ValueError("training output path must not contain links or reparse points")
+    output_dir = config.output_dir.absolute()
     contract_path = output_dir / "run-contract.json"
     config_hash = _stable_hash(config.model_dump(mode="json"))
     expected = TrainingRunContract(
@@ -222,14 +245,22 @@ def prepare_training_run(
         path.name
         for path in entries
         if path.name.startswith("checkpoint-")
-        and (not path.is_dir() or re.fullmatch(r"checkpoint-[0-9]+", path.name) is None)
+        and (
+            not path.is_dir()
+            or _is_link_or_reparse_point(path)
+            or re.fullmatch(r"checkpoint-[0-9]+", path.name) is None
+        )
     ]
     if malformed_checkpoints:
         raise ValueError(
             "training output has malformed checkpoints: " + ", ".join(malformed_checkpoints)
         )
     checkpoints = [
-        path for path in entries if path.is_dir() and re.fullmatch(r"checkpoint-[0-9]+", path.name)
+        path
+        for path in entries
+        if path.is_dir()
+        and not _is_link_or_reparse_point(path)
+        and re.fullmatch(r"checkpoint-[0-9]+", path.name)
     ]
     other_entries = [
         path for path in entries if path not in checkpoints and path.name != contract_path.name
