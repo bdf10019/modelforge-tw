@@ -8,6 +8,7 @@ param(
     [string]$ModelVersion = "",
     [string]$PromptVersion = "optimized-v2",
     [string]$Adapter = "artifacts/qwen3-1.7b-triage-lora-v5/final-adapter",
+    [string]$AdapterTrainingReport = "artifacts/qwen3-1.7b-triage-lora-v5/training-report.json",
     [string]$BaseUrl = "http://127.0.0.1:8081",
     [string]$Quantization = "",
     [int]$ContextWindowTokens = 2048,
@@ -42,7 +43,7 @@ if (-not [string]::IsNullOrWhiteSpace($ModelVersion)) {
     $arguments += @("--model-version", $ModelVersion)
 }
 if ($Engine -eq "transformers") {
-    $arguments += @("--adapter", $Adapter, "--load-in-4bit")
+    $arguments += @("--adapter", $Adapter, "--adapter-training-report", $AdapterTrainingReport, "--load-in-4bit")
 }
 elseif ($Engine -eq "llama-http") {
     $arguments += @("--base-url", $BaseUrl, "--quantization", $Quantization)

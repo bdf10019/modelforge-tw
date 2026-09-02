@@ -399,6 +399,9 @@ def build_engine(settings: Settings) -> InferenceEngine:
             model_id=settings.model_id,
             model_revision=settings.model_revision,
             adapter_path=settings.adapter_path,
+            adapter_training_report=(
+                str(settings.adapter_training_report) if settings.adapter_training_report else None
+            ),
             prompt_version=settings.prompt_version,
             model_version=settings.model_version,
             load_in_4bit=settings.load_in_4bit,

@@ -66,6 +66,8 @@
 - 本機 Transformers 的 tokenizer assets 必須全部來自指定 Hugging Face snapshot commit；訓練、merge
   與 serving 都執行此檢查，serving 並核對載入後模型 config 的 `_commit_hash`，防止權重／tokenizer
   或服務快取來源分裂。
+- 直接 PEFT serving、evaluate 與 benchmark 不接受單獨 adapter 路徑；training report 必須成對提供並
+  在載入 ML runtime 前驗證，續跑 cache 另綁定該報告 SHA-256，不能沿用不同訓練 lineage 的結果。
 - Measured evaluate／benchmark 必須顯式提供 `--model-version`；`unversioned`、控制字元與不安全識別字
   不能進入引擎、推論 metadata、評測報告或 registry，避免不同 artifact 共用模糊身份。
 - llama-http measured 流程另強制顯式量化格式；`unknown` 或不安全識別字不能進入 runtime metadata、

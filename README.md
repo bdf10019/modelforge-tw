@@ -79,6 +79,8 @@ API、安全 gate、評測與 registry 機制，其數字不代表 LLM 品質，
 訓練與 merge 還會核對下載層回報的 resolved commit 必須逐字等於要求值，缺失或漂移即停止；
 merge 另要求 `--training-report`，並在載入模型前重算其中列出的每個 adapter 檔案；
 訓練、merge 與 Transformers serving 也會由 tokenizer cache snapshot 路徑核對同一 commit；
+直接 PEFT 評測／壓測使用 `--adapter` 時，必須同時提供 `--adapter-training-report`；服務環境則成對
+設定 `MODELFORGE_ADAPTER_PATH` 與 `MODELFORGE_ADAPTER_TRAINING_REPORT`。
 `probe-model` 也有明確 `--model-revision`，因此下載探針、訓練、評測、merge 與服務不會各自漂移。
 實測評估與訓練的省略值同樣對齊現行 `optimized-v2`、192-token 契約；歷史 v1 比較仍須顯式指定。
 Transformers／llama-http 的評估與壓測必須顯式帶 `--model-version`，不接受 `unversioned` 身份。

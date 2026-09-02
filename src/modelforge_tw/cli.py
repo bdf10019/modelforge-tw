@@ -76,12 +76,17 @@ def _engine_from_args(args: argparse.Namespace):
     if args.engine == "transformers":
         if args.model_version is None:
             raise ValueError("measured engines require --model-version")
+        if bool(args.adapter) != bool(args.adapter_training_report):
+            raise ValueError("--adapter and --adapter-training-report must be provided together")
         from modelforge_tw.engines.transformers_local import TransformersInferenceEngine
 
         return TransformersInferenceEngine(
             model_id=args.model_id,
             model_revision=args.model_revision,
             adapter_path=str(args.adapter) if args.adapter else None,
+            adapter_training_report=(
+                str(args.adapter_training_report) if args.adapter_training_report else None
+            ),
             prompt_version=args.prompt_version,
             load_in_4bit=args.load_in_4bit,
             model_version=args.model_version,
@@ -159,7 +164,7 @@ def _evaluation_fingerprint(args: argparse.Namespace) -> str:
             if path.is_file()
         }
     payload = {
-        "cache_fingerprint_version": "8",
+        "cache_fingerprint_version": "9",
         "openai_http_contract_version": OPENAI_HTTP_CONTRACT_VERSION,
         "safety_policy_version": args.safety_policy_version,
         "evaluation_contract_version": EVALUATION_CONTRACT_VERSION,
@@ -175,6 +180,9 @@ def _evaluation_fingerprint(args: argparse.Namespace) -> str:
         "context_window_tokens": args.context_window_tokens,
         "max_model_response_bytes": args.max_model_response_bytes,
         "adapter_files": adapter_files,
+        "adapter_training_report_sha256": (
+            sha256_file(args.adapter_training_report) if args.adapter_training_report else None
+        ),
     }
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -620,6 +628,7 @@ def build_parser() -> argparse.ArgumentParser:
             default=DEFAULT_PROMPT_VERSION,
         )
         command.add_argument("--adapter", type=Path)
+        command.add_argument("--adapter-training-report", type=Path)
         command.add_argument("--load-in-4bit", action="store_true")
         command.add_argument("--max-new-tokens", type=int, default=DEFAULT_MAX_NEW_TOKENS)
         command.add_argument("--context-window-tokens", type=int, default=2048)

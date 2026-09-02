@@ -9,6 +9,7 @@ param(
     [string]$Quantization = "q8_0",
     [string]$PromptVersion = "optimized-v2",
     [string]$AdapterPath = "artifacts/qwen3-1.7b-triage-lora-v5/final-adapter",
+    [string]$AdapterTrainingReport = "artifacts/qwen3-1.7b-triage-lora-v5/training-report.json",
     [string]$LlamaBaseUrl = "http://127.0.0.1:8081",
     [int]$ContextWindowTokens = 2048,
     [ValidateSet("risk-precedence-v2", "risk-precedence-v3")]
@@ -30,6 +31,7 @@ $env:MODELFORGE_CONTEXT_WINDOW_TOKENS = $ContextWindowTokens
 $env:MODELFORGE_SAFETY_POLICY_VERSION = $SafetyPolicyVersion
 if ($Engine -eq "transformers") {
     $env:MODELFORGE_ADAPTER_PATH = $AdapterPath
+    $env:MODELFORGE_ADAPTER_TRAINING_REPORT = $AdapterTrainingReport
     $env:MODELFORGE_LOAD_IN_4BIT = "true"
 }
 elseif ($Engine -eq "llama-http") {

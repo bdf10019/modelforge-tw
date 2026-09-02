@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from modelforge_tw.model_identity import (
@@ -30,6 +32,7 @@ class Settings(BaseSettings):
     quantization: str = "bnb-nf4"
     prompt_version: PromptVersion = DEFAULT_PROMPT_VERSION
     adapter_path: str | None = None
+    adapter_training_report: Path | None = None
     load_in_4bit: bool = True
     max_new_tokens: int = Field(default=DEFAULT_MAX_NEW_TOKENS, ge=32, le=512)
     context_window_tokens: int = Field(default=2048, ge=1536, le=131072)
@@ -52,6 +55,11 @@ class Settings(BaseSettings):
     @field_validator("api_key", mode="before")
     @classmethod
     def empty_api_key_disables_authentication(cls, value: object) -> object:
+        return None if value == "" else value
+
+    @field_validator("adapter_path", "adapter_training_report", mode="before")
+    @classmethod
+    def empty_adapter_setting_is_disabled(cls, value: object) -> object:
         return None if value == "" else value
 
     @field_validator("registry_deployment_role", mode="before")
@@ -80,3 +88,9 @@ class Settings(BaseSettings):
         if value is not None and len(value.get_secret_value()) < 32:
             raise ValueError("API key must contain at least 32 characters")
         return value
+
+    @model_validator(mode="after")
+    def adapter_lineage_settings_are_paired(self) -> Settings:
+        if bool(self.adapter_path) != (self.adapter_training_report is not None):
+            raise ValueError("adapter path and adapter training report must be configured together")
+        return self

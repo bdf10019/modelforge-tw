@@ -52,6 +52,8 @@ Web / REST / OpenAI-compatible client
   訓練、merge 與 Transformers serving 會從 tokenizer 的實際 Hugging Face cache snapshot paths
   解析 commit，要求所有 tokenizer assets 來自同一個指定 revision；serving 也會在模型載入後核對
   config `_commit_hash`。Training report 1.2 另保存並強制驗證 resolved tokenizer revision。
+  Transformers 直接掛載 PEFT adapter 時，CLI／環境設定／引擎三層都要求 training report 成對提供，
+  並重用 merge 的檔案與身份驗證；evaluation cache fingerprint 也包含 training report SHA-256。
   未指定時的實測評估與訓練也統一使用現行 attestation 的 `optimized-v2`／192-token 生成契約；歷史
   A/B 實驗的 v1 標記只保留在既有證據與顯式選擇中。
   Prompt 與 safety policy 的已實作版本由單一型別契約列舉；推論 metadata、evaluation report 與

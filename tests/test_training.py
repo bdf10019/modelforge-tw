@@ -240,6 +240,36 @@ def test_measured_cli_requires_explicit_model_version():
     assert error.value.code == 2
 
 
+def test_transformers_cli_requires_adapter_training_report_pair():
+    adapter_only = build_parser().parse_args(
+        [
+            "evaluate",
+            "--engine",
+            "transformers",
+            "--model-version",
+            "test-v1",
+            "--adapter",
+            "adapter",
+        ]
+    )
+    with pytest.raises(ValueError, match="--adapter-training-report"):
+        cli._engine_from_args(adapter_only)
+
+    report_only = build_parser().parse_args(
+        [
+            "evaluate",
+            "--engine",
+            "transformers",
+            "--model-version",
+            "test-v1",
+            "--adapter-training-report",
+            "training-report.json",
+        ]
+    )
+    with pytest.raises(ValueError, match="--adapter and"):
+        cli._engine_from_args(report_only)
+
+
 def test_llama_cli_requires_explicit_quantization():
     args = build_parser().parse_args(
         [

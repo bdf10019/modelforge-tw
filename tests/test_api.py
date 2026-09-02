@@ -35,6 +35,19 @@ def test_service_defaults_to_attested_safety_policy_v2():
         Settings(prompt_version="unknown-v1")
 
 
+def test_service_requires_adapter_and_training_report_pair():
+    with pytest.raises(ValueError, match="configured together"):
+        Settings(adapter_path="artifacts/adapter")
+    with pytest.raises(ValueError, match="configured together"):
+        Settings(adapter_training_report="artifacts/training-report.json")
+    settings = Settings(
+        adapter_path="artifacts/adapter",
+        adapter_training_report="artifacts/training-report.json",
+    )
+    assert settings.adapter_path == "artifacts/adapter"
+    assert settings.adapter_training_report is not None
+
+
 def test_registry_deployment_binding_is_optional():
     assert Settings(registry_deployment_role="").registry_deployment_role is None
     assert Settings(registry_artifact_root="").registry_artifact_root is None

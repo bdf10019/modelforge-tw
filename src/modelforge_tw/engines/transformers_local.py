@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import time
+from pathlib import Path
 from typing import Any, Literal
 
 from modelforge_tw.model_identity import (
@@ -31,6 +32,7 @@ class TransformersInferenceEngine:
         *,
         model_id: str,
         adapter_path: str | None,
+        adapter_training_report: str | None = None,
         prompt_version: PromptVersion,
         model_revision: str = DEFAULT_BASE_MODEL_REVISION,
         load_in_4bit: bool = False,
@@ -40,6 +42,17 @@ class TransformersInferenceEngine:
     ) -> None:
         validate_immutable_model_revision(model_revision)
         validate_model_version(model_version)
+        if bool(adapter_path) != bool(adapter_training_report):
+            raise ValueError("adapter and adapter training report must be provided together")
+        if adapter_path and adapter_training_report:
+            from modelforge_tw.training import verify_adapter_training_lineage
+
+            verify_adapter_training_lineage(
+                model_id=model_id,
+                model_revision=model_revision,
+                adapter_path=Path(adapter_path),
+                training_report_path=Path(adapter_training_report),
+            )
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
