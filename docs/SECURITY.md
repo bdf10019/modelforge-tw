@@ -61,6 +61,8 @@
   commit hash；預設統一鎖定已驗證 commit，浮動的 `main`／tag 在載入模型或 ML runtime 前拒絕。
 - 訓練與 merge 載入模型後會把 loader 回報的 resolved commit 與要求值逐字比對；缺失、格式錯誤或
   不相等都停止，training attestation 載入時也會再次核對，避免快取或下載層漂移被報告掩蓋。
+- Merge 必須顯式提供 training report；載入 ML runtime 前逐項核對 base identity 與 adapter regular
+  files 的集合、大小及 SHA-256，不接受額外檔、缺檔、symlink 或被替換的 adapter。
 - Measured evaluate／benchmark 必須顯式提供 `--model-version`；`unversioned`、控制字元與不安全識別字
   不能進入引擎、推論 metadata、評測報告或 registry，避免不同 artifact 共用模糊身份。
 - llama-http measured 流程另強制顯式量化格式；`unknown` 或不安全識別字不能進入 runtime metadata、

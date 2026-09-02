@@ -521,6 +521,7 @@ def command_merge(args: argparse.Namespace) -> int:
         model_id=args.model_id,
         model_revision=args.model_revision,
         adapter_path=args.adapter,
+        training_report_path=args.training_report,
         output_dir=args.output,
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
@@ -714,6 +715,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_BASE_MODEL_REVISION,
     )
     merge.add_argument("--adapter", type=Path, required=True)
+    merge.add_argument("--training-report", type=Path, required=True)
     merge.add_argument("--output", type=Path, required=True)
     merge.set_defaults(func=command_merge)
 

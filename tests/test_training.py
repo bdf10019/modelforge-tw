@@ -22,6 +22,7 @@ from modelforge_tw.training import (
     TrainingReportAttestation,
     installed_dependency_versions,
     merge_adapter,
+    verify_adapter_training_lineage,
 )
 
 
@@ -29,6 +30,35 @@ def _stable_hash(payload: dict[str, object]) -> str:
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
     ).hexdigest()
+
+
+def _write_attested_adapter(tmp_path):
+    adapter = tmp_path / "adapter"
+    adapter.mkdir()
+    model_file = adapter / "adapter_model.safetensors"
+    model_file.write_bytes(b"adapter-fixture")
+    file_hash = hashlib.sha256(model_file.read_bytes()).hexdigest()
+    config = TrainingConfig().model_dump(mode="json")
+    report = tmp_path / "training-report.json"
+    report.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.1",
+                "evidence_kind": "measured",
+                "model_id": config["model_id"],
+                "model_revision": config["model_revision"],
+                "resolved_model_revision": config["model_revision"],
+                "config": config,
+                "training_config_sha256": _stable_hash(config),
+                "dataset_manifest_sha256": "a" * 64,
+                "final_adapter_files": {
+                    model_file.name: {"bytes": model_file.stat().st_size, "sha256": file_hash}
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    return adapter, report
 
 
 def test_training_dependency_snapshot_is_complete_and_versioned():
@@ -42,7 +72,15 @@ def test_model_workflows_default_to_one_immutable_base_revision(tmp_path):
     parser = build_parser()
     evaluate = parser.parse_args(["evaluate"])
     merge = parser.parse_args(
-        ["merge", "--adapter", str(tmp_path / "adapter"), "--output", str(tmp_path / "merged")]
+        [
+            "merge",
+            "--adapter",
+            str(tmp_path / "adapter"),
+            "--training-report",
+            str(tmp_path / "training-report.json"),
+            "--output",
+            str(tmp_path / "merged"),
+        ]
     )
     probe = parser.parse_args(["probe-model"])
 
@@ -88,6 +126,35 @@ def test_training_attestation_rejects_resolved_revision_drift():
         )
 
 
+def test_adapter_lineage_verification_rejects_file_or_identity_drift(tmp_path):
+    adapter, report = _write_attested_adapter(tmp_path)
+    attestation, report_hash = verify_adapter_training_lineage(
+        model_id="Qwen/Qwen3-1.7B",
+        model_revision=DEFAULT_BASE_MODEL_REVISION,
+        adapter_path=adapter,
+        training_report_path=report,
+    )
+    assert attestation.model_revision == DEFAULT_BASE_MODEL_REVISION
+    assert report_hash == hashlib.sha256(report.read_bytes()).hexdigest()
+
+    with pytest.raises(ValueError, match="model_id"):
+        verify_adapter_training_lineage(
+            model_id="different/model",
+            model_revision=DEFAULT_BASE_MODEL_REVISION,
+            adapter_path=adapter,
+            training_report_path=report,
+        )
+
+    (adapter / "adapter_model.safetensors").write_bytes(b"tampered")
+    with pytest.raises(ValueError, match="does not match training report"):
+        verify_adapter_training_lineage(
+            model_id="Qwen/Qwen3-1.7B",
+            model_revision=DEFAULT_BASE_MODEL_REVISION,
+            adapter_path=adapter,
+            training_report_path=report,
+        )
+
+
 def test_cli_rejects_floating_model_revision():
     with pytest.raises(SystemExit) as error:
         build_parser().parse_args(["evaluate", "--model-revision", "main"])
@@ -112,6 +179,7 @@ def test_model_operations_reject_floating_revision_before_loading_ml_runtime(tmp
             model_id="Qwen/Qwen3-1.7B",
             model_revision="main",
             adapter_path=tmp_path / "adapter",
+            training_report_path=tmp_path / "training-report.json",
             output_dir=output,
         )
     assert not output.exists()

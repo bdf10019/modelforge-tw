@@ -70,6 +70,13 @@ class TrainingConfig(BaseModel):
     prompt_version: OptimizedPromptVersion = DEFAULT_PROMPT_VERSION
 
 
+class AdapterFileAttestation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    bytes: int = Field(ge=0)
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
 class TrainingReportAttestation(BaseModel):
     """Minimum verified lineage required before a training run enters the registry."""
 
@@ -83,6 +90,7 @@ class TrainingReportAttestation(BaseModel):
     config: dict[str, Any]
     training_config_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     dataset_manifest_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    final_adapter_files: dict[str, AdapterFileAttestation] | None = None
 
     @model_validator(mode="after")
     def validate_lineage(self) -> TrainingReportAttestation:
@@ -103,6 +111,48 @@ class TrainingReportAttestation(BaseModel):
 
 def load_training_config(path: Path) -> TrainingConfig:
     return TrainingConfig.model_validate_json(read_utf8_text_limited(path))
+
+
+def verify_adapter_training_lineage(
+    *,
+    model_id: str,
+    model_revision: str,
+    adapter_path: Path,
+    training_report_path: Path,
+) -> tuple[TrainingReportAttestation, str]:
+    """Verify an adapter against its measured training report before merge."""
+    validate_immutable_model_revision(model_revision)
+    report = TrainingReportAttestation.model_validate_json(
+        read_utf8_text_limited(training_report_path)
+    )
+    mismatches: list[str] = []
+    if report.model_id != model_id:
+        mismatches.append("model_id")
+    if report.model_revision != model_revision:
+        mismatches.append("model_revision")
+    if mismatches:
+        raise ValueError("adapter training lineage mismatch: " + ", ".join(mismatches))
+    if report.final_adapter_files is None:
+        raise ValueError("training report lacks final adapter file attestations")
+    if not report.final_adapter_files:
+        raise ValueError("training report has no final adapter file attestations")
+    if not adapter_path.is_dir():
+        raise FileNotFoundError(adapter_path)
+
+    entries = sorted(adapter_path.iterdir(), key=lambda path: path.name)
+    if any(not path.is_file() or path.is_symlink() for path in entries):
+        raise ValueError("adapter directory must contain regular files only")
+    actual_names = {path.name for path in entries}
+    expected_names = set(report.final_adapter_files)
+    if actual_names != expected_names:
+        raise ValueError("adapter files do not match training report")
+    for name, expected in report.final_adapter_files.items():
+        if Path(name).name != name or any(ord(character) < 32 for character in name):
+            raise ValueError("training report contains an unsafe adapter file name")
+        path = adapter_path / name
+        if path.stat().st_size != expected.bytes or sha256_file(path) != expected.sha256:
+            raise ValueError(f"adapter file does not match training report: {name}")
+    return report, sha256_file(training_report_path)
 
 
 def _stable_hash(payload: dict[str, Any]) -> str:
@@ -392,10 +442,19 @@ def merge_adapter(
     *,
     model_id: str,
     adapter_path: Path,
+    training_report_path: Path,
     output_dir: Path,
     model_revision: str = DEFAULT_BASE_MODEL_REVISION,
 ) -> dict[str, Any]:
-    validate_immutable_model_revision(model_revision)
+    training_report, training_report_sha256 = verify_adapter_training_lineage(
+        model_id=model_id,
+        model_revision=model_revision,
+        adapter_path=adapter_path,
+        training_report_path=training_report_path,
+    )
+    adapter_files = training_report.final_adapter_files
+    if adapter_files is None:  # validated by verify_adapter_training_lineage
+        raise RuntimeError("validated training report lost adapter attestations")
     import torch
     from peft import PeftModel
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -433,6 +492,14 @@ def merge_adapter(
         "model_id": model_id,
         "model_revision": model_revision,
         "resolved_model_revision": resolved_model_revision,
+        "source_training_report": str(training_report_path),
+        "source_training_report_sha256": training_report_sha256,
+        "training_config_sha256": training_report.training_config_sha256,
+        "dataset_manifest_sha256": training_report.dataset_manifest_sha256,
+        "adapter_files": {
+            name: evidence.model_dump(mode="json")
+            for name, evidence in sorted(adapter_files.items())
+        },
         "merge_device": torch.cuda.get_device_name(0) if use_cuda else "cpu",
         "peak_vram_allocated_bytes": torch.cuda.max_memory_allocated() if use_cuda else None,
         "peak_vram_reserved_bytes": torch.cuda.max_memory_reserved() if use_cuda else None,

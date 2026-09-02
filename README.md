@@ -77,6 +77,7 @@ API、安全 gate、評測與 registry 機制，其數字不代表 LLM 品質，
 
 所有 base-model 操作預設鎖定同一個已驗證的 Hugging Face commit；CLI 不接受 `main` 或浮動 tag。
 訓練與 merge 還會核對下載層回報的 resolved commit 必須逐字等於要求值，缺失或漂移即停止；
+merge 另要求 `--training-report`，並在載入模型前重算其中列出的每個 adapter 檔案；
 `probe-model` 也有明確 `--model-revision`，因此下載探針、訓練、評測、merge 與服務不會各自漂移。
 實測評估與訓練的省略值同樣對齊現行 `optimized-v2`、192-token 契約；歷史 v1 比較仍須顯式指定。
 Transformers／llama-http 的評估與壓測必須顯式帶 `--model-version`，不接受 `unversioned` 身份。
@@ -87,6 +88,7 @@ llama-http 另須提供 `--quantization`，不接受 `unknown` 進入實測證�
 .\scripts\train.ps1
 .\scripts\evaluate.ps1 -Full
 modelforge merge --adapter artifacts\qwen3-1.7b-triage-lora-v5\final-adapter `
+  --training-report artifacts\qwen3-1.7b-triage-lora-v5\training-report.json `
   --output artifacts\qwen3-1.7b-triage-merged
 .\scripts\prepare-llama.ps1
 .\scripts\quantize.ps1

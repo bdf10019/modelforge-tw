@@ -46,6 +46,9 @@ Web / REST / OpenAI-compatible client
   revision 必須是 40–64 位 lowercase commit hash，`main`／tag 會在匯入大型 ML runtime 前 fail fast。
   訓練與合併在模型載入後還要求 Hugging Face 回報的 resolved commit 逐字相等，報告驗證也重做
   同一比較，不能只因 requested／resolved 各自長得像 hash 就接受。
+  合併前還會解析明確指定的 training report，核對 base identity，並重算 adapter 目錄中每個 regular
+  file 的大小與 SHA-256；新增、缺少、symlink 或內容漂移都在匯入 Torch／PEFT 前停止。新版 merge
+  report 保存 training report hash、資料／設定 lineage 與 adapter file attestations。
   未指定時的實測評估與訓練也統一使用現行 attestation 的 `optimized-v2`／192-token 生成契約；歷史
   A/B 實驗的 v1 標記只保留在既有證據與顯式選擇中。
   Prompt 與 safety policy 的已實作版本由單一型別契約列舉；推論 metadata、evaluation report 與
