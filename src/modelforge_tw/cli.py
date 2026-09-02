@@ -64,6 +64,7 @@ def _engine_from_args(args: argparse.Namespace):
         return OpenAIHTTPInferenceEngine(
             base_url=args.base_url,
             model_id=args.model_id,
+            model_revision=args.model_revision,
             model_version=args.model_version,
             quantization=args.quantization,
             prompt_version=args.prompt_version,

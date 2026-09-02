@@ -9,7 +9,9 @@ from urllib.parse import urlsplit
 import httpx
 
 from modelforge_tw.model_identity import (
+    DEFAULT_BASE_MODEL_REVISION,
     DEFAULT_MAX_NEW_TOKENS,
+    validate_immutable_model_revision,
     validate_model_version,
     validate_quantization,
 )
@@ -114,6 +116,7 @@ class OpenAIHTTPInferenceEngine:
         *,
         base_url: str,
         model_id: str,
+        model_revision: str = DEFAULT_BASE_MODEL_REVISION,
         model_version: str,
         quantization: str,
         prompt_version: PromptVersion,
@@ -123,11 +126,13 @@ class OpenAIHTTPInferenceEngine:
         max_response_bytes: int = DEFAULT_MAX_MODEL_RESPONSE_BYTES,
         safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,
     ) -> None:
+        validate_immutable_model_revision(model_revision)
         validate_model_version(model_version)
         validate_quantization(quantization)
         self.name = "openai-http"
         self.base_url = _validated_base_url(base_url)
         self.model_id = model_id
+        self.model_revision = model_revision
         self.model_version = model_version
         self.quantization = quantization
         self.prompt_version = prompt_version
@@ -269,6 +274,7 @@ class OpenAIHTTPInferenceEngine:
                 engine=self.name,
                 model_id=self.model_id,
                 model_version=self.model_version,
+                model_revision=self.model_revision,
                 quantization=self.quantization,
                 prompt_version=self.prompt_version,
                 elapsed_ms=elapsed_ms,

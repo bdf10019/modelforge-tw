@@ -384,6 +384,7 @@ def build_engine(settings: Settings) -> InferenceEngine:
         return OpenAIHTTPInferenceEngine(
             base_url=settings.llama_base_url,
             model_id=settings.model_id,
+            model_revision=settings.model_revision,
             model_version=settings.model_version,
             quantization=settings.quantization,
             prompt_version=settings.prompt_version,

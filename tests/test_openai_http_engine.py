@@ -26,6 +26,7 @@ def make_engine(
     return OpenAIHTTPInferenceEngine(
         base_url=base_url,
         model_id="model-q8",
+        model_revision="a" * 40,
         model_version="v5",
         quantization="q8_0",
         prompt_version="optimized-v2",
@@ -87,6 +88,18 @@ def test_model_server_rejects_unversioned_runtime_identity():
             base_url="http://model.test",
             model_id="model-q8",
             model_version="unversioned",
+            quantization="q8_0",
+            prompt_version="optimized-v2",
+        )
+
+
+def test_model_server_rejects_floating_source_revision():
+    with pytest.raises(ValueError, match="commit hash"):
+        OpenAIHTTPInferenceEngine(
+            base_url="http://model.test",
+            model_id="model-q8",
+            model_revision="main",
+            model_version="v5",
             quantization="q8_0",
             prompt_version="optimized-v2",
         )
@@ -181,6 +194,7 @@ def test_non_streaming_generation_sends_strict_contract_and_records_usage(monkey
     assert result.output.severity == "high"
     assert result.metadata.prompt_tokens == 87
     assert result.metadata.output_tokens == 41
+    assert result.metadata.model_revision == "a" * 40
     assert result.metadata.context_window_tokens == 2048
     assert result.metadata.safety_policy_version == "risk-precedence-v2"
     assert result.metadata.evidence_kind == "measured"
