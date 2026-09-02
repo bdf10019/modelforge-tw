@@ -196,7 +196,7 @@ def test_registry_preserves_parallel_candidate_additions(tmp_path):
 def test_registry_event_chain_detects_content_tampering(tmp_path):
     registry = FileRegistry(tmp_path / "registry.json")
     state = registry.add(manifest("v1"))
-    assert state.schema_version == "1.4"
+    assert state.schema_version == "1.5"
     assert state.events[0].event_sha256 is not None
 
     payload = json.loads(registry.path.read_text(encoding="utf-8"))
@@ -207,13 +207,24 @@ def test_registry_event_chain_detects_content_tampering(tmp_path):
         registry.load()
 
 
+def test_registry_state_hash_detects_manifest_tampering(tmp_path):
+    registry = FileRegistry(tmp_path / "registry.json")
+    registry.add(manifest("v1"))
+    payload = json.loads(registry.path.read_text(encoding="utf-8"))
+    payload["manifests"]["v1"]["license"] = "tampered-license"
+    registry.path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="state hash"):
+        registry.load()
+
+
 def test_registry_anchor_binds_exact_snapshot_and_verified_event_head(tmp_path):
     registry = FileRegistry(tmp_path / "registry.json")
     state = registry.add(manifest("v1"))
 
     anchor = registry.anchor()
 
-    assert anchor.schema_version == "1.4"
+    assert anchor.schema_version == "1.5"
     assert anchor.registry_sha256 == hashlib.sha256(registry.path.read_bytes()).hexdigest()
     assert anchor.event_count == 1
     assert anchor.event_chain_verified is True
@@ -272,10 +283,11 @@ def test_registry_mutation_seals_legacy_events_into_hash_chain(tmp_path):
 
     state = registry.add(manifest("v2"))
 
-    assert state.schema_version == "1.4"
+    assert state.schema_version == "1.5"
     assert len(state.events) == 2
     assert all(event.event_sha256 is not None for event in state.events)
     assert state.events[1].previous_event_sha256 == state.events[0].event_sha256
+    assert state.events[-1].registry_state_sha256 is not None
 
 
 def test_registry_events_require_timezone_existing_manifest_and_chronology():
@@ -603,7 +615,7 @@ def test_registry_never_promotes_fixture_evidence(tmp_path):
     assert state.manifests["fixture-only"].status == "candidate"
 
 
-def test_registry_rechecks_attestation_before_promotion(tmp_path):
+def test_registry_rejects_attestation_tampering_before_promotion(tmp_path):
     registry = FileRegistry(tmp_path / "registry.json")
     state = registry.add(manifest("v1"))
     state.manifests["v1"] = state.manifests["v1"].model_copy(
@@ -611,9 +623,9 @@ def test_registry_rechecks_attestation_before_promotion(tmp_path):
     )
     registry.path.write_text(state.model_dump_json(indent=2), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="manifest lacks evaluation attestation"):
+    with pytest.raises(ValueError, match="registry state hash"):
         registry.promote("v1")
-    assert registry.load().released is None
+    assert json.loads(registry.path.read_text(encoding="utf-8"))["released"] is None
 
 
 def test_registry_allows_only_fully_legacy_previous_good_on_schema_1_rollback(tmp_path):

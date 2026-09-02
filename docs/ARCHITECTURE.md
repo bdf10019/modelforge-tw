@@ -95,8 +95,10 @@ Web / REST / OpenAI-compatible client
   `/readyz` 也會重讀 pointer 與相同契約，運行中 registry 改版會先撤除此 Pod 流量，等待明確重啟。
   若另設定 artifact root，啟動還會重算評測／訓練報告與模型 artifact 的大小及 SHA-256；高頻 readiness
   不重讀大型權重。這能驗證 API Pod 看見的唯讀掛載副本，不等同遠端模型 server 的記憶體證明。
-  Registry 1.4 將操作事件限制為 typed schema，並以 canonical JSON SHA-256 串接前一筆事件；
-  1.0–1.3 可唯讀相容，下一次 mutation 才封入新鏈。這可偵測未同步重算的封存後改寫，但不是
+  Registry 1.5 將操作事件限制為 typed schema，以 canonical JSON SHA-256 串接前一筆事件，並讓
+  最新事件封存當下完整 manifests、released／previous-good 指標與 schema 的狀態雜湊；直接改寫
+  manifest 欄位也會在載入時被拒絕。1.0–1.4 可唯讀相容，下一次 mutation 才封入 1.5 新鏈。
+  這可偵測未同步重算的封存後改寫，但不是
   外部數位簽章或不可變 audit storage；能改寫檔案的攻擊者也能重算整條鏈。正式環境必須把 head digest／registry
   副本送往獨立受控稽核系統，才能對抗事後重算。`modelforge registry anchor` 會先完整驗證
   registry，再從同一次讀取匯出整份檔案 SHA-256、事件數、鏈驗證狀態與 head digest；舊版未封鏈

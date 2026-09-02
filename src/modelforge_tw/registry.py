@@ -119,6 +119,7 @@ class RegistryEvent(BaseModel):
     manifest_id: str = Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
     evaluation_report: str | None = None
     evaluation_report_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    registry_state_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     previous_event_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     event_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
 
@@ -156,7 +157,7 @@ def _registry_event_sha256(event: RegistryEvent) -> str:
 class RegistryState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["1.0", "1.1", "1.2", "1.3", "1.4"] = "1.4"
+    schema_version: Literal["1.0", "1.1", "1.2", "1.3", "1.4", "1.5"] = "1.5"
     released: str | None = None
     previous_good: str | None = None
     manifests: dict[str, ModelManifest] = Field(default_factory=dict)
@@ -196,7 +197,7 @@ class RegistryState(BaseModel):
             if current_event.at < previous_event.at:
                 raise ValueError("registry event timestamps are not chronological")
 
-        if self.schema_version == "1.4":
+        if self.schema_version in {"1.4", "1.5"}:
             previous_digest: str | None = None
             for event in self.events:
                 if event.previous_event_sha256 != previous_digest:
@@ -206,7 +207,16 @@ class RegistryState(BaseModel):
                 ):
                     raise ValueError("registry event chain hash does not match event contents")
                 previous_digest = event.event_sha256
+        if self.schema_version == "1.5" and self.events:
+            if self.events[-1].registry_state_sha256 != _registry_state_sha256(self):
+                raise ValueError("registry state hash does not match manifests and pointers")
         return self
+
+
+def _registry_state_sha256(state: RegistryState) -> str:
+    payload = state.model_dump(mode="json", exclude={"events"})
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return sha256(encoded).hexdigest()
 
 
 class RegistryAnchor(BaseModel):
@@ -214,7 +224,7 @@ class RegistryAnchor(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["1.0", "1.1", "1.2", "1.3", "1.4"]
+    schema_version: Literal["1.0", "1.1", "1.2", "1.3", "1.4", "1.5"]
     registry_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     event_count: int = Field(ge=0)
     event_chain_verified: bool
@@ -236,7 +246,7 @@ class FileRegistry:
         """Validate and hash the exact snapshot read from the registry file."""
         serialized = read_utf8_text_limited(self.path)
         state = RegistryState.model_validate_json(serialized)
-        chain_verified = state.schema_version == "1.4"
+        chain_verified = state.schema_version in {"1.4", "1.5"}
         chain_head = state.events[-1].event_sha256 if chain_verified and state.events else None
         return RegistryAnchor(
             schema_version=state.schema_version,
@@ -271,10 +281,11 @@ class FileRegistry:
     ) -> None:
         previous_digest: str | None = None
         chained_events: list[RegistryEvent] = []
-        if state.schema_version != "1.4":
+        if state.schema_version != "1.5":
             for existing in state.events:
                 event = existing.model_copy(
                     update={
+                        "registry_state_sha256": None,
                         "previous_event_sha256": previous_digest,
                         "event_sha256": None,
                     }
@@ -283,7 +294,7 @@ class FileRegistry:
                 chained_events.append(event)
                 previous_digest = event.event_sha256
             state.events = chained_events
-            state.schema_version = "1.4"
+            state.schema_version = "1.5"
         elif state.events:
             previous_digest = state.events[-1].event_sha256
 
@@ -293,6 +304,7 @@ class FileRegistry:
             manifest_id=manifest_id,
             evaluation_report=evaluation_report,
             evaluation_report_sha256=evaluation_report_sha256,
+            registry_state_sha256=_registry_state_sha256(state),
             previous_event_sha256=previous_digest,
         )
         event = event.model_copy(update={"event_sha256": _registry_event_sha256(event)})
