@@ -24,6 +24,20 @@ from modelforge_tw.safety import (
 from modelforge_tw.schemas import InferenceMetadata, InferenceResult, TriageRequest
 
 
+def _validate_context_budget(
+    *, prompt_tokens: int, max_new_tokens: int | None, context_window_tokens: int
+) -> None:
+    if (
+        prompt_tokens < 0
+        or max_new_tokens is None
+        or max_new_tokens < 1
+        or context_window_tokens < 1
+    ):
+        raise ValueError("token budgets must be positive")
+    if prompt_tokens + max_new_tokens > context_window_tokens:
+        raise ValueError("prompt and generation budget exceed the configured context window")
+
+
 class TransformersInferenceEngine:
     """Local measured inference; heavy dependencies are imported only when selected."""
 
@@ -38,10 +52,16 @@ class TransformersInferenceEngine:
         load_in_4bit: bool = False,
         model_version: str,
         max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
+        context_window_tokens: int = 2048,
         safety_policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,
     ) -> None:
         validate_immutable_model_revision(model_revision)
         validate_model_version(model_version)
+        _validate_context_budget(
+            prompt_tokens=1,
+            max_new_tokens=max_new_tokens,
+            context_window_tokens=context_window_tokens,
+        )
         if bool(adapter_path) != bool(adapter_training_report):
             raise ValueError("adapter and adapter training report must be provided together")
         if adapter_path and adapter_training_report:
@@ -64,6 +84,7 @@ class TransformersInferenceEngine:
         self.prompt_version = prompt_version
         self.evidence_kind: Literal["fixture", "measured"] = "measured"
         self.max_new_tokens: int | None = max_new_tokens
+        self.context_window_tokens = context_window_tokens
         self.structured_output_contract: str = "prompt-schema+bounded-repair-v1"
         self.safety_policy_version: SafetyPolicyVersion = safety_policy_version
         self._lock = threading.Lock()
@@ -133,6 +154,12 @@ class TransformersInferenceEngine:
         torch = self._torch
         prompt = self._render(request)
         inputs = self.tokenizer(prompt, return_tensors="pt")
+        prompt_tokens = int(inputs["input_ids"].shape[-1])
+        _validate_context_budget(
+            prompt_tokens=prompt_tokens,
+            max_new_tokens=self.max_new_tokens,
+            context_window_tokens=self.context_window_tokens,
+        )
         target_device = next(self.model.parameters()).device
         inputs = {key: value.to(target_device) for key, value in inputs.items()}
         if torch.cuda.is_available():
@@ -150,7 +177,6 @@ class TransformersInferenceEngine:
         if torch.cuda.is_available():
             torch.cuda.synchronize()
         elapsed_ms = (time.perf_counter() - started) * 1000
-        prompt_tokens = inputs["input_ids"].shape[-1]
         output_ids = generated[0, prompt_tokens:]
         decoded = self.tokenizer.decode(output_ids, skip_special_tokens=True)
         if not isinstance(decoded, str):
@@ -192,6 +218,7 @@ class TransformersInferenceEngine:
                     output_tokens / (elapsed_ms / 1000) if elapsed_ms else None
                 ),
                 max_new_tokens=self.max_new_tokens,
+                context_window_tokens=self.context_window_tokens,
                 structured_output_contract=self.structured_output_contract,
                 safety_policy_version=self.safety_policy_version,
                 evidence_kind="measured",

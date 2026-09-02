@@ -408,6 +408,7 @@ def build_engine(settings: Settings) -> InferenceEngine:
             model_version=settings.model_version,
             load_in_4bit=settings.load_in_4bit,
             max_new_tokens=settings.max_new_tokens,
+            context_window_tokens=settings.context_window_tokens,
             safety_policy_version=settings.safety_policy_version,
         )
     raise ValueError(f"unsupported engine: {settings.engine}")

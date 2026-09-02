@@ -92,6 +92,7 @@ def _engine_from_args(args: argparse.Namespace):
             load_in_4bit=args.load_in_4bit,
             model_version=args.model_version,
             max_new_tokens=args.max_new_tokens,
+            context_window_tokens=args.context_window_tokens,
             safety_policy_version=args.safety_policy_version,
         )
     raise ValueError(f"unsupported CLI engine: {args.engine}")

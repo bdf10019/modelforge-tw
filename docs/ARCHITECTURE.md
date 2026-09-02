@@ -71,8 +71,9 @@ Web / REST / OpenAI-compatible client
   進入引擎、評測報告或 registry。llama-http 也必須明確提供量化格式，`unknown` 不能進入 measured
   evidence；Transformers 則依實際 NF4／BF16 載入方式設定。載入 probe 由 immutable base commit
   推導可重現版本標記。
-  Transformers inference metadata／evaluation 內的非空 model revision 同樣只接受 commit hash，且
-  registry 必須確認它等於 training manifest 的 base revision；遠端 llama-http 無法證明時保留 `null`。
+  Transformers 與 llama-http inference metadata／evaluation 的 model revision 都只接受 pinned
+  commit hash，registry 必須確認它等於 training manifest 的 base revision。Transformers 另在生成前
+  驗證 prompt tokens 加生成上限不超過宣告的 context window；不靜默截斷超額輸入。
 - `quantize.ps1`：轉換前依 merge report 重算每個來源檔的大小與 SHA-256，並核對 llama.cpp source
   commit；新版量化報告保存 merge report hash、來源檔清單、commit 與實際 quantizer executable hash。
   既有 schema 1.0 實測報告保持唯讀，不以新欄位回填歷史執行。
