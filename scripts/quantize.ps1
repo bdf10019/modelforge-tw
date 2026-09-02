@@ -2,7 +2,8 @@
 param(
     [string]$MergedModel = "artifacts/qwen3-1.7b-triage-merged",
     [string]$OutputDirectory = "artifacts/gguf",
-    [string]$ExpectedLlamaCommit = "ca3d5a3e10d53f7ea672cb9b6178faca3e2807bc"
+    [string]$ExpectedLlamaCommit = "ca3d5a3e10d53f7ea672cb9b6178faca3e2807bc",
+    [string]$ExpectedQuantizerSha256 = "0cff41994af0a3425b63cfcdc841542ec7b709ceeced6217bc5fc156815b2122"
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,8 +14,14 @@ $sourceRoot = Join-Path $projectRoot "tools\llama.cpp-src"
 $converter = Join-Path $sourceRoot "convert_hf_to_gguf.py"
 $binaryRoot = Join-Path $projectRoot "tools\llama.cpp-bin"
 $quantizer = Get-ChildItem -LiteralPath $binaryRoot -Filter "llama-quantize.exe" -Recurse | Select-Object -First 1
-$mergedPath = Join-Path $projectRoot $MergedModel
-$outputRoot = Join-Path $projectRoot $OutputDirectory
+$projectPrefix = $projectRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+$mergedPath = [IO.Path]::GetFullPath((Join-Path $projectRoot $MergedModel))
+$outputRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot $OutputDirectory))
+foreach ($candidatePath in @($mergedPath, $outputRoot)) {
+    if (-not $candidatePath.StartsWith($projectPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "量化路徑必須位於專案目錄內：$candidatePath"
+    }
+}
 $f16 = Join-Path $outputRoot "modelforge-tw-f16.gguf"
 $q8 = Join-Path $outputRoot "modelforge-tw-q8_0.gguf"
 $q4 = Join-Path $outputRoot "modelforge-tw-q4_k_m.gguf"
@@ -27,7 +34,7 @@ function Assert-NoReparsePointInPath {
         if (Test-Path -LiteralPath $current) {
             $item = Get-Item -LiteralPath $current -Force
             if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-                throw "量化 output 路徑不能包含 reparse point：$current"
+                throw "量化路徑不能包含 reparse point：$current"
             }
         }
         $parent = Split-Path -Parent $current
@@ -40,6 +47,7 @@ if (-not (Test-Path -LiteralPath $converter)) { throw "請先執行 scripts\prep
 if (-not $quantizer) { throw "找不到 llama-quantize.exe" }
 if (-not (Test-Path -LiteralPath $mergedPath)) { throw "找不到 merged model：$mergedPath" }
 if (-not (Test-Path -LiteralPath $mergeReportPath)) { throw "找不到 merge report：$mergeReportPath" }
+Assert-NoReparsePointInPath -LiteralPath $mergedPath
 Assert-NoReparsePointInPath -LiteralPath $outputRoot
 if (Test-Path -LiteralPath $outputRoot) {
     $outputItem = Get-Item -LiteralPath $outputRoot
@@ -66,6 +74,9 @@ foreach ($property in $mergeReport.files.PSObject.Properties) {
         throw "merge report 來源檔不存在：$fileName"
     }
     $item = Get-Item -LiteralPath $sourceFile
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        throw "merge report 來源檔不能是 reparse point：$fileName"
+    }
     $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $sourceFile).Hash.ToLowerInvariant()
     if ($item.Length -ne $property.Value.bytes -or $actualHash -ne $property.Value.sha256) {
         throw "merge report 來源檔驗證失敗：$fileName"
@@ -82,7 +93,17 @@ $sourceCommit = (& git -C $sourceRoot rev-parse HEAD).Trim().ToLowerInvariant()
 if ($LASTEXITCODE -ne 0 -or $sourceCommit -ne $ExpectedLlamaCommit.ToLowerInvariant()) {
     throw "llama.cpp source commit 不符"
 }
+$sourceStatus = @(& git -C $sourceRoot status --porcelain --untracked-files=normal)
+if ($LASTEXITCODE -ne 0 -or $sourceStatus.Count -ne 0) {
+    throw "llama.cpp source tree 必須保持乾淨"
+}
+if ($quantizer.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+    throw "llama-quantize.exe 不能是 reparse point"
+}
 $quantizerHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $quantizer.FullName).Hash.ToLowerInvariant()
+if ($quantizerHash -ne $ExpectedQuantizerSha256.ToLowerInvariant()) {
+    throw "llama-quantize.exe SHA-256 不符"
+}
 
 & $python $converter $mergedPath --outfile $f16 --outtype f16
 if ($LASTEXITCODE -ne 0) { throw "HF → GGUF 轉換失敗" }
@@ -90,7 +111,7 @@ if ($LASTEXITCODE -ne 0) { throw "HF → GGUF 轉換失敗" }
 # The official Windows quantizer currently decodes non-ASCII argv paths through
 # the active code page. Keep the canonical artifacts in the project directory,
 # but use an ASCII-only, same-volume hard-link bridge while invoking the binary.
-$workspaceRoot = Split-Path -Parent (Split-Path -Parent $projectRoot)
+$workspaceRoot = Split-Path -Parent $projectRoot
 $bridgeRoot = Join-Path $workspaceRoot ("modelforge-gguf-" + [guid]::NewGuid().ToString("N"))
 $bridgeF16 = Join-Path $bridgeRoot "model-f16.gguf"
 $bridgeQ8 = Join-Path $bridgeRoot "model-q8_0.gguf"

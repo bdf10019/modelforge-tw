@@ -87,9 +87,10 @@
   被目前程式解析成已理解的發布證據，舊版 1.0–1.5 報告仍可按已知欄位唯讀驗證。
 - Evaluation report 會從 cases 重算可獨立驗證的 accuracy、macro-F1、case pass rate 與完整延遲摘要，
   並要求 `passed` 與 errors 一致；發布通過時不接受缺少 actual output 的案例。
-- 新量化流程在轉檔前會重驗 merge report 與其每個來源檔，並把 llama.cpp commit、merge report hash
-  及 quantizer executable hash 寫入報告；來源或工具漂移會在產生 GGUF 前停止。
-- 量化 output 必須是全新或空的 regular directory，不接受 reparse point；Q8／Q4 移入正式名稱時
+- 新量化流程在轉檔前會重驗 merge report 與其每個 regular source file，核對 llama.cpp commit、乾淨的
+  source tree 與 quantizer executable SHA-256，並把 lineage 寫入報告；來源或工具漂移會在產生 GGUF 前停止。
+- 量化 source 與 output 必須位於專案目錄內，output 必須是全新或空的 regular directory，兩種路徑都不
+  接受 symlink／Windows reparse point；Q8／Q4 移入正式名稱時
   不使用強制覆寫，既有實測 GGUF 不會被一次重跑悄悄取代。
 - 資料與續跑快取 JSONL 的單行上限為 1 MiB；正式資料超限或非 UTF-8 時 fail closed，快取則只
   丟棄損壞行並重新產生受影響案例，不讓一行殘片破壞後續可恢復結果。

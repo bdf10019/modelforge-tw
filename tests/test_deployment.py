@@ -171,7 +171,17 @@ def test_quantization_revalidates_source_and_records_tool_lineage():
     assert "量化 output directory 必須為空" in script
     assert "[IO.FileAttributes]::ReparsePoint" in script
     assert '$sourceRoot = Join-Path $projectRoot "tools\\llama.cpp-src"' in script
+    assert "Assert-NoReparsePointInPath -LiteralPath $mergedPath" in script
     assert "Assert-NoReparsePointInPath -LiteralPath $outputRoot" in script
     assert "git -C $sourceRoot rev-parse HEAD" in script
+    assert "git -C $sourceRoot status --porcelain --untracked-files=normal" in script
+    assert "llama.cpp source tree 必須保持乾淨" in script
+    assert "$quantizerHash -ne $ExpectedQuantizerSha256.ToLowerInvariant()" in script
+    assert "llama-quantize.exe SHA-256 不符" in script
+    assert "merge report 來源檔不能是 reparse point" in script
+    assert "[StringComparison]::OrdinalIgnoreCase" in script
+    assert "量化路徑必須位於專案目錄內" in script
+    assert "$workspaceRoot = Split-Path -Parent $projectRoot" in script
+    assert "Split-Path -Parent (Split-Path -Parent $projectRoot)" not in script
     assert "Move-Item -LiteralPath $bridgeQ8 -Destination $q8" in script
     assert "Move-Item -Force -LiteralPath $bridgeQ8" not in script
