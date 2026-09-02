@@ -21,7 +21,7 @@ from modelforge_tw.io_utils import (
 )
 from modelforge_tw.model_identity import validate_model_version, validate_quantization
 from modelforge_tw.schemas import EvaluationReport
-from modelforge_tw.training import TrainingReportAttestation
+from modelforge_tw.training import TrainingReportAttestation, verify_training_run_contract
 
 SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
 DeploymentRole = Literal["released", "previous-good"]
@@ -422,6 +422,7 @@ class FileRegistry:
         if digest.hexdigest() != manifest.training_report_sha256:
             raise ValueError("registered training report hash changed")
         training = TrainingReportAttestation.model_validate_json(read_utf8_text_limited(path))
+        verify_training_run_contract(training, path)
         checks = {
             "base_model": manifest.base_model == training.model_id,
             "base_revision": manifest.base_revision == training.resolved_model_revision,

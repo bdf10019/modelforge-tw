@@ -24,9 +24,11 @@ from modelforge_tw.training import (
     TrainingReportAttestation,
     installed_dependency_versions,
     merge_adapter,
+    prepare_training_run,
     run_training,
     verify_adapter_training_lineage,
     verify_training_dataset_manifest,
+    verify_training_run_contract,
 )
 
 
@@ -91,6 +93,69 @@ def test_training_dataset_manifest_is_verified_before_ml_runtime(tmp_path):
         handle.write(b"\n")
     with pytest.raises(ValueError, match="does not match manifest"):
         verify_training_dataset_manifest(tmp_path)
+
+
+def test_checkpoint_resume_requires_matching_run_contract(tmp_path):
+    data_dir = tmp_path / "data"
+    write_dataset(
+        data_dir,
+        train_per_type=1,
+        validation_per_type=1,
+        test_per_type=1,
+    )
+    manifest = verify_training_dataset_manifest(data_dir)
+    output_dir = tmp_path / "training-output"
+    config = TrainingConfig(data_dir=data_dir, output_dir=output_dir)
+
+    prepared, checkpoint, contract_hash = prepare_training_run(config, manifest)
+    assert prepared == output_dir.resolve()
+    assert checkpoint is None
+    assert len(contract_hash) == 64
+    (output_dir / "checkpoint-10").mkdir()
+
+    _, checkpoint, resumed_contract_hash = prepare_training_run(config, manifest)
+    assert checkpoint == str(output_dir.resolve() / "checkpoint-10")
+    assert resumed_contract_hash == contract_hash
+
+    with pytest.raises(ValueError, match="does not match"):
+        prepare_training_run(config.model_copy(update={"learning_rate": 0.0001}), manifest)
+    with pytest.raises(ValueError, match="resume is disabled"):
+        prepare_training_run(config.model_copy(update={"resume_from_checkpoint": False}), manifest)
+
+    config_payload = config.model_dump(mode="json")
+    report = TrainingReportAttestation(
+        schema_version="1.2",
+        evidence_kind="measured",
+        model_id=config.model_id,
+        model_revision=config.model_revision,
+        resolved_model_revision=config.model_revision,
+        resolved_tokenizer_revision=config.model_revision,
+        config=config_payload,
+        training_config_sha256=_stable_hash(config_payload),
+        dataset_manifest_sha256=manifest.dataset_manifest_sha256,
+        training_run_contract_sha256=contract_hash,
+    )
+    report_path = output_dir / "training-report.json"
+    report_path.write_text(report.model_dump_json(), encoding="utf-8")
+    assert verify_training_run_contract(report, report_path) is not None
+
+    (output_dir / "run-contract.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(ValueError, match="hash does not match"):
+        verify_training_run_contract(report, report_path)
+
+
+def test_legacy_checkpoint_is_not_silently_attested(tmp_path):
+    data_dir = tmp_path / "data"
+    write_dataset(data_dir, train_per_type=1, validation_per_type=1, test_per_type=1)
+    manifest = verify_training_dataset_manifest(data_dir)
+    output_dir = tmp_path / "legacy-output"
+    (output_dir / "checkpoint-5").mkdir(parents=True)
+
+    with pytest.raises(ValueError, match="legacy checkpoints lack"):
+        prepare_training_run(
+            TrainingConfig(data_dir=data_dir, output_dir=output_dir),
+            manifest,
+        )
 
 
 def test_model_workflows_default_to_one_immutable_base_revision(tmp_path):

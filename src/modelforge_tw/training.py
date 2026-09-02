@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import random
+import re
 import time
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
@@ -120,6 +121,16 @@ class TrainingDatasetManifestAttestation(BaseModel):
         return self
 
 
+class TrainingRunContract(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["1.0"] = "1.0"
+    model_id: str = Field(min_length=1, max_length=256)
+    model_revision: str = Field(pattern=r"^[a-f0-9]{40,64}$")
+    dataset_manifest_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    training_config_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
 class TrainingReportAttestation(BaseModel):
     """Minimum verified lineage required before a training run enters the registry."""
 
@@ -134,6 +145,7 @@ class TrainingReportAttestation(BaseModel):
     config: dict[str, Any]
     training_config_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     dataset_manifest_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    training_run_contract_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     final_adapter_files: dict[str, AdapterFileAttestation] | None = None
 
     @model_validator(mode="after")
@@ -153,6 +165,8 @@ class TrainingReportAttestation(BaseModel):
             and self.resolved_tokenizer_revision != self.model_revision
         ):
             mismatches.append("resolved_tokenizer_revision")
+        if self.schema_version == "1.2" and self.training_run_contract_sha256 is None:
+            mismatches.append("training_run_contract_sha256")
         if _stable_hash(self.config) != self.training_config_sha256:
             mismatches.append("training_config_sha256")
         if mismatches:
@@ -188,6 +202,97 @@ def verify_training_dataset_manifest(data_dir: Path) -> TrainingDatasetManifestA
     return manifest
 
 
+def prepare_training_run(
+    config: TrainingConfig,
+    dataset_manifest: TrainingDatasetManifestAttestation,
+) -> tuple[Path, str | None, str]:
+    """Create or verify the immutable contract governing checkpoint resume."""
+    output_dir = config.output_dir.resolve()
+    contract_path = output_dir / "run-contract.json"
+    config_hash = _stable_hash(config.model_dump(mode="json"))
+    expected = TrainingRunContract(
+        model_id=config.model_id,
+        model_revision=config.model_revision,
+        dataset_manifest_sha256=dataset_manifest.dataset_manifest_sha256,
+        training_config_sha256=config_hash,
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    entries = sorted(output_dir.iterdir(), key=lambda path: path.name)
+    malformed_checkpoints = [
+        path.name
+        for path in entries
+        if path.name.startswith("checkpoint-")
+        and (not path.is_dir() or re.fullmatch(r"checkpoint-[0-9]+", path.name) is None)
+    ]
+    if malformed_checkpoints:
+        raise ValueError(
+            "training output has malformed checkpoints: " + ", ".join(malformed_checkpoints)
+        )
+    checkpoints = [
+        path for path in entries if path.is_dir() and re.fullmatch(r"checkpoint-[0-9]+", path.name)
+    ]
+    other_entries = [
+        path for path in entries if path not in checkpoints and path.name != contract_path.name
+    ]
+    if checkpoints and not config.resume_from_checkpoint:
+        raise ValueError("training output contains checkpoints but resume is disabled")
+    if other_entries and not checkpoints:
+        raise ValueError("training output contains artifacts without a resumable checkpoint")
+
+    if contract_path.exists():
+        if not contract_path.is_file() or contract_path.is_symlink():
+            raise ValueError("training run contract must be a regular file")
+        actual = TrainingRunContract.model_validate_json(read_utf8_text_limited(contract_path))
+        if actual != expected:
+            raise ValueError("training checkpoint contract does not match the requested run")
+    elif checkpoints:
+        raise ValueError("legacy checkpoints lack a training run contract and cannot be resumed")
+    else:
+        atomic_write_text(
+            contract_path,
+            json.dumps(expected.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
+        )
+
+    last_checkpoint = (
+        str(max(checkpoints, key=lambda path: int(path.name.removeprefix("checkpoint-"))))
+        if checkpoints
+        else None
+    )
+    return output_dir, last_checkpoint, sha256_file(contract_path)
+
+
+def verify_training_run_contract(
+    report: TrainingReportAttestation,
+    training_report_path: Path,
+) -> TrainingRunContract | None:
+    if report.schema_version != "1.2":
+        return None
+    if report.training_run_contract_sha256 is None:  # enforced by report validation
+        raise ValueError("training report lacks run contract hash")
+    contract_path = training_report_path.parent / "run-contract.json"
+    if not contract_path.is_file() or contract_path.is_symlink():
+        raise FileNotFoundError(
+            f"training run contract not found as a regular file: {contract_path}"
+        )
+    if sha256_file(contract_path) != report.training_run_contract_sha256:
+        raise ValueError("training run contract hash does not match training report")
+    contract = TrainingRunContract.model_validate_json(read_utf8_text_limited(contract_path))
+    checks = {
+        "model_id": contract.model_id == report.model_id,
+        "model_revision": contract.model_revision == report.model_revision,
+        "dataset_manifest_sha256": (
+            contract.dataset_manifest_sha256 == report.dataset_manifest_sha256
+        ),
+        "training_config_sha256": (
+            contract.training_config_sha256 == report.training_config_sha256
+        ),
+    }
+    mismatches = [name for name, matched in checks.items() if not matched]
+    if mismatches:
+        raise ValueError("training run contract lineage mismatch: " + ", ".join(mismatches))
+    return contract
+
+
 def verify_adapter_training_lineage(
     *,
     model_id: str,
@@ -200,6 +305,7 @@ def verify_adapter_training_lineage(
     report = TrainingReportAttestation.model_validate_json(
         read_utf8_text_limited(training_report_path)
     )
+    verify_training_run_contract(report, training_report_path)
     mismatches: list[str] = []
     if report.model_id != model_id:
         mismatches.append("model_id")
@@ -294,6 +400,10 @@ class CompletionOnlyCollator:
 
 def run_training(config: TrainingConfig) -> dict[str, Any]:
     dataset_manifest = verify_training_dataset_manifest(config.data_dir)
+    output_dir, last_checkpoint, run_contract_sha256 = prepare_training_run(
+        config,
+        dataset_manifest,
+    )
     import numpy as np
     import torch
     import transformers
@@ -306,7 +416,6 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
         Trainer,
         TrainingArguments,
     )
-    from transformers.trainer_utils import get_last_checkpoint
 
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is required for the approved real training run")
@@ -415,11 +524,6 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
     model = get_peft_model(model, lora_config)
     trainable, total = model.get_nb_trainable_parameters()
 
-    output_dir = config.output_dir.resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
-    last_checkpoint = (
-        get_last_checkpoint(str(output_dir)) if config.resume_from_checkpoint else None
-    )
     training_args = TrainingArguments(
         output_dir=str(output_dir),
         seed=config.seed,
@@ -479,6 +583,7 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
         "training_method": "qlora-nf4" if config.use_4bit else "lora-bf16",
         "config": config_payload,
         "training_config_sha256": config_hash,
+        "training_run_contract_sha256": run_contract_sha256,
         "resumed_from_checkpoint": last_checkpoint,
         "dataset_manifest_sha256": dataset_manifest.dataset_manifest_sha256,
         "dataset_generator_version": dataset_manifest.generator_version,

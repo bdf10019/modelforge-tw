@@ -45,6 +45,10 @@ Web / REST / OpenAI-compatible client
   訓練進入任何 ML runtime 前，會先解析 dataset manifest、要求 audit passed、重算 combined hash，
   並逐一核對所有列出的 JSONL regular file 大小、SHA-256、可解析筆數與 audit split counts；train／
   validation 缺一不可。
+  第一次執行另原子寫入 training run contract，綁定 model revision、dataset manifest 與完整 config
+  hash；只有 contract 完全一致且 checkpoint 名稱合法時才可 resume。Training report 1.2 保存 contract
+  SHA-256，PEFT runtime 與 registry artifact 驗證會重讀同目錄 contract 並逐欄比對。沒有當時 contract
+  的歷史 checkpoint 不做事後補簽，只能保留證據或改用新 output directory 開始新 run。
   訓練、評測、合併、載入探針與 Transformers 服務共用同一個已驗證 base-model commit 預設；
   revision 必須是 40–64 位 lowercase commit hash，`main`／tag 會在匯入大型 ML runtime 前 fail fast。
   訓練與合併在模型載入後還要求 Hugging Face 回報的 resolved commit 逐字相等，報告驗證也重做
