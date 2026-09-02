@@ -63,6 +63,34 @@ def test_runtime_evidence_rejects_unknown_contract_versions():
         )
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("elapsed_ms", float("nan")),
+        ("elapsed_ms", float("inf")),
+        ("generation_tokens_per_second", float("nan")),
+        ("generation_tokens_per_second", float("inf")),
+        ("ttft_ms", float("nan")),
+        ("ttft_ms", float("inf")),
+    ],
+)
+def test_runtime_metadata_rejects_non_finite_performance_values(field, value):
+    metadata = {
+        "engine": "fixture",
+        "model_id": "fixture",
+        "model_version": "fixture-v1",
+        "quantization": "none",
+        "prompt_version": "optimized-v2",
+        "elapsed_ms": 0,
+        "safety_policy_version": "risk-precedence-v2",
+        "evidence_kind": "fixture",
+        field: value,
+    }
+
+    with pytest.raises(ValidationError, match=field):
+        InferenceMetadata.model_validate(metadata)
+
+
 def valid_output(**updates):
     payload = {
         "event_type": EventType.MECHANICAL,

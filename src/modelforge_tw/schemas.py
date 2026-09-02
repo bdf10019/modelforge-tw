@@ -207,11 +207,11 @@ class InferenceMetadata(BaseModel):
     model_revision: str | None = None
     quantization: str
     prompt_version: PromptVersion
-    elapsed_ms: float = Field(ge=0)
+    elapsed_ms: NonnegativeFiniteFloat
     prompt_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
-    generation_tokens_per_second: float | None = Field(default=None, ge=0)
-    ttft_ms: float | None = Field(default=None, ge=0)
+    generation_tokens_per_second: NonnegativeFiniteFloat | None = None
+    ttft_ms: NonnegativeFiniteFloat | None = None
     max_new_tokens: int | None = Field(default=None, ge=1)
     context_window_tokens: int | None = Field(default=None, ge=1)
     structured_output_contract: str | None = None
