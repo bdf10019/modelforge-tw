@@ -162,12 +162,15 @@ class OpenAIHTTPInferenceEngine:
             "response_format": _structured_response_format(),
         }
         started = time.perf_counter()
-        with httpx.Client(timeout=self.timeout_seconds, trust_env=False) as client:
-            with client.stream(
-                "POST", f"{self.base_url}/v1/chat/completions", json=payload
-            ) as response:
-                response.raise_for_status()
-                body = json.loads(_read_bounded_response(response, self.max_response_bytes))
+        try:
+            with httpx.Client(timeout=self.timeout_seconds, trust_env=False) as client:
+                with client.stream(
+                    "POST", f"{self.base_url}/v1/chat/completions", json=payload
+                ) as response:
+                    response.raise_for_status()
+                    body = json.loads(_read_bounded_response(response, self.max_response_bytes))
+        except httpx.HTTPError:
+            raise ValueError("model server request failed") from None
         elapsed_ms = (time.perf_counter() - started) * 1000
         raw = body["choices"][0]["message"]["content"]
         return self._build_result(
@@ -193,32 +196,35 @@ class OpenAIHTTPInferenceEngine:
         first_content_ms: float | None = None
         parts: list[str] = []
         usage: dict[str, Any] = {}
-        with httpx.Client(timeout=self.timeout_seconds, trust_env=False) as client:
-            with client.stream(
-                "POST", f"{self.base_url}/v1/chat/completions", json=payload
-            ) as response:
-                response.raise_for_status()
-                for raw_line in _iter_bounded_response_lines(response, self.max_response_bytes):
-                    try:
-                        line = raw_line.decode("utf-8")
-                    except UnicodeDecodeError as error:
-                        raise ValueError("model response is not valid UTF-8") from error
-                    if not line.startswith("data: "):
-                        continue
-                    data = line.removeprefix("data: ").strip()
-                    if not data or data == "[DONE]":
-                        continue
-                    event = json.loads(data)
-                    if event.get("usage"):
-                        usage = event["usage"]
-                    choices = event.get("choices", [])
-                    if not choices:
-                        continue
-                    content = choices[0].get("delta", {}).get("content")
-                    if content:
-                        if first_content_ms is None:
-                            first_content_ms = (time.perf_counter() - started) * 1000
-                        parts.append(content)
+        try:
+            with httpx.Client(timeout=self.timeout_seconds, trust_env=False) as client:
+                with client.stream(
+                    "POST", f"{self.base_url}/v1/chat/completions", json=payload
+                ) as response:
+                    response.raise_for_status()
+                    for raw_line in _iter_bounded_response_lines(response, self.max_response_bytes):
+                        try:
+                            line = raw_line.decode("utf-8")
+                        except UnicodeDecodeError as error:
+                            raise ValueError("model response is not valid UTF-8") from error
+                        if not line.startswith("data: "):
+                            continue
+                        data = line.removeprefix("data: ").strip()
+                        if not data or data == "[DONE]":
+                            continue
+                        event = json.loads(data)
+                        if event.get("usage"):
+                            usage = event["usage"]
+                        choices = event.get("choices", [])
+                        if not choices:
+                            continue
+                        content = choices[0].get("delta", {}).get("content")
+                        if content:
+                            if first_content_ms is None:
+                                first_content_ms = (time.perf_counter() - started) * 1000
+                            parts.append(content)
+        except httpx.HTTPError:
+            raise ValueError("model server request failed") from None
         elapsed_ms = (time.perf_counter() - started) * 1000
         return self._build_result(
             request=request,

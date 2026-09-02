@@ -133,6 +133,26 @@ def test_ready_is_fail_closed_for_status_and_connection_errors(monkeypatch):
     assert engine.ready() is False
 
 
+@pytest.mark.parametrize("streaming", [False, True])
+def test_generation_sanitizes_upstream_http_failures(monkeypatch, streaming):
+    private_detail = "private upstream detail with token-do-not-expose"
+
+    install_transport(
+        monkeypatch,
+        lambda request: httpx.Response(503, request=request, text=private_detail),
+    )
+    engine = make_engine("http://private-model.internal:8081")
+    generate = engine.generate_streaming if streaming else engine.generate
+
+    with pytest.raises(ValueError) as captured:
+        generate(TriageRequest(incident_text="泵浦持續異音且趨勢尚未停止。"))
+
+    assert str(captured.value) == "model server request failed"
+    assert captured.value.__cause__ is None
+    assert "private-model" not in str(captured.value)
+    assert private_detail not in str(captured.value)
+
+
 def test_non_streaming_generation_sends_strict_contract_and_records_usage(monkeypatch):
     captured = {}
 
