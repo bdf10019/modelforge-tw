@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 from typing import Any, Literal
 
+from modelforge_tw.contracts import ValidationWarning
 from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_REVISION,
     DEFAULT_MAX_NEW_TOKENS,
@@ -182,6 +183,7 @@ class TransformersInferenceEngine:
         if not isinstance(decoded, str):
             raise TypeError("tokenizer decode did not return text")
         raw = decoded.strip()
+        warnings: list[ValidationWarning]
         try:
             parsed = parse_output(raw, allow_bounded_repair=True)
             output, warnings = apply_safety_policy(

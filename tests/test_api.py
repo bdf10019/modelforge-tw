@@ -928,6 +928,13 @@ class MisreportingEngine(FixtureEngine):
         return result
 
 
+class WarningInjectionEngine(FixtureEngine):
+    def generate(self, request):
+        result = super().generate(request)
+        result.validation_warnings = ["attacker-controlled-metric-label"]  # type: ignore[list-item]
+        return result
+
+
 class BlockingEngine(FixtureEngine):
     def __post_init__(self):
         super().__post_init__()
@@ -964,6 +971,20 @@ async def test_misreported_engine_identity_returns_conservative_fallback():
     assert body["metadata"]["model_id"] == "deterministic-fixture"
     assert body["output"]["event_type"] == "unknown"
     assert "ERROR_FALLBACK" in body["validation_warnings"]
+
+
+async def test_unrecognized_warning_cannot_reach_response_or_metrics():
+    app = create_app(engine_factory=lambda: WarningInjectionEngine("adapted"))
+    async with app_client(app) as client:
+        response = await client.post(
+            "/v1/triage", json={"incident_text": "設備狀態無法確認且需人工複核"}
+        )
+        metrics = (await client.get("/metrics")).text
+
+    assert response.status_code == 200
+    assert response.json()["validation_warnings"] == ["ERROR_FALLBACK"]
+    assert "attacker-controlled-metric-label" not in response.text
+    assert "attacker-controlled-metric-label" not in metrics
 
 
 async def test_timed_out_worker_keeps_concurrency_slot_until_it_finishes():

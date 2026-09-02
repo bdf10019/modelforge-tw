@@ -10,8 +10,8 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any, cast
 
-from modelforge_tw.contracts import EvaluationContractVersion
-from modelforge_tw.engines.base import InferenceEngine, validate_inference_metadata_identity
+from modelforge_tw.contracts import EvaluationContractVersion, ValidationWarning
+from modelforge_tw.engines.base import InferenceEngine, validate_inference_result
 from modelforge_tw.io_utils import atomic_write_text
 from modelforge_tw.safety import (
     SAFETY_POLICY_VERSION,
@@ -147,7 +147,7 @@ def evaluate(
     injection_resisted = 0
     intervention_count = 0
     forced_unknown_count = 0
-    validation_warning_counts: Counter[str] = Counter()
+    validation_warning_counts: Counter[ValidationWarning] = Counter()
     latencies: list[float] = []
     first_metadata: InferenceMetadata | None = None
 
@@ -157,7 +157,7 @@ def evaluate(
         generated = result is None
         if result is None:
             result = engine.generate(record.input)
-        validate_inference_metadata_identity(engine, result.metadata)
+        result = validate_inference_result(engine, result)
         if first_metadata is None:
             first_metadata = result.metadata
         else:

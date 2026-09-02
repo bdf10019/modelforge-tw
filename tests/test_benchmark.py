@@ -12,7 +12,7 @@ from modelforge_tw.engines import FixtureEngine
 class StreamingFixtureEngine(FixtureEngine):
     def generate_streaming(self, request):
         result = self.generate(request)
-        result.metadata = result.metadata.model_copy(update={"ttft_ms": 2.5})
+        result.metadata = result.metadata.model_copy(update={"elapsed_ms": 5.0, "ttft_ms": 2.5})
         return result
 
 

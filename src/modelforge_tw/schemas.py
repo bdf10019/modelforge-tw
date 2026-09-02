@@ -12,6 +12,7 @@ from modelforge_tw.contracts import (
     EvaluationSchemaVersion,
     PromptVersion,
     SafetyPolicyVersion,
+    ValidationWarning,
 )
 from modelforge_tw.model_identity import (
     validate_immutable_model_revision,
@@ -260,7 +261,7 @@ class InferenceResult(BaseModel):
     output: TriageOutput
     metadata: InferenceMetadata
     repair_used: bool = False
-    validation_warnings: list[str] = Field(default_factory=list)
+    validation_warnings: list[ValidationWarning] = Field(default_factory=list, max_length=16)
 
 
 class TriageResponse(BaseModel):
@@ -269,7 +270,7 @@ class TriageResponse(BaseModel):
     request_id: str
     output: TriageOutput
     metadata: InferenceMetadata
-    validation_warnings: list[str] = Field(default_factory=list)
+    validation_warnings: list[ValidationWarning] = Field(default_factory=list, max_length=16)
 
 
 class DatasetRecord(BaseModel):
@@ -303,7 +304,7 @@ class CaseResult(BaseModel):
     raw_text: str
     elapsed_ms: NonnegativeFiniteFloat
     repair_used: bool
-    validation_warnings: list[str] = Field(default_factory=list)
+    validation_warnings: list[ValidationWarning] = Field(default_factory=list, max_length=16)
 
     @model_validator(mode="after")
     def validate_pass_result(self) -> CaseResult:
@@ -337,7 +338,9 @@ class EvaluationReport(BaseModel):
     gates: dict[str, dict[str, Any]]
     release_passed: bool
     latency_ms: dict[str, NonnegativeFiniteFloat]
-    validation_warning_counts: dict[str, NonnegativeInteger] = Field(default_factory=dict)
+    validation_warning_counts: dict[ValidationWarning, NonnegativeInteger] = Field(
+        default_factory=dict
+    )
     cases: list[CaseResult]
 
     @field_validator("model_version")

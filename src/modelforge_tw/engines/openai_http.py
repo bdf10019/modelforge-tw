@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from modelforge_tw.contracts import ValidationWarning
 from modelforge_tw.model_identity import (
     DEFAULT_BASE_MODEL_REVISION,
     DEFAULT_MAX_NEW_TOKENS,
@@ -248,6 +249,7 @@ class OpenAIHTTPInferenceEngine:
         usage: dict[str, Any],
         ttft_ms: float | None = None,
     ) -> InferenceResult:
+        warnings: list[ValidationWarning]
         try:
             parsed = parse_output(raw, allow_bounded_repair=True)
             output, warnings = apply_safety_policy(

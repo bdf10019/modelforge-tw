@@ -17,3 +17,14 @@ EvaluationContractVersion = Literal[
     "release-metrics-v4",
     "release-metrics-v5",
 ]
+ValidationWarning = Literal[
+    "EVIDENCE_SPAN_NOT_IN_INPUT",
+    "EVENT_TYPE_FORCED_UNKNOWN_BY_POLICY",
+    "REVIEW_FORCED_BY_POLICY",
+    "RISK_ESCALATED_BY_POLICY",
+    "UNTRUSTED_INSTRUCTION_DETECTED",
+    "MODEL_OUTPUT_INVALID",
+    "SAFE_FALLBACK_APPLIED",
+    "TIMEOUT_FALLBACK",
+    "ERROR_FALLBACK",
+]

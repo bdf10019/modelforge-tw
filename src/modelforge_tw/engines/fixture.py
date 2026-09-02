@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
+from modelforge_tw.contracts import ValidationWarning
 from modelforge_tw.prompts import MINIMAL_PROMPT_VERSION, OPTIMIZED_PROMPT_VERSION
 from modelforge_tw.safety import SAFETY_POLICY_VERSION, SafetyPolicyVersion, apply_safety_policy
 from modelforge_tw.schemas import (
@@ -103,6 +104,7 @@ class FixtureEngine:
             review_required=review,
             reason_codes=reason_codes,
         )
+        warnings: list[ValidationWarning]
         if self.variant == "adapted":
             output, warnings = apply_safety_policy(
                 request,

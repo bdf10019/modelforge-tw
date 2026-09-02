@@ -17,7 +17,7 @@ import psutil
 from modelforge_tw.engines.base import (
     InferenceEngine,
     InferenceIdentityMismatchError,
-    validate_inference_metadata_identity,
+    validate_inference_result,
 )
 from modelforge_tw.io_utils import atomic_write_text
 from modelforge_tw.schemas import DatasetRecord, InferenceMetadata
@@ -170,7 +170,7 @@ def run_benchmark(
                 request_started = time.perf_counter()
                 try:
                     result = benchmark_generate(records[index % len(records)].input)
-                    validate_inference_metadata_identity(engine, result.metadata)
+                    result = validate_inference_result(engine, result)
                     with metadata_lock:
                         if not metadata_samples:
                             metadata_samples.append(result.metadata)

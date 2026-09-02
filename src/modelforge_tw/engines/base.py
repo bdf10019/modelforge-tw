@@ -51,3 +51,9 @@ def validate_inference_metadata_identity(
         raise InferenceIdentityMismatchError(
             "inference metadata does not match configured engine: " + ", ".join(mismatches)
         )
+
+
+def validate_inference_result(engine: InferenceEngine, result: InferenceResult) -> InferenceResult:
+    validated = InferenceResult.model_validate(result.model_dump(mode="python"))
+    validate_inference_metadata_identity(engine, validated.metadata)
+    return validated

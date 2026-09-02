@@ -18,8 +18,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from modelforge_tw.contracts import ValidationWarning
 from modelforge_tw.engines import FixtureEngine, InferenceEngine, OpenAIHTTPInferenceEngine
-from modelforge_tw.engines.base import validate_inference_metadata_identity
+from modelforge_tw.engines.base import validate_inference_result
 from modelforge_tw.metrics import ServiceMetrics
 from modelforge_tw.registry import FileRegistry
 from modelforge_tw.safety import conservative_fallback
@@ -592,7 +593,7 @@ def create_app(
                     asyncio.shield(engine_task),
                     timeout=selected_settings.request_timeout_seconds,
                 )
-                validate_inference_metadata_identity(engine, result.metadata)
+                result = validate_inference_result(engine, result)
                 outcome = "success"
                 for warning in result.validation_warnings:
                     metrics.validation_warnings.labels(code=warning).inc()
@@ -604,13 +605,15 @@ def create_app(
                 )
             except TimeoutError:
                 outcome = "timeout_fallback"
+                fallback_warning: ValidationWarning = "TIMEOUT_FALLBACK"
                 fallback = conservative_fallback("MODEL_TIMEOUT")
                 release_deferred = True
                 engine_task.add_done_callback(release_after_background_completion)
             except Exception:
                 outcome = "error_fallback"
+                fallback_warning = "ERROR_FALLBACK"
                 fallback = conservative_fallback("MODEL_INFERENCE_ERROR")
-            metrics.validation_warnings.labels(code=outcome.upper()).inc()
+            metrics.validation_warnings.labels(code=fallback_warning).inc()
             return TriageResponse(
                 request_id=request_id,
                 output=fallback,
@@ -626,7 +629,7 @@ def create_app(
                     safety_policy_version=engine.safety_policy_version,
                     evidence_kind=engine.evidence_kind,
                 ),
-                validation_warnings=[outcome.upper()],
+                validation_warnings=[fallback_warning],
             )
         except asyncio.CancelledError:
             outcome = "client_cancelled"

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from pydantic import ValidationError
 
-from modelforge_tw.contracts import SafetyPolicyVersion
+from modelforge_tw.contracts import SafetyPolicyVersion, ValidationWarning
 from modelforge_tw.schemas import (
     EventType,
     ReasonCode,
@@ -92,10 +92,10 @@ def apply_safety_policy(
     output: TriageOutput,
     *,
     policy_version: SafetyPolicyVersion = SAFETY_POLICY_VERSION,
-) -> tuple[TriageOutput, list[str]]:
+) -> tuple[TriageOutput, list[ValidationWarning]]:
     if policy_version not in SUPPORTED_SAFETY_POLICY_VERSIONS:
         raise ValueError(f"unsupported safety policy version: {policy_version}")
-    warnings: list[str] = []
+    warnings: list[ValidationWarning] = []
     update: dict[str, object] = {}
 
     invalid_spans = [span for span in output.evidence_spans if span not in request.incident_text]
