@@ -40,7 +40,8 @@ Web / REST / OpenAI-compatible client
 - `training.py`：固定 seed 的 completion-only QLoRA 與 merge；新版報告保存資料／設定／adapter
   hash、Python、Torch、CUDA、cuDNN、GPU capability、實體顯存與完整 ML 依賴版本，避免只鎖
   模型卻漏掉訓練 runtime 漂移。候選加入 registry 前會驗證報告 schema、measured evidence、
-  immutable resolved revision、內嵌 config 雜湊、模型 identity、prompt 契約及本機資料 manifest；
+  immutable resolved revision、內嵌 config 雜湊、模型 identity、prompt 契約及本機資料 manifest；新版
+  runtime-bound manifest 只接受 Training report 1.2，必須同時驗證 tokenizer revision 與 run contract。
   正式發布另要求至少一個已雜湊模型 artifact，不能發布只有 metadata 的空候選。
   訓練進入任何 ML runtime 前，會先解析 dataset manifest、要求 audit passed、重算 combined hash，
   並逐一核對所有列出的 JSONL regular file 大小、SHA-256、可解析筆數與 audit split counts；train／
@@ -83,8 +84,9 @@ Web / REST / OpenAI-compatible client
   既有 schema 1.0 實測報告保持唯讀，不以新欄位回填歷史執行。
 - `registry.py`：candidate、evaluation attestation、promote、previous-good 與 rollback 的原子檔案
   registry；切換前重新驗證 artifact 大小與 SHA-256，attestation 會鎖住評測資料 hash、引擎、
-  模型 identity、evidence kind、生成、安全與評分契約。新候選缺少任一 attestation 欄位都不能
-  加入；舊 manifest 缺少 identity 時只能讀取或沿用既有狀態，不能拿新版報告重新 attestation。
+  模型 identity、evidence kind、生成、安全與評分契約。新候選缺少任一 attestation 欄位、runtime
+  identity contract 或 Training report 1.2 都不能加入；舊 manifest 缺少 identity 時只能讀取或
+  沿用既有狀態，不能拿新版報告重新 attestation。
   評測／訓練報告與 artifact 只接受 canonical POSIX-style 相對路徑，絕對路徑、反斜線及 `..`
   穿越會在讀取或寫入 registry 時拒絕；新版 attestation 也保存兩份報告本身的 SHA-256。新 promote
   會重新要求完整 attestation 且只接受 measured evidence，並重新雜湊、解析評測與訓練報告、

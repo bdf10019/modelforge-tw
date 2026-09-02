@@ -62,6 +62,8 @@
 - Checkpoint resume 由原子 run contract 綁定 model、dataset manifest 與完整 training config hash；
   contract 缺失、被改寫、lineage 不符、checkpoint 名稱異常或明確停用 resume 都會在 ML 載入前拒絕。
   Training report 1.2、adapter runtime 與 registry 會再驗 contract 檔案 hash，不接受事後自稱的續跑來源。
+  新 registry 候選必須帶 runtime identity contract，並拒絕缺 tokenizer revision／run contract 的 1.0／1.1
+  training report；舊 registry 仍可依原 schema 唯讀驗證。
 - 訓練、評測、合併、probe 與 Transformers serving 的 base revision 必須是 40–64 位 lowercase
   commit hash；預設統一鎖定已驗證 commit，浮動的 `main`／tag 在載入模型或 ML runtime 前拒絕。
 - 訓練與 merge 載入模型後會把 loader 回報的 resolved commit 與要求值逐字比對；缺失、格式錯誤或

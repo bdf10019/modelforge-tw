@@ -95,6 +95,40 @@ def valid_evaluation_report(**updates) -> EvaluationReport:
 def write_training_report(root: Path) -> Path:
     path = root / "outputs" / "training.json"
     path.parent.mkdir(exist_ok=True)
+    contract = {
+        "schema_version": "1.0",
+        "model_id": "fixture",
+        "model_revision": HASH,
+        "dataset_manifest_sha256": HASH,
+        "training_config_sha256": TRAINING_CONFIG_HASH,
+    }
+    contract_path = path.parent / "run-contract.json"
+    contract_path.write_text(json.dumps(contract), encoding="utf-8")
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.2",
+                "evidence_kind": "measured",
+                "model_id": "fixture",
+                "model_revision": HASH,
+                "resolved_model_revision": HASH,
+                "resolved_tokenizer_revision": HASH,
+                "config": TRAINING_CONFIG,
+                "training_config_sha256": TRAINING_CONFIG_HASH,
+                "dataset_manifest_sha256": HASH,
+                "training_run_contract_sha256": hashlib.sha256(
+                    contract_path.read_bytes()
+                ).hexdigest(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def write_legacy_training_report(root: Path) -> Path:
+    path = root / "outputs" / "training.json"
+    path.parent.mkdir(exist_ok=True)
     path.write_text(
         json.dumps(
             {
@@ -163,6 +197,14 @@ def test_runtime_identity_contract_requires_revision_and_context():
     payload["evaluation_model_revision"] = "b" * 64
     with pytest.raises(ValidationError, match="does not match base revision"):
         ModelManifest.model_validate(payload)
+
+
+def test_registry_rejects_new_manifest_without_current_runtime_identity(tmp_path):
+    legacy = manifest("legacy-new").model_copy(update={"runtime_identity_contract_version": None})
+
+    with pytest.raises(ValueError, match="new manifests require runtime identity contract 1.0"):
+        FileRegistry(tmp_path / "registry.json").add(legacy)
+    assert not (tmp_path / "registry.json").exists()
 
 
 def test_registry_promote_and_rollback(tmp_path):
@@ -771,6 +813,24 @@ def test_registry_rejects_hash_valid_training_report_with_wrong_identity(tmp_pat
     registry = FileRegistry(tmp_path / "registry.json", artifact_root=tmp_path)
 
     with pytest.raises(ValueError, match="base_model"):
+        registry.add(candidate)
+    assert not registry.path.exists()
+
+
+def test_runtime_bound_manifest_rejects_legacy_training_report(tmp_path):
+    evaluation_path = tmp_path / "outputs" / "evaluation.json"
+    evaluation_path.parent.mkdir()
+    evaluation_path.write_text(valid_evaluation_report().model_dump_json(), encoding="utf-8")
+    training_path = write_legacy_training_report(tmp_path)
+    candidate = manifest("v1").model_copy(
+        update={
+            "evaluation_report_sha256": hashlib.sha256(evaluation_path.read_bytes()).hexdigest(),
+            "training_report_sha256": hashlib.sha256(training_path.read_bytes()).hexdigest(),
+        }
+    )
+    registry = FileRegistry(tmp_path / "registry.json", artifact_root=tmp_path)
+
+    with pytest.raises(ValueError, match="requires training report schema 1.2"):
         registry.add(candidate)
     assert not registry.path.exists()
 

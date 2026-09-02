@@ -463,6 +463,8 @@ class FileRegistry:
         if digest.hexdigest() != manifest.training_report_sha256:
             raise ValueError("registered training report hash changed")
         training = TrainingReportAttestation.model_validate_json(read_utf8_text_limited(path))
+        if manifest.runtime_identity_contract_version == "1.0" and training.schema_version != "1.2":
+            raise ValueError("runtime-bound manifest requires training report schema 1.2")
         verify_training_run_contract(training, path)
         checks = {
             "base_model": manifest.base_model == training.model_id,
@@ -624,6 +626,8 @@ class FileRegistry:
 
     def _add_unlocked(self, manifest: ModelManifest) -> RegistryState:
         self._validate_id(manifest.manifest_id)
+        if manifest.runtime_identity_contract_version != "1.0":
+            raise ValueError("new manifests require runtime identity contract 1.0")
         self._require_evaluation_attestation(manifest)
         self._require_training_attestation(manifest)
         state = self.load()

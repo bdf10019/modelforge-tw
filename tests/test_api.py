@@ -108,8 +108,10 @@ async def app_client(app):
             yield client
 
 
-def write_runtime_registry(path, engine, *, strict_identity=False):
+def write_runtime_registry(path, engine):
     digest = "a" * 64
+    engine.model_revision = getattr(engine, "model_revision", digest)
+    engine.context_window_tokens = getattr(engine, "context_window_tokens", 2048)
     registry = FileRegistry(path)
     registry.add(
         ModelManifest(
@@ -131,9 +133,9 @@ def write_runtime_registry(path, engine, *, strict_identity=False):
             evaluation_engine=engine.name,
             evaluation_model_id=engine.model_id,
             evaluation_model_version=engine.model_version,
-            evaluation_model_revision=(engine.model_revision if strict_identity else None),
-            context_window_tokens=(engine.context_window_tokens if strict_identity else None),
-            runtime_identity_contract_version=("1.0" if strict_identity else None),
+            evaluation_model_revision=engine.model_revision,
+            context_window_tokens=engine.context_window_tokens,
+            runtime_identity_contract_version="1.0",
             evaluation_evidence_kind="measured",
             evaluation_report="outputs/evaluation.json",
             evaluation_report_sha256=digest,
@@ -396,7 +398,7 @@ async def test_service_fails_startup_when_pinned_model_revision_drifted(tmp_path
     engine.structured_output_contract = "json-schema-v2"
     engine.evidence_kind = "measured"
     registry_path = tmp_path / "registry.json"
-    write_runtime_registry(registry_path, engine, strict_identity=True)
+    write_runtime_registry(registry_path, engine)
     engine.model_revision = "b" * 64
     app = create_app(
         settings=Settings(

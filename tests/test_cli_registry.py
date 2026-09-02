@@ -48,17 +48,30 @@ def write_inputs(tmp_path):
         json.dumps(training_config, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
     training_path = tmp_path / "training.json"
+    contract = {
+        "schema_version": "1.0",
+        "model_id": "fixture-base",
+        "model_revision": HASH,
+        "dataset_manifest_sha256": HASH,
+        "training_config_sha256": training_config_sha256,
+    }
+    contract_path = tmp_path / "run-contract.json"
+    contract_path.write_text(json.dumps(contract), encoding="utf-8")
     training_path.write_text(
         json.dumps(
             {
-                "schema_version": "1.1",
+                "schema_version": "1.2",
                 "evidence_kind": "measured",
                 "model_id": "fixture-base",
                 "model_revision": HASH,
                 "resolved_model_revision": HASH,
+                "resolved_tokenizer_revision": HASH,
                 "config": training_config,
                 "dataset_manifest_sha256": HASH,
                 "training_config_sha256": training_config_sha256,
+                "training_run_contract_sha256": hashlib.sha256(
+                    contract_path.read_bytes()
+                ).hexdigest(),
             }
         ),
         encoding="utf-8",
@@ -179,6 +192,9 @@ def test_registry_cli_exports_validated_anchor(tmp_path, capsys):
             evaluation_engine="fixture",
             evaluation_model_id="fixture-model",
             evaluation_model_version="1.0",
+            evaluation_model_revision=HASH,
+            context_window_tokens=2048,
+            runtime_identity_contract_version="1.0",
             evaluation_evidence_kind="measured",
             evaluation_report="evaluation.json",
             evaluation_report_sha256=HASH,
