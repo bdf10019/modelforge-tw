@@ -33,6 +33,19 @@ BENCHMARK_IDENTITY_FIELDS = (
 )
 
 
+class _InferenceIdentityMismatchError(Exception):
+    pass
+
+
+def _benchmark_error_sample(error: Exception) -> dict[str, str]:
+    if isinstance(error, _InferenceIdentityMismatchError):
+        return {
+            "code": "inference_identity_mismatch",
+            "exception_type": "InferenceIdentityMismatchError",
+        }
+    return {"code": "inference_request_failed", "exception_type": type(error).__name__}
+
+
 def _percentile(values: list[float], percentile: float) -> float:
     if not values:
         return 0.0
@@ -144,7 +157,7 @@ def run_benchmark(
             latencies: list[float] = []
             output_tokens: list[int] = []
             ttfts: list[float] = []
-            errors: list[str] = []
+            errors: list[dict[str, str]] = []
             started = time.perf_counter()
 
             def execute(
@@ -152,7 +165,7 @@ def run_benchmark(
                 latency_sink: list[float],
                 token_sink: list[int],
                 ttft_sink: list[float],
-                error_sink: list[str],
+                error_sink: list[dict[str, str]],
             ) -> None:
                 request_started = time.perf_counter()
                 try:
@@ -168,7 +181,7 @@ def run_benchmark(
                                 != getattr(metadata_samples[0], field)
                             ]
                             if identity_mismatches:
-                                raise ValueError(
+                                raise _InferenceIdentityMismatchError(
                                     "inference metadata changed during benchmark: "
                                     + ", ".join(identity_mismatches)
                                 )
@@ -178,7 +191,7 @@ def run_benchmark(
                     if result.metadata.ttft_ms is not None:
                         ttft_sink.append(result.metadata.ttft_ms)
                 except Exception as error:  # benchmark must retain failures in its report
-                    error_sink.append(f"{type(error).__name__}: {str(error)[:160]}")
+                    error_sink.append(_benchmark_error_sample(error))
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
                 worker = functools.partial(
@@ -243,7 +256,7 @@ def run_benchmark(
         level["errors"] == 0 and level["completed"] == level["requests"] for level in levels
     )
     return {
-        "schema_version": "1.2",
+        "schema_version": "1.3",
         "created_at": datetime.now(UTC).isoformat(),
         "passed": passed,
         "failure_reason": None if passed else "one_or_more_benchmark_requests_failed",
@@ -285,6 +298,7 @@ def run_benchmark(
         "levels": levels,
         "notes": [
             "A report passes only when every measured request completes without error.",
+            "Error samples contain stable categories and exception types, never exception text.",
             "TTFT requires a streaming adapter and is not represented as zero.",
             "Fixture evidence validates the benchmark pipeline only and is not model performance.",
             "GPU memory is sampled for the whole device, not attributed to one process.",

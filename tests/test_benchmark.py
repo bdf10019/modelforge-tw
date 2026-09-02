@@ -32,7 +32,7 @@ def test_benchmark_keeps_unavailable_ttft_explicit():
     assert report["levels"][0]["errors"] == 0
     assert report["levels"][0]["output_token_sample_count"] == 0
     assert report["levels"][0]["ttft_sample_count"] == 0
-    assert report["schema_version"] == "1.2"
+    assert report["schema_version"] == "1.3"
     assert report["safety_policy_version"] == "risk-precedence-v2"
     assert (
         report["environment"]["peak_process_rss_bytes"]
@@ -124,7 +124,33 @@ def test_benchmark_fails_closed_when_inference_identity_drifts():
     assert report["passed"] is False
     assert report["levels"][0]["completed"] == 1
     assert report["levels"][0]["errors"] == 1
-    assert "metadata changed" in report["levels"][0]["error_samples"][0]
+    assert report["levels"][0]["error_samples"][0] == {
+        "code": "inference_identity_mismatch",
+        "exception_type": "InferenceIdentityMismatchError",
+    }
+
+
+def test_benchmark_report_does_not_retain_private_exception_text():
+    private_detail = "https://private.example.invalid?api_key=do-not-record"
+
+    class LeakyFailingEngine(FixtureEngine):
+        def generate(self, request):
+            raise RuntimeError(private_detail)
+
+    report = run_benchmark(
+        LeakyFailingEngine("adapted"),
+        generate_records(1, 1, 1)[:1],
+        concurrency_levels=[1],
+        requests_per_level=1,
+        warmup_requests=0,
+    )
+
+    serialized = json.dumps(report)
+    assert report["levels"][0]["error_samples"] == [
+        {"code": "inference_request_failed", "exception_type": "RuntimeError"}
+    ]
+    assert private_detail not in serialized
+    assert "do-not-record" not in serialized
 
 
 def test_benchmark_cli_returns_nonzero_and_writes_failed_report(tmp_path, monkeypatch):
