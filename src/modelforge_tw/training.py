@@ -61,6 +61,17 @@ def _first_linked_path_component(path: Path) -> Path | None:
     return None
 
 
+def _report_relative_path(path: Path, report_directory: Path) -> str:
+    """Represent local lineage without embedding a workstation-specific absolute path."""
+    try:
+        relative = os.path.relpath(path.absolute(), start=report_directory.absolute())
+    except ValueError:
+        # Windows cannot express a relative path across drive letters. The content hash
+        # remains authoritative, so preserve only the non-sensitive file or directory name.
+        return path.name
+    return Path(relative).as_posix()
+
+
 class TrainingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -615,7 +626,11 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
         "config": config_payload,
         "training_config_sha256": config_hash,
         "training_run_contract_sha256": run_contract_sha256,
-        "resumed_from_checkpoint": last_checkpoint,
+        "resumed_from_checkpoint": (
+            _report_relative_path(Path(last_checkpoint), output_dir)
+            if last_checkpoint is not None
+            else None
+        ),
         "dataset_manifest_sha256": dataset_manifest.dataset_manifest_sha256,
         "dataset_generator_version": dataset_manifest.generator_version,
         "dataset_file_sha256": {
@@ -630,7 +645,7 @@ def run_training(config: TrainingConfig) -> dict[str, Any]:
         "peak_vram_allocated_bytes": torch.cuda.max_memory_allocated(),
         "peak_vram_reserved_bytes": torch.cuda.max_memory_reserved(),
         "environment": _torch_environment(torch),
-        "final_adapter": str(final_dir.relative_to(Path.cwd())),
+        "final_adapter": _report_relative_path(final_dir, output_dir),
         "final_adapter_files": {
             path.name: {"bytes": path.stat().st_size, "sha256": sha256_file(path)}
             for path in sorted(final_dir.iterdir())
@@ -712,7 +727,7 @@ def merge_adapter(
         "model_revision": model_revision,
         "resolved_model_revision": resolved_model_revision,
         "resolved_tokenizer_revision": resolved_tokenizer_revision,
-        "source_training_report": str(training_report_path),
+        "source_training_report": _report_relative_path(training_report_path, output_dir),
         "source_training_report_sha256": training_report_sha256,
         "training_config_sha256": training_report.training_config_sha256,
         "dataset_manifest_sha256": training_report.dataset_manifest_sha256,
@@ -723,8 +738,8 @@ def merge_adapter(
         "merge_device": torch.cuda.get_device_name(0) if use_cuda else "cpu",
         "peak_vram_allocated_bytes": torch.cuda.max_memory_allocated() if use_cuda else None,
         "peak_vram_reserved_bytes": torch.cuda.max_memory_reserved() if use_cuda else None,
-        "adapter_path": str(adapter_path),
-        "output_dir": str(output_dir),
+        "adapter_path": _report_relative_path(adapter_path, output_dir),
+        "output_dir": ".",
         "duration_seconds": round(time.perf_counter() - started, 3),
         "environment": (
             _torch_environment(torch)

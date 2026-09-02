@@ -24,6 +24,7 @@ from modelforge_tw.training import (
     TrainingConfig,
     TrainingReportAttestation,
     _is_link_or_reparse_point,
+    _report_relative_path,
     installed_dependency_versions,
     merge_adapter,
     prepare_training_run,
@@ -32,6 +33,19 @@ from modelforge_tw.training import (
     verify_training_dataset_manifest,
     verify_training_run_contract,
 )
+
+
+def test_report_paths_are_portable_and_relative_to_the_report(tmp_path, monkeypatch):
+    report_directory = tmp_path / "artifacts" / "merged"
+    source = tmp_path / "artifacts" / "adapter" / "training-report.json"
+
+    assert _report_relative_path(source, report_directory) == "../adapter/training-report.json"
+
+    def cross_drive(*_args, **_kwargs):
+        raise ValueError
+
+    monkeypatch.setattr("modelforge_tw.training.os.path.relpath", cross_drive)
+    assert _report_relative_path(source, report_directory) == "training-report.json"
 
 
 def test_windows_reparse_attribute_is_treated_as_link(monkeypatch, tmp_path):

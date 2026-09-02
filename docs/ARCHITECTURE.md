@@ -56,7 +56,8 @@ Web / REST / OpenAI-compatible client
   同一比較，不能只因 requested／resolved 各自長得像 hash 就接受。
   合併前還會解析明確指定的 training report，核對 base identity，並重算 adapter 目錄中每個 regular
   file 的大小與 SHA-256；新增、缺少、symlink 或內容漂移都在匯入 Torch／PEFT 前停止。新版 merge
-  report 保存 training report hash、資料／設定 lineage 與 adapter file attestations。
+  report 保存 training report hash、資料／設定 lineage 與 adapter file attestations。Training／merge report 的
+  checkpoint、adapter 與來源報告路徑都以報告目錄為基準，不嵌入工作站絕對路徑。
   訓練、merge 與 Transformers serving 會從 tokenizer 的實際 Hugging Face cache snapshot paths
   解析 commit，要求所有 tokenizer assets 來自同一個指定 revision；serving 也會在模型載入後核對
   config `_commit_hash`。Training report 1.2 另保存並強制驗證 resolved tokenizer revision。
