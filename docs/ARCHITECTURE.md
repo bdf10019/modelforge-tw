@@ -55,7 +55,8 @@ Web / REST / OpenAI-compatible client
   訓練與合併在模型載入後還要求 Hugging Face 回報的 resolved commit 逐字相等，報告驗證也重做
   同一比較，不能只因 requested／resolved 各自長得像 hash 就接受。
   合併前還會解析明確指定的 training report，核對 base identity，並重算 adapter 目錄中每個 regular
-  file 的大小與 SHA-256；新增、缺少、symlink 或內容漂移都在匯入 Torch／PEFT 前停止。新版 merge
+  file 的大小與 SHA-256；資料、training report、run contract 與 adapter 的既有路徑元件都拒絕
+  symlink／Windows reparse point。新增、缺少或內容漂移也都在匯入 Torch／PEFT 前停止。新版 merge
   report 保存 training report hash、資料／設定 lineage 與 adapter file attestations。Training／merge report 的
   checkpoint、adapter 與來源報告路徑都以報告目錄為基準，不嵌入工作站絕對路徑。
   訓練、merge 與 Transformers serving 會從 tokenizer 的實際 Hugging Face cache snapshot paths

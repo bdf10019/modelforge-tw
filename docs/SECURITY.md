@@ -69,7 +69,8 @@
 - 訓練與 merge 載入模型後會把 loader 回報的 resolved commit 與要求值逐字比對；缺失、格式錯誤或
   不相等都停止，training attestation 載入時也會再次核對，避免快取或下載層漂移被報告掩蓋。
 - Merge 必須顯式提供 training report；載入 ML runtime 前逐項核對 base identity 與 adapter regular
-  files 的集合、大小及 SHA-256，不接受額外檔、缺檔、symlink 或被替換的 adapter。
+  files 的集合、大小及 SHA-256，資料、report、run contract 與 adapter 路徑的任一層 symlink／
+  Windows reparse point 都拒絕，也不接受額外檔、缺檔或被替換的 adapter。
 - Merge output 必須是全新或空的 regular directory；既有檔案會在 ML runtime 載入前拒絕，避免舊
   safetensors shard、tokenizer 或 config 殘留並混入新 artifact／後續量化。
 - 本機 Transformers 的 tokenizer assets 必須全部來自指定 Hugging Face snapshot commit；訓練、merge

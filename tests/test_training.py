@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
+import modelforge_tw.training as training_module
 from modelforge_tw import cli
 from modelforge_tw.cli import build_parser
 from modelforge_tw.dataset import write_dataset
@@ -119,6 +120,17 @@ def test_training_dataset_manifest_is_verified_before_ml_runtime(tmp_path):
     with (tmp_path / "train.jsonl").open("ab") as handle:
         handle.write(b"\n")
     with pytest.raises(ValueError, match="does not match manifest"):
+        verify_training_dataset_manifest(tmp_path)
+
+
+def test_training_dataset_rejects_linked_path_component(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        training_module,
+        "_first_linked_path_component",
+        lambda path: path,
+    )
+
+    with pytest.raises(ValueError, match="training data path"):
         verify_training_dataset_manifest(tmp_path)
 
 
@@ -346,6 +358,30 @@ def test_adapter_lineage_verification_rejects_file_or_identity_drift(tmp_path):
 
     (adapter / "adapter_model.safetensors").write_bytes(b"tampered")
     with pytest.raises(ValueError, match="does not match training report"):
+        verify_adapter_training_lineage(
+            model_id="Qwen/Qwen3-1.7B",
+            model_revision=DEFAULT_BASE_MODEL_REVISION,
+            adapter_path=adapter,
+            training_report_path=report,
+        )
+
+
+@pytest.mark.parametrize(
+    ("linked_target", "expected_message"),
+    [("adapter", "adapter path"), ("report", "training report path")],
+)
+def test_adapter_lineage_rejects_linked_source_component(
+    tmp_path, monkeypatch, linked_target, expected_message
+):
+    adapter, report = _write_attested_adapter(tmp_path)
+    selected = adapter if linked_target == "adapter" else report
+    monkeypatch.setattr(
+        training_module,
+        "_first_linked_path_component",
+        lambda path: path if path == selected else None,
+    )
+
+    with pytest.raises(ValueError, match=expected_message):
         verify_adapter_training_lineage(
             model_id="Qwen/Qwen3-1.7B",
             model_revision=DEFAULT_BASE_MODEL_REVISION,

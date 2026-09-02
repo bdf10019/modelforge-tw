@@ -210,8 +210,10 @@ def load_training_config(path: Path) -> TrainingConfig:
 
 
 def verify_training_dataset_manifest(data_dir: Path) -> TrainingDatasetManifestAttestation:
+    if _first_linked_path_component(data_dir) is not None:
+        raise ValueError("training data path must not contain links or reparse points")
     manifest_path = data_dir / "manifest.json"
-    if not manifest_path.is_file() or manifest_path.is_symlink():
+    if not manifest_path.is_file() or _is_link_or_reparse_point(manifest_path):
         raise FileNotFoundError(f"dataset manifest not found as a regular file: {manifest_path}")
     manifest = TrainingDatasetManifestAttestation.model_validate_json(
         read_utf8_text_limited(manifest_path)
@@ -224,7 +226,7 @@ def verify_training_dataset_manifest(data_dir: Path) -> TrainingDatasetManifestA
         if Path(name).name != name or not name.endswith(".jsonl"):
             raise ValueError("dataset manifest contains an unsafe file name")
         path = data_dir / name
-        if not path.is_file() or path.is_symlink():
+        if not path.is_file() or _is_link_or_reparse_point(path):
             raise FileNotFoundError(f"dataset file not found as a regular file: {path}")
         if path.stat().st_size != expected.bytes or sha256_file(path) != expected.sha256:
             raise ValueError(f"dataset file does not match manifest: {name}")
@@ -312,7 +314,7 @@ def verify_training_run_contract(
     if report.training_run_contract_sha256 is None:  # enforced by report validation
         raise ValueError("training report lacks run contract hash")
     contract_path = training_report_path.parent / "run-contract.json"
-    if not contract_path.is_file() or contract_path.is_symlink():
+    if not contract_path.is_file() or _first_linked_path_component(contract_path) is not None:
         raise FileNotFoundError(
             f"training run contract not found as a regular file: {contract_path}"
         )
@@ -344,6 +346,12 @@ def verify_adapter_training_lineage(
 ) -> tuple[TrainingReportAttestation, str]:
     """Verify an adapter against its measured training report before merge."""
     validate_immutable_model_revision(model_revision)
+    if _first_linked_path_component(training_report_path) is not None:
+        raise ValueError("training report path must not contain links or reparse points")
+    if not training_report_path.is_file():
+        raise FileNotFoundError(training_report_path)
+    if _first_linked_path_component(adapter_path) is not None:
+        raise ValueError("adapter path must not contain links or reparse points")
     report = TrainingReportAttestation.model_validate_json(
         read_utf8_text_limited(training_report_path)
     )
@@ -363,7 +371,7 @@ def verify_adapter_training_lineage(
         raise FileNotFoundError(adapter_path)
 
     entries = sorted(adapter_path.iterdir(), key=lambda path: path.name)
-    if any(not path.is_file() or path.is_symlink() for path in entries):
+    if any(not path.is_file() or _is_link_or_reparse_point(path) for path in entries):
         raise ValueError("adapter directory must contain regular files only")
     actual_names = {path.name for path in entries}
     expected_names = set(report.final_adapter_files)
