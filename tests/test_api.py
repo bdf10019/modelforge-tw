@@ -108,7 +108,7 @@ async def app_client(app):
             yield client
 
 
-def write_runtime_registry(path, engine):
+def write_runtime_registry(path, engine, *, strict_identity=False):
     digest = "a" * 64
     registry = FileRegistry(path)
     registry.add(
@@ -131,6 +131,9 @@ def write_runtime_registry(path, engine):
             evaluation_engine=engine.name,
             evaluation_model_id=engine.model_id,
             evaluation_model_version=engine.model_version,
+            evaluation_model_revision=(engine.model_revision if strict_identity else None),
+            context_window_tokens=(engine.context_window_tokens if strict_identity else None),
+            runtime_identity_contract_version=("1.0" if strict_identity else None),
             evaluation_evidence_kind="measured",
             evaluation_report="outputs/evaluation.json",
             evaluation_report_sha256=digest,
@@ -377,6 +380,33 @@ async def test_service_fails_startup_when_runtime_drifted_from_registry(tmp_path
     )
 
     with pytest.raises(ValueError, match="quantization"):
+        async with app.router.lifespan_context(app):
+            pass
+
+
+async def test_service_fails_startup_when_pinned_model_revision_drifted(tmp_path):
+    engine = FixtureEngine("adapted")
+    engine.name = "openai-http"
+    engine.model_id = "deployed-model"
+    engine.model_version = "measured-v1"
+    engine.model_revision = "a" * 64
+    engine.context_window_tokens = 2048
+    engine.quantization = "q8_0"
+    engine.max_new_tokens = 192
+    engine.structured_output_contract = "json-schema-v2"
+    engine.evidence_kind = "measured"
+    registry_path = tmp_path / "registry.json"
+    write_runtime_registry(registry_path, engine, strict_identity=True)
+    engine.model_revision = "b" * 64
+    app = create_app(
+        settings=Settings(
+            registry_path=registry_path,
+            registry_deployment_role="released",
+        ),
+        engine_factory=lambda: engine,
+    )
+
+    with pytest.raises(ValueError, match="model_revision"):
         async with app.router.lifespan_context(app):
             pass
 

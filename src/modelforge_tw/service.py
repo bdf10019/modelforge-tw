@@ -429,9 +429,17 @@ def validate_registry_deployment(
         "engine": manifest.evaluation_engine == engine.name,
         "model_id": manifest.evaluation_model_id == engine.model_id,
         "model_version": manifest.evaluation_model_version == engine.model_version,
+        "model_revision": (
+            manifest.runtime_identity_contract_version != "1.0"
+            or manifest.evaluation_model_revision == getattr(engine, "model_revision", None)
+        ),
         "quantization": manifest.quantization == engine.quantization,
         "prompt_version": manifest.prompt_version == engine.prompt_version,
         "max_new_tokens": manifest.max_new_tokens == engine.max_new_tokens,
+        "context_window_tokens": (
+            manifest.runtime_identity_contract_version != "1.0"
+            or manifest.context_window_tokens == getattr(engine, "context_window_tokens", None)
+        ),
         "structured_output_contract": (
             manifest.structured_output_contract == engine.structured_output_contract
         ),

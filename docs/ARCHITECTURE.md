@@ -91,7 +91,8 @@ Web / REST / OpenAI-compatible client
   部分遷移的資料不放行。Registry 載入時另驗證 manifest key／ID、唯一 released status、released
   pointer、通過結果與 retired previous-good pointer 一致；人工改壞的狀態不能進入後續操作。
   線上服務可選擇綁定 `released` 或 `previous-good` 指標；啟用後會在啟動時逐欄比對實際引擎的
-  measured identity、模型版本、量化、prompt、生成上限、輸出契約與安全政策，漂移即拒絕啟動；
+  measured identity、模型版本、量化、prompt、生成上限、輸出契約與安全政策；新版 runtime identity
+  contract 另強制綁定不可變 model revision 與 context window，任一漂移即拒絕啟動；
   `/readyz` 也會重讀 pointer 與相同契約，運行中 registry 改版會先撤除此 Pod 流量，等待明確重啟。
   若另設定 artifact root，啟動還會重算評測／訓練報告與模型 artifact 的大小及 SHA-256；高頻 readiness
   不重讀大型權重。這能驗證 API Pod 看見的唯讀掛載副本，不等同遠端模型 server 的記憶體證明。

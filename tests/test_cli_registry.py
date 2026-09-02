@@ -18,6 +18,7 @@ def write_inputs(tmp_path):
         engine="fixture",
         model_id="fixture-model",
         model_version="1.0",
+        model_revision=HASH,
         quantization="none",
         prompt_version="optimized-v2",
         max_new_tokens=192,
@@ -94,6 +95,9 @@ def test_registry_cli_add_locks_complete_evaluation_identity(tmp_path, monkeypat
     assert saved.evaluation_engine == "fixture"
     assert saved.evaluation_model_id == "fixture-model"
     assert saved.evaluation_model_version == "1.0"
+    assert saved.evaluation_model_revision == HASH
+    assert saved.context_window_tokens == 2048
+    assert saved.runtime_identity_contract_version == "1.0"
     assert saved.evaluation_evidence_kind == "fixture"
     assert (
         saved.evaluation_report_sha256 == hashlib.sha256(evaluation_path.read_bytes()).hexdigest()

@@ -19,7 +19,11 @@ from modelforge_tw.io_utils import (
     exclusive_file_lock,
     read_utf8_text_limited,
 )
-from modelforge_tw.model_identity import validate_model_version, validate_quantization
+from modelforge_tw.model_identity import (
+    validate_immutable_model_revision,
+    validate_model_version,
+    validate_quantization,
+)
 from modelforge_tw.schemas import EvaluationReport
 from modelforge_tw.training import TrainingReportAttestation, verify_training_run_contract
 
@@ -79,6 +83,9 @@ class ModelManifest(BaseModel):
     evaluation_engine: str | None = None
     evaluation_model_id: str | None = None
     evaluation_model_version: str | None = None
+    evaluation_model_revision: str | None = None
+    context_window_tokens: int | None = Field(default=None, ge=1)
+    runtime_identity_contract_version: Literal["1.0"] | None = None
     evaluation_evidence_kind: Literal["fixture", "measured"] | None = None
     status: Literal["candidate", "released", "retired", "blocked"] = "candidate"
     evaluation_report: str
@@ -99,10 +106,32 @@ class ModelManifest(BaseModel):
     def evaluation_model_version_is_explicit(cls, value: str | None) -> str | None:
         return validate_model_version(value) if value is not None else None
 
+    @field_validator("evaluation_model_revision")
+    @classmethod
+    def evaluation_model_revision_is_immutable(cls, value: str | None) -> str | None:
+        return validate_immutable_model_revision(value) if value is not None else None
+
     @field_validator("quantization")
     @classmethod
     def quantization_is_explicit(cls, value: str) -> str:
         return validate_quantization(value)
+
+    @model_validator(mode="after")
+    def runtime_identity_contract_is_complete(self) -> ModelManifest:
+        if self.runtime_identity_contract_version == "1.0":
+            missing = [
+                name
+                for name, value in {
+                    "evaluation_model_revision": self.evaluation_model_revision,
+                    "context_window_tokens": self.context_window_tokens,
+                }.items()
+                if value is None
+            ]
+            if missing:
+                raise ValueError("runtime identity contract lacks: " + ", ".join(sorted(missing)))
+            if self.evaluation_model_revision != self.base_revision:
+                raise ValueError("evaluation model revision does not match base revision")
+        return self
 
 
 class RegistryEvent(BaseModel):
@@ -464,8 +493,15 @@ class FileRegistry:
                 manifest.evaluation_model_version == evaluation.model_version
             ),
             "evaluation_model_revision": (
-                evaluation.model_revision is None
+                manifest.evaluation_model_revision == evaluation.model_revision
+                if manifest.runtime_identity_contract_version == "1.0"
+                else evaluation.model_revision is None
                 or manifest.base_revision == evaluation.model_revision
+            ),
+            "context_window_tokens": (
+                manifest.context_window_tokens == evaluation.context_window_tokens
+                if manifest.runtime_identity_contract_version == "1.0"
+                else True
             ),
             "evaluation_evidence_kind": (
                 manifest.evaluation_evidence_kind == evaluation.evidence_kind
@@ -548,6 +584,9 @@ class FileRegistry:
         self.validate_evaluation(manifest_id, evaluation)
         required_contract = {
             "max_new_tokens": evaluation.max_new_tokens,
+            "evaluation_model_revision": evaluation.model_revision,
+            "context_window_tokens": evaluation.context_window_tokens,
+            "runtime_identity_contract_version": "1.0",
             "structured_output_contract": evaluation.structured_output_contract,
             "safety_policy_version": evaluation.safety_policy_version,
             "evaluation_contract_version": evaluation.evaluation_contract_version,

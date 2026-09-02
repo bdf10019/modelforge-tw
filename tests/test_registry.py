@@ -51,9 +51,11 @@ def valid_evaluation_report(**updates) -> EvaluationReport:
         engine="fixture",
         model_id="fixture",
         model_version="1",
+        model_revision=HASH,
         quantization="none",
         prompt_version="optimized-v1",
         max_new_tokens=192,
+        context_window_tokens=2048,
         structured_output_contract="json-schema-v2",
         safety_policy_version="risk-precedence-v2",
         evaluation_contract_version="release-metrics-v2",
@@ -131,6 +133,9 @@ def manifest(manifest_id: str, passed: bool = True) -> ModelManifest:
         evaluation_engine="fixture",
         evaluation_model_id="fixture",
         evaluation_model_version="1",
+        evaluation_model_revision=HASH,
+        context_window_tokens=2048,
+        runtime_identity_contract_version="1.0",
         evaluation_evidence_kind="measured",
         evaluation_report="outputs/evaluation.json",
         evaluation_report_sha256=HASH,
@@ -146,6 +151,18 @@ def manifest(manifest_id: str, passed: bool = True) -> ModelManifest:
             )
         ],
     )
+
+
+def test_runtime_identity_contract_requires_revision_and_context():
+    payload = manifest("strict-v1").model_dump(mode="json")
+    payload["context_window_tokens"] = None
+    with pytest.raises(ValidationError, match="runtime identity contract lacks"):
+        ModelManifest.model_validate(payload)
+
+    payload = manifest("strict-v1").model_dump(mode="json")
+    payload["evaluation_model_revision"] = "b" * 64
+    with pytest.raises(ValidationError, match="does not match base revision"):
+        ModelManifest.model_validate(payload)
 
 
 def test_registry_promote_and_rollback(tmp_path):
@@ -766,9 +783,11 @@ def test_registry_attests_and_locks_evaluation_contract(tmp_path):
         engine="fixture",
         model_id="fixture",
         model_version="1",
+        model_revision=HASH,
         quantization="none",
         prompt_version="optimized-v1",
         max_new_tokens=192,
+        context_window_tokens=2048,
         structured_output_contract="json-schema-v2",
         safety_policy_version="risk-precedence-v2",
         evaluation_contract_version="release-metrics-v2",
