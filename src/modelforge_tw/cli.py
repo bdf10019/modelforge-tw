@@ -329,7 +329,7 @@ def command_compare(args: argparse.Namespace) -> int:
         json.dumps(comparison, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
     )
     print(json.dumps(comparison, ensure_ascii=False, indent=2))
-    passed = comparison["dataset_match"]
+    passed = comparison["compatible"]
     if args.profile == "q4":
         passed = passed and comparison["quantization_gate"]["passed"]
     return 0 if passed else 2

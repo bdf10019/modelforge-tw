@@ -337,25 +337,37 @@ def compare_reports(baseline: EvaluationReport, candidate: EvaluationReport) -> 
         name: round(candidate.metrics.get(name, 0.0) - baseline.metrics.get(name, 0.0), 6)
         for name in names
     }
+    compatibility_checks = {
+        "dataset": baseline.dataset_manifest_sha256 == candidate.dataset_manifest_sha256,
+        "release_gate": baseline.release_gate_sha256 == candidate.release_gate_sha256,
+        "prompt": baseline.prompt_version == candidate.prompt_version,
+        "max_new_tokens": baseline.max_new_tokens == candidate.max_new_tokens,
+        "context_window_tokens": (
+            baseline.context_window_tokens == candidate.context_window_tokens
+        ),
+        "structured_output_contract": (
+            baseline.structured_output_contract == candidate.structured_output_contract
+        ),
+        "safety_policy_version": (
+            baseline.safety_policy_version == candidate.safety_policy_version
+        ),
+        "evaluation_contract_version": (
+            baseline.evaluation_contract_version == candidate.evaluation_contract_version
+        ),
+    }
     return {
         "baseline_run_id": baseline.run_id,
         "candidate_run_id": candidate.run_id,
-        "dataset_match": baseline.dataset_manifest_sha256 == candidate.dataset_manifest_sha256,
-        "release_gate_match": baseline.release_gate_sha256 == candidate.release_gate_sha256,
-        "prompt_match": baseline.prompt_version == candidate.prompt_version,
-        "max_new_tokens_match": baseline.max_new_tokens == candidate.max_new_tokens,
-        "context_window_tokens_match": (
-            baseline.context_window_tokens == candidate.context_window_tokens
-        ),
-        "structured_output_contract_match": (
-            baseline.structured_output_contract == candidate.structured_output_contract
-        ),
-        "safety_policy_version_match": (
-            baseline.safety_policy_version == candidate.safety_policy_version
-        ),
-        "evaluation_contract_version_match": (
-            baseline.evaluation_contract_version == candidate.evaluation_contract_version
-        ),
+        "compatible": all(compatibility_checks.values()),
+        "compatibility_checks": compatibility_checks,
+        "dataset_match": compatibility_checks["dataset"],
+        "release_gate_match": compatibility_checks["release_gate"],
+        "prompt_match": compatibility_checks["prompt"],
+        "max_new_tokens_match": compatibility_checks["max_new_tokens"],
+        "context_window_tokens_match": compatibility_checks["context_window_tokens"],
+        "structured_output_contract_match": compatibility_checks["structured_output_contract"],
+        "safety_policy_version_match": compatibility_checks["safety_policy_version"],
+        "evaluation_contract_version_match": compatibility_checks["evaluation_contract_version"],
         "metric_deltas": deltas,
         "candidate_release_passed": candidate.release_passed,
         "failure_counts": {

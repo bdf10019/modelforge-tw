@@ -1,8 +1,10 @@
 import json
+from argparse import Namespace
 
 from modelforge_tw import cli
 from modelforge_tw.dataset import generate_records
 from modelforge_tw.engines import FixtureEngine
+from modelforge_tw.evaluation import evaluate
 
 
 def test_evaluation_cache_skips_truncated_tail_and_keeps_valid_result(tmp_path):
@@ -60,3 +62,28 @@ def test_evaluation_cache_line_boundary_separates_future_entries(tmp_path):
         '{"truncated":',
         '{"next":"valid"}',
     ]
+
+
+def test_compare_command_fails_when_inference_contracts_differ(tmp_path):
+    records = [item for item in generate_records(2, 1, 2) if item.split == "test"]
+    baseline = evaluate(FixtureEngine("adapted"), records)
+    candidate = baseline.model_copy(update={"prompt_version": "minimal-v1"})
+    baseline_path = tmp_path / "baseline.json"
+    candidate_path = tmp_path / "candidate.json"
+    output_path = tmp_path / "comparison.json"
+    baseline_path.write_text(baseline.model_dump_json(), encoding="utf-8")
+    candidate_path.write_text(candidate.model_dump_json(), encoding="utf-8")
+
+    exit_code = cli.command_compare(
+        Namespace(
+            baseline=baseline_path,
+            candidate=candidate_path,
+            output=output_path,
+            profile="metrics",
+        )
+    )
+
+    comparison = json.loads(output_path.read_text(encoding="utf-8"))
+    assert exit_code == 2
+    assert comparison["compatible"] is False
+    assert comparison["compatibility_checks"]["prompt"] is False

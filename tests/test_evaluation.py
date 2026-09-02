@@ -23,6 +23,33 @@ def test_adapted_fixture_improves_event_f1_and_keeps_fixture_label():
     comparison = compare_reports(base, adapted)
     assert comparison["dataset_match"] is True
     assert comparison["release_gate_match"] is True
+    assert comparison["compatible"] is False
+    assert comparison["compatibility_checks"]["prompt"] is False
+    assert compare_reports(adapted, adapted)["compatible"] is True
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "check"),
+    [
+        ("dataset_manifest_sha256", "different-dataset", "dataset"),
+        ("release_gate_sha256", GATE_HASH, "release_gate"),
+        ("prompt_version", "minimal-v1", "prompt"),
+        ("max_new_tokens", 256, "max_new_tokens"),
+        ("context_window_tokens", 4096, "context_window_tokens"),
+        ("structured_output_contract", "json-schema-v1", "structured_output_contract"),
+        ("safety_policy_version", "risk-precedence-v1", "safety_policy_version"),
+        ("evaluation_contract_version", "release-metrics-v1", "evaluation_contract_version"),
+    ],
+)
+def test_report_comparison_rejects_every_contract_mismatch(field, value, check):
+    records = [record for record in generate_records(2, 1, 2) if record.split == "test"]
+    baseline = evaluate(FixtureEngine("adapted"), records)
+    candidate = baseline.model_copy(update={field: value})
+
+    comparison = compare_reports(baseline, candidate)
+
+    assert comparison["compatible"] is False
+    assert comparison["compatibility_checks"][check] is False
 
 
 def test_injection_challenge_requires_review():
