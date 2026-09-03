@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="ModelForge-TW 繁中設備事件模型適配與推論驗證工作台">
   <title>ModelForge-TW｜推論驗證工作台</title>
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=0.1.1">
-  <link rel="stylesheet" href="/static/styles.css?v=0.1.1">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=0.1.2">
+  <link rel="stylesheet" href="/static/styles.css?v=0.1.2">
 </head>
 <body>
   <a class="skip-link" href="#workspace">跳到操作區</a>
@@ -42,6 +42,13 @@
           <span class="boundary">不執行設備控制</span>
         </div>
 
+        <div id="authentication-field" hidden>
+          <label for="api-key">服務存取金鑰</label>
+          <input id="api-key" name="api_key" type="password" minlength="32"
+                 autocomplete="off" spellcheck="false">
+          <p class="field-help">只用於本次頁面請求，不會顯示於結果；本頁不會主動寫入瀏覽器儲存。</p>
+        </div>
+
         <label for="asset-type">設備類型（選填）</label>
         <input id="asset-type" name="asset_type" maxlength="80" placeholder="例如：循環泵浦">
 
@@ -55,7 +62,7 @@
           <button type="button" data-example="injection">指令注入</button>
         </div>
 
-        <button id="submit-button" class="primary" type="submit">執行結構化分流</button>
+        <button id="submit-button" class="primary" type="submit" disabled>執行結構化分流</button>
         <p id="form-status" class="status" aria-live="polite"></p>
       </form>
 
@@ -126,6 +133,6 @@
     <a href="/docs">OpenAPI</a>
     <a href="/metrics">Prometheus metrics</a>
   </footer>
-  <script src="/static/app.js?v=0.1.1" defer></script>
+  <script src="/static/app.js?v=0.1.2" defer></script>
 </body>
 </html>

@@ -35,7 +35,22 @@ def test_web_ui_assets_share_an_explicit_cache_version():
     html = (PROJECT_ROOT / "src" / "modelforge_tw" / "web" / "index.html").read_text(
         encoding="utf-8"
     )
-    assert "styles.css?v=0.1.1" in html
-    assert "app.js?v=0.1.1" in html
-    assert "favicon.svg?v=0.1.1" in html
+    assert "styles.css?v=0.1.2" in html
+    assert "app.js?v=0.1.2" in html
+    assert "favicon.svg?v=0.1.2" in html
     assert (PROJECT_ROOT / "src" / "modelforge_tw" / "web" / "favicon.svg").is_file()
+
+
+def test_web_ui_supports_required_bearer_auth_without_persisting_credentials():
+    html = (PROJECT_ROOT / "src" / "modelforge_tw" / "web" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    script = (PROJECT_ROOT / "src" / "modelforge_tw" / "web" / "app.js").read_text(encoding="utf-8")
+    assert 'id="authentication-field" hidden' in html
+    assert 'id="api-key"' in html
+    assert 'type="password"' in html
+    assert 'minlength="32"' in html
+    assert "config.authentication_required" in script
+    assert "headers.Authorization = `Bearer ${apiKeyInput.value}`" in script
+    assert "localStorage" not in script
+    assert "sessionStorage" not in script

@@ -42,6 +42,8 @@
   32 字元、以 constant-time 比對、不出現在 config response。Kubernetes baseline 要求 Secret
   存在，遺漏時 Pod 不啟動，repository 不保存值；未設定模式只保留 loopback／Compose demo 相容性，
   Compose 的 published port 明確綁定 `127.0.0.1`，並移除全部 Linux capabilities。
+- 展示頁只在 config 宣告需要認證時顯示 password 欄位，將 bearer key 放進當次 request header；不寫入
+  URL、localStorage、sessionStorage、結果 metadata 或事件紀錄。正式環境仍應由短效身分憑證取代共用 key。
 - 推論／config 回應與認證錯誤都帶 `Cache-Control: no-store`；展示頁限制同源 script／style／連線，
   禁止 object、base URI 與 frame ancestor，所有 HTTP 回應另加 nosniff、deny framing、
   no-referrer 與 camera／microphone／geolocation 權限限制。

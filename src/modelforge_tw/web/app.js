@@ -1,6 +1,8 @@
 const form = document.querySelector("#triage-form");
 const textInput = document.querySelector("#incident-text");
 const assetInput = document.querySelector("#asset-type");
+const authenticationField = document.querySelector("#authentication-field");
+const apiKeyInput = document.querySelector("#api-key");
 const submitButton = document.querySelector("#submit-button");
 const status = document.querySelector("#form-status");
 
@@ -86,9 +88,11 @@ form.addEventListener("submit", async (event) => {
   submitButton.disabled = true;
   status.textContent = "執行推論與伺服器安全驗證…";
   try {
+    const headers = { "Content-Type": "application/json" };
+    if (apiKeyInput.required) headers.Authorization = `Bearer ${apiKeyInput.value}`;
     const response = await fetch("/v1/triage", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         incident_text: textInput.value,
         asset_type: assetInput.value || null,
@@ -122,7 +126,12 @@ fetch("/api/config")
   .then((config) => {
     const label = `${config.engine} · ${config.model_id} · ${config.evidence_kind}`;
     document.querySelector("#runtime-badge").textContent = label;
+    authenticationField.hidden = !config.authentication_required;
+    apiKeyInput.required = config.authentication_required;
   })
   .catch(() => {
     document.querySelector("#runtime-badge").textContent = "執行環境尚未就緒";
+  })
+  .finally(() => {
+    submitButton.disabled = false;
   });

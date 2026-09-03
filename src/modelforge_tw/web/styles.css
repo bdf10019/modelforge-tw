@@ -42,6 +42,7 @@ label { display: block; margin: 1.2rem 0 .5rem; font-weight: 750; }
 input, textarea { width: 100%; border: 1px solid var(--line); color: var(--text); background: #071310; border-radius: 10px; padding: .85rem .9rem; outline: none; }
 input:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(94, 226, 184, .12); }
 textarea { resize: vertical; line-height: 1.6; }
+.field-help { color: var(--muted); font-size: .75rem; line-height: 1.5; margin: .45rem 0 0; }
 .char-row { display: flex; justify-content: space-between; gap: 1rem; color: var(--muted); font-size: .75rem; margin-top: .45rem; }
 .examples { display: flex; flex-wrap: wrap; gap: .55rem; margin: 1rem 0; }
 .examples button { min-height: 44px; border: 1px solid var(--line); background: transparent; color: var(--muted); padding: .45rem .7rem; border-radius: 999px; cursor: pointer; }

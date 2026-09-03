@@ -27,7 +27,9 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/triage -ContentType
 
 展示時說明三點：原始模型輸出不可信、證據必須落在輸入、high/critical/unknown 一律人工複核。
 `/api/config` 只顯示非敏感 runtime 契約，例如並發、queue 與 bytes 上限、是否需要認證及綁定的
-registry manifest ID；不回傳 bearer key、事件原文或本機路徑。
+registry manifest ID；不回傳 bearer key、事件原文或本機路徑。服務要求 bearer key 時，展示頁才會
+顯示密碼欄位並把值放入當次請求的 `Authorization` header；前端不寫入 URL、localStorage、
+sessionStorage 或結果 metadata。
 
 ## GGUF + llama.cpp
 
