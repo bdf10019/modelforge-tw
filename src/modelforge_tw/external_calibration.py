@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import io
 import json
 import math
 from collections import Counter
@@ -23,6 +24,7 @@ from modelforge_tw.schemas import (
 )
 
 TRANSFORM_VERSION = "ai4i-calibration-v2"
+MAX_EXTERNAL_CSV_BYTES = 16 * 1024 * 1024
 CalibrationSplit = Literal["external", "external_holdout"]
 EXPECTED_COLUMNS = {
     "UDI",
@@ -326,11 +328,21 @@ def _unknown_record(row: AI4IRow, split: CalibrationSplit) -> DatasetRecord:
     )
 
 
-def _read_rows(source_csv: Path) -> tuple[list[AI4IRow], set[str]]:
-    with source_csv.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle)
-        columns = set(reader.fieldnames or [])
-        rows = [AI4IRow.from_csv(item) for item in reader]
+def _read_source_snapshot(source_csv: Path) -> tuple[bytes, str]:
+    with source_csv.open("rb") as handle:
+        raw = handle.read(MAX_EXTERNAL_CSV_BYTES + 1)
+    if len(raw) > MAX_EXTERNAL_CSV_BYTES:
+        raise ValueError("external source CSV exceeds the 16 MiB limit")
+    try:
+        return raw, raw.decode("utf-8-sig")
+    except UnicodeDecodeError as error:
+        raise ValueError("external source CSV is not valid UTF-8") from error
+
+
+def _read_rows(serialized_csv: str) -> tuple[list[AI4IRow], set[str]]:
+    reader = csv.DictReader(io.StringIO(serialized_csv, newline=""))
+    columns = set(reader.fieldnames or [])
+    rows = [AI4IRow.from_csv(item) for item in reader]
     return rows, columns
 
 
@@ -410,10 +422,11 @@ def build_external_calibration(
     selection = config["selection"]
     if config.get("transform_version") != TRANSFORM_VERSION:
         raise ValueError("external calibration transform version mismatch")
-    actual_sha256 = sha256_file(source_csv)
+    source_bytes, serialized_csv = _read_source_snapshot(source_csv)
+    actual_sha256 = hashlib.sha256(source_bytes).hexdigest()
     if actual_sha256 != source["csv_sha256"]:
         raise ValueError("external source CSV SHA-256 mismatch")
-    rows, columns = _read_rows(source_csv)
+    rows, columns = _read_rows(serialized_csv)
     if columns != EXPECTED_COLUMNS:
         raise ValueError(f"external source columns changed: {sorted(columns)}")
     if len(rows) != int(source["expected_rows"]):

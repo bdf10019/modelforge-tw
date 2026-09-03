@@ -2,6 +2,9 @@ import csv
 import hashlib
 from pathlib import Path
 
+import pytest
+
+import modelforge_tw.external_calibration as external_calibration_module
 from modelforge_tw.dataset import audit_records, read_jsonl
 from modelforge_tw.external_calibration import build_external_calibration
 
@@ -21,6 +24,18 @@ HEADERS = [
     "OSF",
     "RNF",
 ]
+
+
+def test_external_source_snapshot_is_bounded_and_utf8(tmp_path, monkeypatch):
+    source = tmp_path / "source.csv"
+    source.write_bytes(b"x" * 33)
+    monkeypatch.setattr(external_calibration_module, "MAX_EXTERNAL_CSV_BYTES", 32)
+    with pytest.raises(ValueError, match="16 MiB limit"):
+        external_calibration_module._read_source_snapshot(source)
+
+    source.write_bytes(b"\xff")
+    with pytest.raises(ValueError, match="valid UTF-8"):
+        external_calibration_module._read_source_snapshot(source)
 
 
 def _row(
@@ -86,7 +101,7 @@ def _write_fixture(path: Path) -> None:
         writer.writerows(rows)
 
 
-def test_external_calibration_is_frozen_audited_and_separate(tmp_path):
+def test_external_calibration_is_frozen_audited_and_separate(tmp_path, monkeypatch):
     source = tmp_path / "ai4i.csv"
     _write_fixture(source)
     source_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
@@ -109,6 +124,17 @@ def test_external_calibration_is_frozen_audited_and_separate(tmp_path):
         },
     }
     output = tmp_path / "generated"
+    source_path = source.resolve()
+    source_reads = 0
+    original_open = Path.open
+
+    def observed_open(path, *args, **kwargs):
+        nonlocal source_reads
+        if path.resolve() == source_path:
+            source_reads += 1
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", observed_open)
     manifest = build_external_calibration(source, output, config)
     records = read_jsonl(output / "external.jsonl")
     holdout_records = read_jsonl(output / "external_holdout.jsonl")
@@ -133,3 +159,4 @@ def test_external_calibration_is_frozen_audited_and_separate(tmp_path):
     assert manifest["externality"]["holdout_not_used_for_prompt_tuning"] is True
     assert manifest["externality"]["real_factory_measurements"] is False
     assert audit_records(records + holdout_records)["passed"] is True
+    assert source_reads == 1
