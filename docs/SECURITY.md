@@ -40,7 +40,8 @@
   `trust_env=false`，事件原文不會因程序環境中的 `HTTP_PROXY`／`HTTPS_PROXY` 意外繞送代理。
 - 設定 `MODELFORGE_API_KEY` 後，兩個推論路由都要求標準 `Authorization: Bearer ...`；key 至少
   32 字元、以 constant-time 比對、不出現在 config response。Kubernetes baseline 要求 Secret
-  存在，遺漏時 Pod 不啟動，repository 不保存值；未設定模式只保留 loopback／Compose demo 相容性。
+  存在，遺漏時 Pod 不啟動，repository 不保存值；未設定模式只保留 loopback／Compose demo 相容性，
+  Compose 的 published port 明確綁定 `127.0.0.1`，並移除全部 Linux capabilities。
 - 推論／config 回應與認證錯誤都帶 `Cache-Control: no-store`；展示頁限制同源 script／style／連線，
   禁止 object、base URI 與 frame ancestor，所有 HTTP 回應另加 nosniff、deny framing、
   no-referrer 與 camera／microphone／geolocation 權限限制。
@@ -101,8 +102,9 @@
   不使用強制覆寫，既有實測 GGUF 不會被一次重跑悄悄取代。
 - llama.cpp 工具準備會核對壓縮檔 hash、解壓後完整檔案清單與 quantizer／server executable hash；
   啟動 server 不遞迴搜尋同名檔，還會重驗 GGUF 與 quantization report，工具或模型漂移均先停止。
-- Kubernetes training Job 不掛 service-account token，強制 non-root、RuntimeDefault seccomp、禁止提權、移除全部
-  capabilities 與唯讀根檔案系統；只有 artifact、可重建資料、cache 與暫存目錄可寫。
+- Kubernetes 線上 Pod 與 training Job 都以 UID 10001 強制 non-root、不掛 service-account token、使用
+  RuntimeDefault seccomp、禁止提權並移除全部 capabilities；training root filesystem 唯讀，只有
+  artifact、可重建資料、cache 與暫存目錄可寫。
 - 資料與續跑快取 JSONL 的單行上限為 1 MiB；正式資料超限或非 UTF-8 時 fail closed，快取則只
   丟棄損壞行並重新產生受影響案例，不讓一行殘片破壞後續可恢復結果。
 - `MODELFORGE_LOG_INPUTS` 唯一合法值為 `false`；誤設 `true` 時服務拒絕啟動，API 不提供事件原文

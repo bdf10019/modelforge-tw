@@ -62,8 +62,9 @@ def test_compose_baseline_is_non_privileged_and_does_not_log_inputs():
     assert api["environment"]["MODELFORGE_API_KEY"] is None
     assert api["read_only"] is True
     assert "/tmp" in api["tmpfs"]
+    assert api["cap_drop"] == ["ALL"]
     assert "no-new-privileges:true" in api["security_opt"]
-    assert api["ports"] == ["8000:8000"]
+    assert api["ports"] == ["127.0.0.1:8000:8000"]
 
 
 def test_kubernetes_runtime_security_and_probe_contracts():
@@ -83,11 +84,14 @@ def test_kubernetes_runtime_security_and_probe_contracts():
     assert model["startupProbe"]["httpGet"]["path"] == "/health"
     assert model["startupProbe"]["failureThreshold"] * model["startupProbe"]["periodSeconds"] == 300
     assert model_pod["automountServiceAccountToken"] is False
+    assert model_pod["securityContext"]["runAsNonRoot"] is True
+    assert model_pod["securityContext"]["runAsUser"] == 10001
     assert model_pod["securityContext"]["seccompProfile"]["type"] == "RuntimeDefault"
     assert model["securityContext"]["allowPrivilegeEscalation"] is False
     assert model["securityContext"]["readOnlyRootFilesystem"] is True
     assert model["securityContext"]["capabilities"]["drop"] == ["ALL"]
     assert api_pod["securityContext"]["runAsNonRoot"] is True
+    assert api_pod["securityContext"]["runAsUser"] == 10001
     assert api_pod["securityContext"]["seccompProfile"]["type"] == "RuntimeDefault"
     assert api_pod["automountServiceAccountToken"] is False
     assert api_pod["terminationGracePeriodSeconds"] == 75
@@ -113,6 +117,7 @@ def test_training_job_is_fail_closed_and_requests_one_gpu():
     assert pod["restartPolicy"] == "Never"
     assert pod["automountServiceAccountToken"] is False
     assert pod["securityContext"]["runAsNonRoot"] is True
+    assert pod["securityContext"]["runAsUser"] == 10001
     assert pod["securityContext"]["seccompProfile"]["type"] == "RuntimeDefault"
     assert trainer["resources"]["requests"]["nvidia.com/gpu"] == "1"
     assert trainer["resources"]["limits"]["nvidia.com/gpu"] == "1"

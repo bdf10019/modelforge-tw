@@ -7,8 +7,8 @@ NVIDIA device plugin；目前只完成多文件 YAML 解析與設定一致性檢
 
 - Linux NVIDIA 節點、相容驅動與 NVIDIA device plugin。
 - 名為 `modelforge-models` 的 ReadOnlyMany／ReadWriteMany PVC，根目錄包含
-  `modelforge-tw-q8_0.gguf`。
-- 若執行訓練 Job，另需名為 `modelforge-artifacts` 的可寫 PVC。
+  `modelforge-tw-q8_0.gguf`，且檔案必須可由 UID 10001 唯讀存取。
+- 若執行訓練 Job，另需名為 `modelforge-artifacts`、可由 UID 10001 寫入的 PVC。
 - 內部 registry 的 `modelforge-tw:0.1.0` 與 `modelforge-tw-gpu:0.1.0` images。
 - 正式部署前把 llama.cpp 的 mutable tag 換成經弱點掃描且鎖定 digest 的 image。
 - 套用前必須建立 `modelforge-api-auth` Secret，key 名稱為 `api-key`、值至少 32 字元；manifest
@@ -26,8 +26,9 @@ API baseline 每 replica 最多同時送出 4 筆推論、等待區 16 筆、que
 模型回應分別限制 32 KiB／256 KiB。Readiness 內部上限 4 秒、probe timeout 5 秒；關閉時應用最多
 排空 65 秒，Pod 終止期限為 75 秒，讓 60 秒
 下游 timeout 有完成空間；超期同步工作最終仍須由容器平台終止。
-所有線上 Pod 與訓練 Job 都關閉不需要的 service-account token 自動掛載、使用 RuntimeDefault
-seccomp、禁止提權並移除 Linux capabilities。Training container 另使用唯讀根檔案系統，只將
+所有線上 Pod 與訓練 Job 都明確以 UID 10001 強制 non-root、關閉不需要的 service-account token
+自動掛載、使用 RuntimeDefault seccomp、禁止提權並移除 Linux capabilities。Training container
+另使用唯讀根檔案系統，只將
 artifact PVC、重建的 generated data、模型 cache 與 `/tmp` 掛為可寫目錄；llama.cpp 則有最長
 300 秒 startup probe，模型載入期間不會先被 liveness probe 誤判重啟。
 

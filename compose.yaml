@@ -14,10 +14,12 @@ services:
       # Null means pass through only when the operator exports it; no value lives in this file.
       MODELFORGE_API_KEY:
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     read_only: true
     tmpfs:
       - /tmp
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
