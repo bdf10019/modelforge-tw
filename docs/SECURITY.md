@@ -61,7 +61,9 @@
 - 關閉流程先撤除 readiness，追蹤並在有界寬限期內排空 timeout 後仍執行的模型工作；同步執行緒
   無法安全強制取消，超過應用寬限後由較長的容器終止期限提供最後邊界。
 - CLI 與 registry 對設定、manifest、評測與訓練 JSON 採 16 MiB byte 上限並要求合法 UTF-8；
-  異常大的控制面檔案不會先被無界載入記憶體。大型模型 artifact 仍以串流方式計算 SHA-256。
+  異常大的控制面檔案不會先被無界載入記憶體。Registry 對評測／訓練報告只讀取一次，同一份
+  bounded bytes 同時計算 SHA-256 與解析，避免驗 hash 後重新開檔造成內容替換競態；大型模型
+  artifact 仍以串流方式計算 SHA-256。
 - 訓練在匯入 ML runtime 前 fail closed 驗證 dataset manifest：audit 必須通過、combined hash 與
   split counts 必須一致，所有 JSONL 必須是具名 regular file 且大小、SHA-256、筆數完全相符。
 - Checkpoint resume 由原子 run contract 綁定 model、dataset manifest 與完整 training config hash；

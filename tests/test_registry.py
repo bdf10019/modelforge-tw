@@ -779,6 +779,35 @@ def test_registry_rechecks_evaluation_report_before_promotion(tmp_path):
         registry.promote("v1")
 
 
+def test_registry_hashes_and_parses_each_control_report_from_one_read(tmp_path, monkeypatch):
+    evaluation_path = tmp_path / "outputs" / "evaluation.json"
+    evaluation_path.parent.mkdir()
+    evaluation_path.write_text(valid_evaluation_report().model_dump_json(), encoding="utf-8")
+    training_path = write_training_report(tmp_path)
+    artifact_path = tmp_path / "artifacts" / "model.gguf"
+    artifact_path.parent.mkdir()
+    artifact_path.write_bytes(b"fixture")
+    candidate = manifest("single-read-v1").model_copy(
+        update={
+            "evaluation_report_sha256": hashlib.sha256(evaluation_path.read_bytes()).hexdigest(),
+            "training_report_sha256": hashlib.sha256(training_path.read_bytes()).hexdigest(),
+        }
+    )
+    tracked = {evaluation_path.resolve(): 0, training_path.resolve(): 0}
+    original_open = Path.open
+
+    def observed_open(path, *args, **kwargs):
+        resolved = path.resolve()
+        if resolved in tracked:
+            tracked[resolved] += 1
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", observed_open)
+    FileRegistry(tmp_path / "registry.json", artifact_root=tmp_path).add(candidate)
+
+    assert tracked == {evaluation_path.resolve(): 1, training_path.resolve(): 1}
+
+
 def test_registry_rejects_hash_valid_report_with_wrong_identity(tmp_path):
     report_path = tmp_path / "evaluation.json"
     report_path.write_text(

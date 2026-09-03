@@ -48,6 +48,14 @@ def _validate_portable_relative_path(value: str) -> str:
     return value
 
 
+def _read_verified_control_report(path: Path, expected_sha256: str, kind: str) -> str:
+    """Hash and parse one bounded snapshot instead of reopening a mutable report."""
+    serialized = read_utf8_text_limited(path)
+    if sha256(serialized.encode("utf-8")).hexdigest() != expected_sha256:
+        raise ValueError(f"registered {kind} report hash changed")
+    return serialized
+
+
 class ArtifactRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -431,13 +439,12 @@ class FileRegistry:
             raise ValueError("evaluation report escapes the project root") from error
         if not path.is_file():
             raise FileNotFoundError(path)
-        digest = sha256()
-        with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(chunk)
-        if digest.hexdigest() != manifest.evaluation_report_sha256:
-            raise ValueError("registered evaluation report hash changed")
-        evaluation = EvaluationReport.model_validate_json(read_utf8_text_limited(path))
+        serialized = _read_verified_control_report(
+            path,
+            manifest.evaluation_report_sha256,
+            "evaluation",
+        )
+        evaluation = EvaluationReport.model_validate_json(serialized)
         self._validate_evaluation_against_manifest(manifest, evaluation)
         if manifest.release_passed != evaluation.release_passed:
             raise ValueError("evaluation release result does not match manifest")
@@ -456,13 +463,12 @@ class FileRegistry:
             raise ValueError("training report escapes the project root") from error
         if not path.is_file():
             raise FileNotFoundError(path)
-        digest = sha256()
-        with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(chunk)
-        if digest.hexdigest() != manifest.training_report_sha256:
-            raise ValueError("registered training report hash changed")
-        training = TrainingReportAttestation.model_validate_json(read_utf8_text_limited(path))
+        serialized = _read_verified_control_report(
+            path,
+            manifest.training_report_sha256,
+            "training",
+        )
+        training = TrainingReportAttestation.model_validate_json(serialized)
         if manifest.runtime_identity_contract_version == "1.0" and training.schema_version != "1.2":
             raise ValueError("runtime-bound manifest requires training report schema 1.2")
         verify_training_run_contract(training, path)
