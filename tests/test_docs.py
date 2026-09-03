@@ -37,3 +37,11 @@ def test_public_docs_do_not_contain_job_or_company_source_identifiers():
             if token.lower() in text:
                 findings.append(f"{document.relative_to(PROJECT_ROOT)}: {token}")
     assert findings == []
+
+
+def test_model_card_tracks_current_training_lineage_schema():
+    text = (PROJECT_ROOT / "docs" / "MODEL_CARD.md").read_text(encoding="utf-8")
+    assert "training report schema 1.2" in text
+    assert "resolved tokenizer revision" in text
+    assert "training run contract hash" in text
+    assert "schema 1.1 會在下一次真實訓練" not in text

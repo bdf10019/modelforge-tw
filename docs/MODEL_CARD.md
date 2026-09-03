@@ -19,9 +19,10 @@
 為 `07ce2d7ee13a1f8a9cdd3f3c4509caa99e349c502a14449157601cb77ab61a6b`。
 
 這份歷史 training report schema 1.0 保存 Python、Torch、CUDA、Transformers 與 GPU。程式目前的
-schema 1.1 會在下一次真實訓練／merge 另外保存 Accelerate、bitsandbytes、Datasets、PEFT、
-safetensors、sentencepiece、cuDNN、GPU compute capability 與實體顯存；不以目前環境版本回填
-過去未記錄的欄位。
+training report schema 1.2 會在下一次真實訓練另外保存 Accelerate、bitsandbytes、Datasets、PEFT、
+safetensors、sentencepiece、cuDNN、GPU compute capability、實體顯存、resolved tokenizer revision
+與 training run contract hash；後續 merge 與新 registry 候選會驗證這些 lineage，不以目前環境版本
+回填過去未記錄的欄位。
 
 ## 完整評測
 
