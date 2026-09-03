@@ -93,6 +93,8 @@
   report 或 registry。Transformers 量化則由實際 `load_in_4bit` 選項產生，不信任外部標籤。
 - 評測中的非空 model revision 必須是 immutable commit，registry 會把它和 training base revision
   逐值比對；遠端模型 API 未揭露可驗證 commit 時保存 `null`，不以版本字串假裝來源證明。
+- 正式評測只讀取 release-gate 設定一次，同一份 bounded UTF-8 snapshot 同時套用門檻並計算寫入報告的
+  SHA-256，避免執行期間換檔讓規則與 attestation hash 分離。
 - Prompt 與 safety policy 版本是封閉且共用的實作清單；runtime metadata、評測報告與 registry
   manifest 只接受已支援值，不讓拼字錯誤或未實作政策進入發布契約。
 - Evaluation schema 與 scoring contract 同樣 fail closed；未知 schema 或 release-metrics 版本不能

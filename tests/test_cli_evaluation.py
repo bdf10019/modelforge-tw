@@ -1,10 +1,53 @@
+import hashlib
 import json
 from argparse import Namespace
+from pathlib import Path
 
 from modelforge_tw import cli
-from modelforge_tw.dataset import generate_records
+from modelforge_tw.dataset import generate_records, write_dataset
 from modelforge_tw.engines import FixtureEngine
 from modelforge_tw.evaluation import evaluate
+
+
+def test_evaluate_hashes_and_applies_release_gate_from_one_read(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    write_dataset(data_dir, train_per_type=1, validation_per_type=1, test_per_type=1)
+    gate_path = cli.PROJECT_ROOT / "configs" / "release-gates.json"
+    expected_hash = hashlib.sha256(gate_path.read_bytes()).hexdigest()
+    output_path = tmp_path / "evaluation.json"
+    args = cli.build_parser().parse_args(
+        [
+            "evaluate",
+            "--data",
+            str(data_dir),
+            "--splits",
+            "test",
+            "--limit",
+            "1",
+            "--engine",
+            "fixture-adapted",
+            "--gates",
+            str(gate_path),
+            "--output",
+            str(output_path),
+            "--no-resume-cache",
+        ]
+    )
+    gate_reads = 0
+    original_open = Path.open
+
+    def observed_open(path, *open_args, **open_kwargs):
+        nonlocal gate_reads
+        if path.resolve() == gate_path.resolve():
+            gate_reads += 1
+        return original_open(path, *open_args, **open_kwargs)
+
+    monkeypatch.setattr(Path, "open", observed_open)
+    assert cli.command_evaluate(args) == 0
+
+    report = json.loads(output_path.read_text(encoding="utf-8"))
+    assert report["release_gate_sha256"] == expected_hash
+    assert gate_reads == 1
 
 
 def test_evaluation_cache_skips_truncated_tail_and_keeps_valid_result(tmp_path):

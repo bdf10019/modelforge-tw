@@ -268,7 +268,9 @@ def command_evaluate(args: argparse.Namespace) -> int:
         if completed == total or completed % 5 == 0:
             print(f"evaluation progress: {completed}/{total}", file=sys.stderr, flush=True)
 
-    gate_config = json.loads(read_utf8_text_limited(args.gates))
+    serialized_gates = read_utf8_text_limited(args.gates)
+    gate_config = json.loads(serialized_gates)
+    release_gate_sha256 = hashlib.sha256(serialized_gates.encode("utf-8")).hexdigest()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     cache_writer = (
         None if args.no_resume_cache else cache_path.open("a", encoding="utf-8", newline="\n")
@@ -301,7 +303,7 @@ def command_evaluate(args: argparse.Namespace) -> int:
             engine,
             records,
             gates=gate_config["absolute"],
-            release_gate_sha256=sha256_file(args.gates),
+            release_gate_sha256=release_gate_sha256,
             progress=show_progress,
             cached_results=cached_results,
             result_callback=cache_result,
