@@ -20,7 +20,9 @@
 - critical/high 關鍵風險只可向上升級；動作來自四項 allowlist，沒有設備控制工具。
 - 危險語句的 stop/isolate-and-escalate 優先於缺證據的 collect-evidence 規則；缺證據只能增加人工
   複核與缺失資訊，不能把既有升級動作降級。
-- 解析失敗、timeout、engine exception 都回 unknown + collect evidence + review required。
+- 解析失敗、timeout、engine exception 都回 unknown + collect evidence + review required；服務端重建的
+  fallback metadata 仍保留已部署模型的 immutable revision 與 context-window 身分，不信任失敗輸出
+  自報的 metadata，也不讓保守回應失去部署可追溯性。
 - 所有引擎解析後都拒絕 allowlist 以外的 event、severity、safe action 與 reason code；llama.cpp
   路徑還會在生成前用 strict JSON Schema 約束同一份契約。
 - `incident_text`、asset 與 signal 文字都視為不可信資料並納入注入偵測；signal 字串限制 128 字，

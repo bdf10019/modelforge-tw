@@ -962,7 +962,10 @@ async def test_failure_returns_conservative_fallback_without_error_detail():
 
 
 async def test_misreported_engine_identity_returns_conservative_fallback():
-    app = create_app(engine_factory=lambda: MisreportingEngine("adapted"))
+    engine = MisreportingEngine("adapted")
+    engine.model_revision = "a" * 64
+    engine.context_window_tokens = 2048
+    app = create_app(engine_factory=lambda: engine)
     async with app_client(app) as client:
         response = await client.post(
             "/v1/triage", json={"incident_text": "設備狀態無法確認且需人工複核"}
@@ -971,6 +974,8 @@ async def test_misreported_engine_identity_returns_conservative_fallback():
     assert response.status_code == 200
     body = response.json()
     assert body["metadata"]["model_id"] == "deterministic-fixture"
+    assert body["metadata"]["model_revision"] == "a" * 64
+    assert body["metadata"]["context_window_tokens"] == 2048
     assert body["output"]["event_type"] == "unknown"
     assert "ERROR_FALLBACK" in body["validation_warnings"]
 
@@ -991,13 +996,18 @@ async def test_unrecognized_warning_cannot_reach_response_or_metrics():
 
 async def test_timed_out_worker_keeps_concurrency_slot_until_it_finishes():
     engine = BlockingEngine("adapted")
+    engine.model_revision = "b" * 64
+    engine.context_window_tokens = 2048
     settings = Settings(request_timeout_seconds=0.01, max_concurrency=1)
     app = create_app(settings=settings, engine_factory=lambda: engine)
     async with app_client(app) as client:
         first = await client.post(
             "/v1/triage", json={"incident_text": "設備持續異音但背景工作尚未結束"}
         )
-        assert "TIMEOUT_FALLBACK" in first.json()["validation_warnings"]
+        first_body = first.json()
+        assert first_body["metadata"]["model_revision"] == "b" * 64
+        assert first_body["metadata"]["context_window_tokens"] == 2048
+        assert "TIMEOUT_FALLBACK" in first_body["validation_warnings"]
         metrics_while_timed_out = (await client.get("/metrics")).text
         assert 'modelforge_active_engine_jobs{engine="fixture-adapted"} 1.0' in (
             metrics_while_timed_out

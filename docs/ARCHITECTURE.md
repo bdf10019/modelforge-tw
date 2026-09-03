@@ -150,8 +150,10 @@ registry metadata／引擎健康工作會由後續探針共用，且兩段合計
 只揭露是否啟用，不回傳 secret；這是內部服務基線，不宣稱取代正式 IAM 或細粒度授權。
 同步模型推論逾時時會立即回傳保守 fallback，但底層執行緒無法強制取消；該工作真正結束以前仍
 占用 concurrency slot，避免連續 timeout 繞過容量上限並堆積 GPU 工作。Prometheus 分開呈現
-尚未回應的 HTTP request 與仍在執行的 engine job，因此 timeout 後的背景負載仍可觀測。等待
-semaphore 另有預設 5 秒 queue timeout；容量未釋放時回 503 + `Retry-After` 並記
+尚未回應的 HTTP request 與仍在執行的 engine job，因此 timeout 後的背景負載仍可觀測。
+fallback 雖不沿用未通過驗證的模型輸出 metadata，仍由服務端保留已部署模型的 immutable revision
+與 context-window 身分，讓逾時或失敗回應可以追溯到正確部署。等待 semaphore 另有預設 5 秒
+queue timeout；容量未釋放時回 503 + `Retry-After` 並記
 `capacity_rejected`。等待區另有預設 8 筆的硬上限，滿載時不等待 timeout 就立即拒絕，並以
 `modelforge_queued_requests` 呈現當前排隊深度，避免請求在應用層無限堆積。
 呼叫端取消等待中的 request 時會立即歸還 queue reservation；若取消發生在同步引擎已開始後，
