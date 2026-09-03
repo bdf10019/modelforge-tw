@@ -1,5 +1,6 @@
 import hashlib
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -364,6 +365,31 @@ def test_adapter_lineage_verification_rejects_file_or_identity_drift(tmp_path):
             adapter_path=adapter,
             training_report_path=report,
         )
+
+
+def test_adapter_lineage_parses_and_hashes_report_from_one_read(tmp_path, monkeypatch):
+    adapter, report = _write_attested_adapter(tmp_path)
+    expected_hash = hashlib.sha256(report.read_bytes()).hexdigest()
+    report_path = report.resolve()
+    report_reads = 0
+    original_open = Path.open
+
+    def observed_open(path, *args, **kwargs):
+        nonlocal report_reads
+        if path.resolve() == report_path:
+            report_reads += 1
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", observed_open)
+    _attestation, report_hash = verify_adapter_training_lineage(
+        model_id="Qwen/Qwen3-1.7B",
+        model_revision=DEFAULT_BASE_MODEL_REVISION,
+        adapter_path=adapter,
+        training_report_path=report,
+    )
+
+    assert report_hash == expected_hash
+    assert report_reads == 1
 
 
 @pytest.mark.parametrize(

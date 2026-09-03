@@ -793,7 +793,12 @@ def test_registry_hashes_and_parses_each_control_report_from_one_read(tmp_path, 
             "training_report_sha256": hashlib.sha256(training_path.read_bytes()).hexdigest(),
         }
     )
-    tracked = {evaluation_path.resolve(): 0, training_path.resolve(): 0}
+    contract_path = training_path.parent / "run-contract.json"
+    tracked = {
+        evaluation_path.resolve(): 0,
+        training_path.resolve(): 0,
+        contract_path.resolve(): 0,
+    }
     original_open = Path.open
 
     def observed_open(path, *args, **kwargs):
@@ -805,7 +810,11 @@ def test_registry_hashes_and_parses_each_control_report_from_one_read(tmp_path, 
     monkeypatch.setattr(Path, "open", observed_open)
     FileRegistry(tmp_path / "registry.json", artifact_root=tmp_path).add(candidate)
 
-    assert tracked == {evaluation_path.resolve(): 1, training_path.resolve(): 1}
+    assert tracked == {
+        evaluation_path.resolve(): 1,
+        training_path.resolve(): 1,
+        contract_path.resolve(): 1,
+    }
 
 
 def test_registry_rejects_hash_valid_report_with_wrong_identity(tmp_path):

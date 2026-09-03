@@ -318,9 +318,12 @@ def verify_training_run_contract(
         raise FileNotFoundError(
             f"training run contract not found as a regular file: {contract_path}"
         )
-    if sha256_file(contract_path) != report.training_run_contract_sha256:
+    serialized = read_utf8_text_limited(contract_path)
+    if hashlib.sha256(serialized.encode("utf-8")).hexdigest() != (
+        report.training_run_contract_sha256
+    ):
         raise ValueError("training run contract hash does not match training report")
-    contract = TrainingRunContract.model_validate_json(read_utf8_text_limited(contract_path))
+    contract = TrainingRunContract.model_validate_json(serialized)
     checks = {
         "model_id": contract.model_id == report.model_id,
         "model_revision": contract.model_revision == report.model_revision,
@@ -352,9 +355,9 @@ def verify_adapter_training_lineage(
         raise FileNotFoundError(training_report_path)
     if _first_linked_path_component(adapter_path) is not None:
         raise ValueError("adapter path must not contain links or reparse points")
-    report = TrainingReportAttestation.model_validate_json(
-        read_utf8_text_limited(training_report_path)
-    )
+    serialized_report = read_utf8_text_limited(training_report_path)
+    report_hash = hashlib.sha256(serialized_report.encode("utf-8")).hexdigest()
+    report = TrainingReportAttestation.model_validate_json(serialized_report)
     verify_training_run_contract(report, training_report_path)
     mismatches: list[str] = []
     if report.model_id != model_id:
@@ -383,7 +386,7 @@ def verify_adapter_training_lineage(
         path = adapter_path / name
         if path.stat().st_size != expected.bytes or sha256_file(path) != expected.sha256:
             raise ValueError(f"adapter file does not match training report: {name}")
-    return report, sha256_file(training_report_path)
+    return report, report_hash
 
 
 def _stable_hash(payload: dict[str, Any]) -> str:
