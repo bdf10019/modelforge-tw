@@ -7,11 +7,25 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: trainer
           image: modelforge-tw-gpu:0.1.0
           command: ["/bin/sh", "-lc"]
           args: ["modelforge generate-data && modelforge train --config configs/training.json"]
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: HF_HOME
+              value: /cache/huggingface
+            - name: XDG_CACHE_HOME
+              value: /cache
+            - name: TMPDIR
+              value: /tmp
           resources:
             requests:
               cpu: "2"
@@ -24,7 +38,24 @@ spec:
           volumeMounts:
             - name: workspace
               mountPath: /app/artifacts
+            - name: generated-data
+              mountPath: /app/data/generated
+            - name: cache
+              mountPath: /cache
+            - name: temporary
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: workspace
           persistentVolumeClaim:
             claimName: modelforge-artifacts
+        - name: generated-data
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+        - name: temporary
+          emptyDir: {}

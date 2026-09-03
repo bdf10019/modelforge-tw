@@ -26,8 +26,10 @@ API baseline 每 replica 最多同時送出 4 筆推論、等待區 16 筆、que
 模型回應分別限制 32 KiB／256 KiB。Readiness 內部上限 4 秒、probe timeout 5 秒；關閉時應用最多
 排空 65 秒，Pod 終止期限為 75 秒，讓 60 秒
 下游 timeout 有完成空間；超期同步工作最終仍須由容器平台終止。
-兩個 Pod 都關閉不需要的 service-account token 自動掛載並使用 RuntimeDefault seccomp；llama.cpp
-另有最長 300 秒 startup probe，模型載入期間不會先被 liveness probe 誤判重啟。
+所有線上 Pod 與訓練 Job 都關閉不需要的 service-account token 自動掛載、使用 RuntimeDefault
+seccomp、禁止提權並移除 Linux capabilities。Training container 另使用唯讀根檔案系統，只將
+artifact PVC、重建的 generated data、模型 cache 與 `/tmp` 掛為可寫目錄；llama.cpp 則有最長
+300 秒 startup probe，模型載入期間不會先被 liveness probe 誤判重啟。
 
 範例沒有把 Git 忽略的 `outputs/model-registry.json` 打進 image 或掛入 Pod，因此刻意不設定
 `MODELFORGE_REGISTRY_DEPLOYMENT_ROLE`，不能宣稱已做線上 registry binding。正式環境若要啟用，

@@ -99,6 +99,8 @@
   不使用強制覆寫，既有實測 GGUF 不會被一次重跑悄悄取代。
 - llama.cpp 工具準備會核對壓縮檔 hash、解壓後完整檔案清單與 quantizer／server executable hash；
   啟動 server 不遞迴搜尋同名檔，還會重驗 GGUF 與 quantization report，工具或模型漂移均先停止。
+- Kubernetes training Job 不掛 service-account token，強制 non-root、RuntimeDefault seccomp、禁止提權、移除全部
+  capabilities 與唯讀根檔案系統；只有 artifact、可重建資料、cache 與暫存目錄可寫。
 - 資料與續跑快取 JSONL 的單行上限為 1 MiB；正式資料超限或非 UTF-8 時 fail closed，快取則只
   丟棄損壞行並重新產生受影響案例，不讓一行殘片破壞後續可恢復結果。
 - `MODELFORGE_LOG_INPUTS` 唯一合法值為 `false`；誤設 `true` 時服務拒絕啟動，API 不提供事件原文

@@ -111,8 +111,23 @@ def test_training_job_is_fail_closed_and_requests_one_gpu():
     trainer = pod["containers"][0]
     assert job["spec"]["backoffLimit"] == 0
     assert pod["restartPolicy"] == "Never"
+    assert pod["automountServiceAccountToken"] is False
+    assert pod["securityContext"]["runAsNonRoot"] is True
+    assert pod["securityContext"]["seccompProfile"]["type"] == "RuntimeDefault"
     assert trainer["resources"]["requests"]["nvidia.com/gpu"] == "1"
     assert trainer["resources"]["limits"]["nvidia.com/gpu"] == "1"
+    assert trainer["securityContext"]["allowPrivilegeEscalation"] is False
+    assert trainer["securityContext"]["readOnlyRootFilesystem"] is True
+    assert trainer["securityContext"]["capabilities"]["drop"] == ["ALL"]
+    mounts = {item["mountPath"] for item in trainer["volumeMounts"]}
+    assert mounts == {"/app/artifacts", "/app/data/generated", "/cache", "/tmp"}
+    environment = {item["name"]: item["value"] for item in trainer["env"]}
+    assert environment == {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "HF_HOME": "/cache/huggingface",
+        "XDG_CACHE_HOME": "/cache",
+        "TMPDIR": "/tmp",
+    }
     assert "configs/training.json" in trainer["args"][0]
 
 
