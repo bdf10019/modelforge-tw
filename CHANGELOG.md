@@ -2,6 +2,10 @@
 
 本專案依 [Semantic Versioning](https://semver.org/) 標示公開版本。
 
+## 0.1.3 - 2026-09-09
+
+- 讓 PowerShell 隱私檢查在 Linux 上正確讀取 `.gitignore` 等隱藏檔案。
+
 ## 0.1.2 - 2026-09-09
 
 - 移除隱私檢查對外部 `rg` 指令的必要相依，讓乾淨的 GitHub-hosted Linux runner 可直接驗證。

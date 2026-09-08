@@ -35,7 +35,7 @@ try {
         -not $isExcluded
     })
     foreach ($relativePath in $publicFiles) {
-        $item = Get-Item -LiteralPath $relativePath
+        $item = Get-Item -LiteralPath $relativePath -Force
         if ($item.Length -gt $largeFileLimitBytes) {
             $findings += "$relativePath 超過 5 MiB 公開檔案門檻：$($item.Length) bytes"
         }
