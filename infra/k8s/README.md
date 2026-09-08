@@ -11,7 +11,8 @@ NVIDIA device plugin；目前只完成多文件 YAML 解析與設定一致性檢
 - 若執行訓練 Job，另需名為 `modelforge-artifacts`、可由 UID 10001 寫入的 PVC。
 - 內部 registry 的 `modelforge-tw:0.1.0` 與 `modelforge-tw-gpu:0.1.0` images。
 - 正式部署前把 llama.cpp 的 mutable tag 換成經弱點掃描且鎖定 digest 的 image。
-- 套用前必須建立 `modelforge-api-auth` Secret，key 名稱為 `api-key`、值至少 32 字元；manifest
+- 套用前必須建立 `modelforge-api-auth` Secret，key 名稱為 `api-key`、值至少 32 字元，且為無空白
+  的可列印 ASCII；manifest
   將它注入 `MODELFORGE_API_KEY`，Secret 遺漏時 Pod 不啟動。實際值應由 secret manager 管理，
   不可寫入 repository 或指令歷史；無認證模式只保留給 loopback／Compose 本機演示。
 
@@ -31,6 +32,8 @@ API baseline 每 replica 最多同時送出 4 筆推論、等待區 16 筆、que
 另使用唯讀根檔案系統，只將
 artifact PVC、重建的 generated data、模型 cache 與 `/tmp` 掛為可寫目錄；llama.cpp 則有最長
 300 秒 startup probe，模型載入期間不會先被 liveness probe 誤判重啟。
+Training Job 明確指定 `/app` 下的資料輸出、challenge 來源與訓練設定，因為 image 使用一般
+套件安裝，CLI 的原始碼相對預設路徑不會指向 image 的 `/app` 工作目錄。
 
 範例沒有把 Git 忽略的 `outputs/model-registry.json` 打進 image 或掛入 Pod，因此刻意不設定
 `MODELFORGE_REGISTRY_DEPLOYMENT_ROLE`，不能宣稱已做線上 registry binding。正式環境若要啟用，

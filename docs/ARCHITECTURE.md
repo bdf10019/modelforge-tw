@@ -146,7 +146,7 @@ registry metadata／引擎健康工作會由後續探針共用，且兩段合計
 所有 HTTP 請求在 body 解析前取得或驗證 `X-Request-ID`；重複、非 ASCII 或格式錯誤的值不回顯，
 而以新 server ID 回覆 400。成功、認證失敗、body 超限與 schema 錯誤都在 response header 帶同一
 追蹤 ID，推論 body 內的 ID 也與 header 一致。
-推論路由可由至少 32 字元的 shared bearer key 保護，Kubernetes 透過 Secret 注入且 config endpoint
+推論路由可由至少 32 字元、無空白的可列印 ASCII shared bearer key 保護，Kubernetes 透過 Secret 注入且 config endpoint
 只揭露是否啟用，不回傳 secret；這是內部服務基線，不宣稱取代正式 IAM 或細粒度授權。
 同步模型推論逾時時會立即回傳保守 fallback，但底層執行緒無法強制取消；該工作真正結束以前仍
 占用 concurrency slot，避免連續 timeout 繞過容量上限並堆積 GPU 工作。Prometheus 分開呈現

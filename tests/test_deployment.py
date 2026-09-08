@@ -1,6 +1,13 @@
-from pathlib import Path
+import json
+import shlex
+import shutil
+from pathlib import Path, PurePosixPath
 
 import yaml
+
+from modelforge_tw import cli
+from modelforge_tw.dataset import load_splits
+from modelforge_tw.training import verify_training_dataset_manifest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -148,6 +155,49 @@ def test_container_files_run_as_non_root_and_disable_input_logging():
         assert "MODELFORGE_MAX_QUEUE_DEPTH=8" in dockerfile
         assert "MODELFORGE_SHUTDOWN_GRACE_SECONDS=35" in dockerfile
         assert '"modelforge", "serve"' in dockerfile
+
+
+def test_training_job_generates_mounted_data_when_cli_is_installed(tmp_path, monkeypatch):
+    job = yaml.safe_load((PROJECT_ROOT / "infra" / "k8s" / "training-job.yaml").read_text("utf-8"))
+    trainer = job["spec"]["template"]["spec"]["containers"][0]
+    command = shlex.split(trainer["args"][0])
+    separator = command.index("&&")
+    assert command[0] == command[separator + 1] == "modelforge"
+
+    installed_root = tmp_path / "installed" / "lib" / "python3.12"
+    monkeypatch.setattr(cli, "PROJECT_ROOT", installed_root)
+    parser = cli.build_parser()
+    generate = parser.parse_args(command[1:separator])
+    train = parser.parse_args(command[separator + 2 :])
+    app_root = PurePosixPath("/app")
+    generated_path = PurePosixPath(generate.output.as_posix())
+    challenge_path = PurePosixPath(generate.challenge.as_posix())
+    config_path = PurePosixPath(train.config.as_posix())
+    writable_mounts = {
+        PurePosixPath(item["mountPath"])
+        for item in trainer["volumeMounts"]
+        if not item.get("readOnly", False)
+    }
+    assert generated_path in writable_mounts
+
+    config = json.loads(
+        (PROJECT_ROOT / config_path.relative_to(app_root)).read_text(encoding="utf-8")
+    )
+    assert generated_path == app_root / config["data_dir"]
+
+    # Map only the declared container paths into a temporary /app workspace.
+    workspace = tmp_path / "app"
+    generate.output = workspace / generated_path.relative_to(app_root)
+    generate.challenge = workspace / challenge_path.relative_to(app_root)
+    generate.challenge.parent.mkdir(parents=True)
+    shutil.copyfile(PROJECT_ROOT / challenge_path.relative_to(app_root), generate.challenge)
+    generate.train_per_type = generate.validation_per_type = generate.test_per_type = 1
+    assert generate.func(generate) == 0
+
+    manifest = verify_training_dataset_manifest(generate.output)
+    assert manifest.files["challenge.jsonl"].records == 14
+    assert len(load_splits(generate.output, ["train", "validation", "test", "challenge"])) == 35
+    assert not installed_root.exists()
 
 
 def test_local_llama_launcher_has_measured_context_capacity_guard():

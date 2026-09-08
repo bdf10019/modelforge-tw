@@ -23,6 +23,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     engine: str = "fixture"
@@ -85,8 +86,13 @@ class Settings(BaseSettings):
     @field_validator("api_key")
     @classmethod
     def require_strong_api_key(cls, value: SecretStr | None) -> SecretStr | None:
-        if value is not None and len(value.get_secret_value()) < 32:
+        if value is None:
+            return value
+        credential = value.get_secret_value()
+        if len(credential) < 32:
             raise ValueError("API key must contain at least 32 characters")
+        if any(not "!" <= character <= "~" for character in credential):
+            raise ValueError("API key must use printable ASCII without whitespace")
         return value
 
     @model_validator(mode="after")

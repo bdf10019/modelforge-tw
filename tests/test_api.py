@@ -100,6 +100,28 @@ def test_api_key_is_optional_but_rejects_weak_values():
     assert credential not in repr(Settings(api_key=credential))
 
 
+@pytest.mark.parametrize(
+    "credential",
+    [
+        "測" * 32,
+        " " + "x" * 32,
+        "x" * 32 + " ",
+        "x" * 16 + " " + "y" * 16,
+        "x" * 32 + "\t",
+        "x" * 32 + "\r\n",
+        "x" * 32 + "\x00",
+        "x" * 32 + "\x7f",
+    ],
+    ids=["unicode", "leading-space", "trailing-space", "space", "tab", "crlf", "nul", "del"],
+)
+def test_api_key_rejects_unusable_header_values_without_disclosing_secret(credential):
+    with pytest.raises(ValueError, match="printable ASCII without whitespace") as error:
+        Settings(api_key=credential)
+
+    assert credential not in str(error.value)
+    assert repr(credential) not in str(error.value)
+
+
 @asynccontextmanager
 async def app_client(app):
     async with app.router.lifespan_context(app):
@@ -791,8 +813,12 @@ async def test_openai_compatible_non_streaming_and_streaming():
 
 
 @pytest.mark.parametrize("path", ["/v1/triage", "/v1/chat/completions"])
-async def test_configured_bearer_key_protects_inference_routes(path):
-    credential = "test-api-key-with-at-least-32-characters"
+@pytest.mark.parametrize(
+    "credential",
+    ["test-api-key-with-at-least-32-characters", "Test.Key_~+/0123456789-abcdefghijk="],
+    ids=["plain", "punctuation"],
+)
+async def test_configured_bearer_key_protects_inference_routes(path, credential):
     app = create_app(
         settings=Settings(api_key=credential),
         engine_factory=lambda: FixtureEngine("adapted"),

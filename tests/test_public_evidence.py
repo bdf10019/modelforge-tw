@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 
@@ -124,3 +125,49 @@ def test_interview_walkthrough_preserves_claim_boundaries():
     assert "request／model-response bytes" in walkthrough
     assert "現有 1.0 實測 registry" in walkthrough
     assert "外部不可變稽核" in walkthrough
+
+
+def test_current_context_benchmarks_share_workload_and_complete_token_coverage():
+    evidence = json.loads(
+        (PROJECT_ROOT / "docs" / "current-context-benchmarks.json").read_text(encoding="utf-8")
+    )
+    server = evidence["server_config"]
+    assert server["total_context_tokens"] // server["parallel_slots"] == 2048
+    assert server["parallel_slots"] == 4
+    assert sum(evidence["selected_case_counts"].values()) == 100
+    reports = [entry["report"] for entry in evidence["measurements"].values()]
+    baseline = reports[0]
+    assert len({report["run_id"] for report in reports}) == len(reports) == 2
+    assert {report["quantization"] for report in reports} == {"q8_0", "q4_k_m"}
+    for report in reports:
+        assert UUID(report["run_id"]).version == 4
+        for field in (
+            "model_revision",
+            "prompt_version",
+            "max_new_tokens",
+            "context_window_tokens",
+            "structured_output_contract",
+            "safety_policy_version",
+            "warmup_requests",
+            "workload",
+        ):
+            assert report[field] == baseline[field]
+        assert report["schema_version"] == "1.4"
+        assert report["passed"] is True
+        assert report["evidence_kind"] == "measured"
+        assert report["context_window_tokens"] == 2048
+        assert [level["concurrency"] for level in report["levels"]] == [1, 2, 4, 8]
+        for level, reference in zip(report["levels"], baseline["levels"], strict=True):
+            assert level["input_sequence_sha256"] == reference["input_sequence_sha256"]
+            assert level["requests"] == level["completed"] == 100
+            assert level["errors"] == 0
+            assert level["prompt_token_sample_count"] == 100
+            assert level["output_token_sample_count"] == 100
+            assert level["ttft_sample_count"] == 100
+            assert level["prompt_tokens"] == reference["prompt_tokens"]
+            assert level["requests_per_second"] == pytest.approx(
+                level["completed"] / level["wall_seconds"], abs=0.000051
+            )
+            assert level["output_tokens_per_second"] == pytest.approx(
+                level["output_tokens"] / level["wall_seconds"], abs=0.00006
+            )

@@ -13,6 +13,7 @@ $comparisonChecked = $false
 $trainingChecked = $false
 $artifactReportsChecked = 0
 $benchmarksChecked = 0
+$currentBenchmarksChecked = 0
 $registryChecked = $false
 
 function Assert-Equal([string]$Label, $Expected, $Actual) {
@@ -252,6 +253,24 @@ foreach ($entry in $snapshot.concurrency_benchmarks.PSObject.Properties) {
     $benchmarksChecked += 1
 }
 
+$currentSnapshotPath = Join-Path $projectRoot "docs\current-context-benchmarks.json"
+if (Test-Path -LiteralPath $currentSnapshotPath) {
+    $currentSnapshot = Get-Content -LiteralPath $currentSnapshotPath -Raw | ConvertFrom-Json
+    foreach ($entry in $currentSnapshot.measurements.PSObject.Properties) {
+        $expected = $entry.Value
+        $reportPath = Join-Path $projectRoot $expected.source_report
+        if (-not (Test-Path -LiteralPath $reportPath)) { continue }
+        $reportHash = (Get-FileHash -LiteralPath $reportPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        Assert-Equal "current_benchmark.$($entry.Name).sha256" $expected.source_report_sha256 $reportHash
+        $actual = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+        Assert-Equal `
+            "current_benchmark.$($entry.Name).report" `
+            ($expected.report | ConvertTo-Json -Depth 30 -Compress) `
+            ($actual | ConvertTo-Json -Depth 30 -Compress)
+        $currentBenchmarksChecked += 1
+    }
+}
+
 $registryPath = Join-Path $projectRoot $snapshot.registry_source_report
 if (Test-Path -LiteralPath $registryPath) {
     $registry = Get-Content -LiteralPath $registryPath -Raw | ConvertFrom-Json
@@ -297,6 +316,7 @@ if (Test-Path -LiteralPath $generatedManifestPath) {
     training_checked = $trainingChecked
     artifact_reports_checked = $artifactReportsChecked
     benchmarks_checked = $benchmarksChecked
+    current_context_benchmarks_checked = $currentBenchmarksChecked
     registry_checked = $registryChecked
     external_manifest_checked = $manifestChecked
 } | ConvertTo-Json

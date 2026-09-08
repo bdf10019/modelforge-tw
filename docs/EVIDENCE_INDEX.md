@@ -70,6 +70,10 @@ policy-v2 報告的合約不同，只作診斷，不用來覆寫既有 attestati
 
 - Q8 benchmark：`outputs/benchmark-q8-v5.json`，36/36 requests、0 error。
 - Q4 benchmark：`outputs/benchmark-q4-v5.json`，36/36 requests、0 error。
+- 新設定 benchmark（2026-09-08）：`outputs/benchmark-q8-v5-ctx8192-20260908.json` 與
+  `outputs/benchmark-q4-v5-ctx8192-20260908.json`，各 400/400 requests、0 error；使用 8192 total
+  context／4 slots、client concurrency 1／2／4／8。完整非逐案報告與 SHA-256 封存於
+  [`current-context-benchmarks.json`](current-context-benchmarks.json)，不覆寫上述歷史證據。
 - registry：`outputs/model-registry.json`。事件包含 policy-v2 Q4 blocked、Q8 promoted，以及 NF4／Q8／Q4
   三份 policy-v2 evaluation attested；最終 `released=qwen3-1.7b-qlora-v5-policy-v2`、
   `previous_good=qwen3-1.7b-gguf-q8-v5-policy-v2`。

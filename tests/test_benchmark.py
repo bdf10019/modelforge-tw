@@ -1,5 +1,7 @@
 import argparse
+import hashlib
 import json
+from uuid import UUID
 
 import pytest
 
@@ -32,7 +34,10 @@ def test_benchmark_keeps_unavailable_ttft_explicit():
     assert report["levels"][0]["errors"] == 0
     assert report["levels"][0]["output_token_sample_count"] == 0
     assert report["levels"][0]["ttft_sample_count"] == 0
-    assert report["schema_version"] == "1.3"
+    assert report["schema_version"] == "1.4"
+    assert UUID(report["run_id"]).version == 4
+    assert report["levels"][0]["prompt_tokens"] is None
+    assert report["levels"][0]["prompt_token_sample_count"] == 0
     assert report["safety_policy_version"] == "risk-precedence-v2"
     assert (
         report["environment"]["peak_process_rss_bytes"]
@@ -53,6 +58,147 @@ def test_benchmark_records_streaming_ttft_when_engine_supports_it():
     assert report["levels"][0]["ttft_status"] == "measured_from_streaming_response"
     assert report["levels"][0]["ttft_ms"]["p50"] == 2.5
     assert report["levels"][0]["ttft_sample_count"] == 2
+
+
+class RecordingFixtureEngine(FixtureEngine):
+    def __init__(self):
+        super().__init__("adapted")
+        self.sent_inputs = []
+
+    def generate(self, request):
+        self.sent_inputs.append(request.model_dump(mode="json"))
+        return super().generate(request)
+
+
+def hash_sent_inputs(inputs):
+    return hashlib.sha256(
+        json.dumps(inputs, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+
+
+@pytest.mark.parametrize(("requests", "warmup"), [(1, 0), (3, 2), (5, 4)])
+def test_benchmark_workload_hashes_match_sent_truncated_and_cyclic_inputs(
+    requests, warmup, monkeypatch
+):
+    monkeypatch.setattr("modelforge_tw.benchmark._gpu_snapshot", lambda: None)
+    records = generate_records(1, 1, 1)[:3]
+    pool = [record.input.model_dump(mode="json") for record in records]
+    engine = RecordingFixtureEngine()
+
+    report = run_benchmark(
+        engine,
+        records,
+        concurrency_levels=[1],
+        requests_per_level=requests,
+        warmup_requests=warmup,
+    )
+
+    sent_warmup = engine.sent_inputs[:warmup]
+    sent_measured = engine.sent_inputs[warmup:]
+    assert sent_warmup == [pool[index % len(pool)] for index in range(warmup)]
+    assert sent_measured == [pool[index % len(pool)] for index in range(requests)]
+    assert report["workload"] == {
+        "hash_contract": "sha256-canonical-json-input-sequence-v1",
+        "input_pool_sha256": hash_sent_inputs(pool),
+        "input_pool_records": 3,
+        "requests_per_level": requests,
+        "warmup_input_sequence_sha256": hash_sent_inputs(sent_warmup),
+    }
+    assert report["levels"][0]["input_sequence_sha256"] == hash_sent_inputs(sent_measured)
+    serialized = json.dumps(report, ensure_ascii=False)
+    assert all(record.input.incident_text not in serialized for record in records)
+    assert all(record.record_id not in serialized for record in records)
+
+
+def test_benchmark_workload_hashes_detect_input_order_selection_and_count(monkeypatch):
+    monkeypatch.setattr("modelforge_tw.benchmark._gpu_snapshot", lambda: None)
+    records = generate_records(1, 1, 1)[:3]
+
+    def benchmark(pool, requests=2, warmup=1, mode="adapted"):
+        return run_benchmark(
+            FixtureEngine(mode),
+            pool,
+            concurrency_levels=[1, 2],
+            requests_per_level=requests,
+            warmup_requests=warmup,
+        )
+
+    baseline = benchmark(records)
+    same_inputs_other_engine = benchmark(records, mode="base")
+    assert baseline["run_id"] != same_inputs_other_engine["run_id"]
+    assert baseline["workload"] == same_inputs_other_engine["workload"]
+    sequence_hash = baseline["levels"][0]["input_sequence_sha256"]
+    assert all(level["input_sequence_sha256"] == sequence_hash for level in baseline["levels"])
+    assert same_inputs_other_engine["levels"][0]["input_sequence_sha256"] == sequence_hash
+
+    reordered = benchmark([records[1], records[0], records[2]])
+    assert reordered["workload"]["input_pool_sha256"] != baseline["workload"]["input_pool_sha256"]
+    assert reordered["levels"][0]["input_sequence_sha256"] != sequence_hash
+
+    changed_unselected = [record.model_copy(deep=True) for record in records]
+    changed_unselected[2].input.incident_text += "補充現場紀錄。"
+    unselected_report = benchmark(changed_unselected)
+    assert (
+        unselected_report["workload"]["input_pool_sha256"]
+        != baseline["workload"]["input_pool_sha256"]
+    )
+    assert unselected_report["levels"][0]["input_sequence_sha256"] == sequence_hash
+
+    changed_selected = [record.model_copy(deep=True) for record in records]
+    changed_selected[0].input.asset_type = "另一台設備"
+    selected_report = benchmark(changed_selected)
+    assert selected_report["levels"][0]["input_sequence_sha256"] != sequence_hash
+    assert (
+        selected_report["workload"]["warmup_input_sequence_sha256"]
+        != baseline["workload"]["warmup_input_sequence_sha256"]
+    )
+
+    more_requests = benchmark(records, requests=5)
+    assert (
+        more_requests["workload"]["input_pool_sha256"] == baseline["workload"]["input_pool_sha256"]
+    )
+    assert more_requests["levels"][0]["input_sequence_sha256"] != sequence_hash
+    more_warmup = benchmark(records, warmup=4)
+    assert more_warmup["levels"][0]["input_sequence_sha256"] == sequence_hash
+    assert (
+        more_warmup["workload"]["warmup_input_sequence_sha256"]
+        != baseline["workload"]["warmup_input_sequence_sha256"]
+    )
+
+    relabeled = [record.model_copy(deep=True) for record in records]
+    relabeled[0].record_id = "changed-record-id"
+    relabeled_report = benchmark(relabeled)
+    assert relabeled_report["workload"] == baseline["workload"]
+    assert relabeled_report["levels"][0]["input_sequence_sha256"] == sequence_hash
+
+
+def test_benchmark_reports_partial_prompt_token_coverage_without_inventing_samples(monkeypatch):
+    monkeypatch.setattr("modelforge_tw.benchmark._gpu_snapshot", lambda: None)
+
+    class PartialTokenEngine(FixtureEngine):
+        calls = 0
+
+        def generate(self, request):
+            result = super().generate(request)
+            tokens = [7, None, 0][self.calls]
+            self.calls += 1
+            result.metadata = result.metadata.model_copy(update={"prompt_tokens": tokens})
+            return result
+
+    report = run_benchmark(
+        PartialTokenEngine("adapted"),
+        generate_records(1, 1, 1)[:3],
+        concurrency_levels=[1],
+        requests_per_level=3,
+        warmup_requests=0,
+    )
+
+    assert report["passed"] is True
+    assert report["levels"][0]["completed"] == 3
+    assert report["levels"][0]["prompt_tokens"] == 7
+    assert report["levels"][0]["prompt_token_sample_count"] == 2
 
 
 def test_benchmark_fails_closed_when_measured_requests_error():

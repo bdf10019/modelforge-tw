@@ -1,0 +1,389 @@
+{
+  "schema_version": "1.0",
+  "evidence_kind": "measured",
+  "scope": "2026-09-08 local llama.cpp warm closed-loop benchmark; not an API load test or quality release gate.",
+  "server_config": {
+    "total_context_tokens": 8192,
+    "parallel_slots": 4,
+    "context_window_tokens": 2048,
+    "gpu_layers": "all",
+    "flash_attention": "on",
+    "llama_cpp_build": "b10665-ca3d5a3e1",
+    "server_sha256": "20a83f9ed723c6307749863842657da86918e8b612a3eaa44fe635d147341550"
+  },
+  "dataset": {
+    "source": "data/generated/test.jsonl",
+    "source_sha256": "203024dbcba8573d78c226df8e00d355cb5af65f0aa6426da89a7082db94b06e",
+    "selection": "first 100 inputs in the 210-record test pool, repeated at each concurrency level"
+  },
+  "selected_case_counts": {
+    "mechanical": 30,
+    "electrical": 30,
+    "thermal": 30,
+    "pressure": 10
+  },
+  "notes": [
+    "400 measured requests per model are repeated measurements of 100 inputs, not 400 distinct cases.",
+    "Client concurrency 8 queues against 4 server slots; it does not create 8 server slots.",
+    "Levels run in order on the same warmed server with default prefix-cache behavior; caches are not reset between levels.",
+    "Reports contain environment and aggregate metadata, not incident text; historical registry and quality decisions are unchanged."
+  ],
+  "measurements": {
+    "q8_0": {
+      "source_report": "outputs/benchmark-q8-v5-ctx8192-20260908.json",
+      "source_report_sha256": "8ff6039e3865008c161676327c5a617d597ffb3d60539fc01f30cf4c884c287a",
+      "report": {
+        "context_window_tokens": 2048,
+        "created_at": "2026-09-08T09:59:06.755298+08:00",
+        "engine": "openai-http",
+        "environment": {
+          "gpu_after": {
+            "driver_version": "616.64",
+            "memory_total_mib": 8151,
+            "memory_used_mib": 3216,
+            "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+            "utilization_percent": 62
+          },
+          "gpu_before": {
+            "driver_version": "616.64",
+            "memory_total_mib": 8151,
+            "memory_used_mib": 3339,
+            "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+            "utilization_percent": 90
+          },
+          "gpu_memory_scope": "host-wide nvidia-smi reading",
+          "logical_cpu_count": 12,
+          "peak_gpu_memory_used_mib": 3374,
+          "peak_process_rss_bytes": 97824768,
+          "platform": "Windows-10-10.0.26200-SP0",
+          "process_rss_after_bytes": 97218560,
+          "process_rss_before_bytes": 51163136,
+          "python": "3.11.9",
+          "ram_total_bytes": 16755937280
+        },
+        "evidence_kind": "measured",
+        "failure_reason": null,
+        "levels": [
+          {
+            "completed": 100,
+            "concurrency": 1,
+            "error_samples": [],
+            "errors": 0,
+            "input_sequence_sha256": "109ea0528bd6919742285dbf9d9aa1a910ba4ad7ec59fe57f1745caadd9c6293",
+            "latency_ms": {
+              "mean": 968.1014,
+              "p50": 914.7691,
+              "p95": 1271.1794,
+              "p99": 1313.4998
+            },
+            "output_token_sample_count": 100,
+            "output_tokens": 8683,
+            "output_tokens_per_second": 89.6832,
+            "prompt_token_sample_count": 100,
+            "prompt_tokens": 80404,
+            "requests": 100,
+            "requests_per_second": 1.0329,
+            "ttft_ms": {
+              "mean": 204.9293,
+              "p50": 205.3697,
+              "p95": 220.5932
+            },
+            "ttft_sample_count": 100,
+            "ttft_status": "measured_from_streaming_response",
+            "wall_seconds": 96.818578
+          },
+          {
+            "completed": 100,
+            "concurrency": 2,
+            "error_samples": [],
+            "errors": 0,
+            "input_sequence_sha256": "109ea0528bd6919742285dbf9d9aa1a910ba4ad7ec59fe57f1745caadd9c6293",
+            "latency_ms": {
+              "mean": 1182.9118,
+              "p50": 1113.7162,
+              "p95": 1540.2594,
+              "p99": 1628.0646
+            },
+            "output_token_sample_count": 100,
+            "output_tokens": 8841,
+            "output_tokens_per_second": 149.369,
+            "prompt_token_sample_count": 100,
+            "prompt_tokens": 80404,
+            "requests": 100,
+            "requests_per_second": 1.6895,
+            "ttft_ms": {
+              "mean": 263.8545,
+              "p50": 249.058,
+              "p95": 338.5622
+            },
+            "ttft_sample_count": 100,
+            "ttft_status": "measured_from_streaming_response",
+            "wall_seconds": 59.189002
+          },
+          {
+            "completed": 100,
+            "concurrency": 4,
+            "error_samples": [],
+            "errors": 0,
+            "input_sequence_sha256": "109ea0528bd6919742285dbf9d9aa1a910ba4ad7ec59fe57f1745caadd9c6293",
+            "latency_ms": {
+              "mean": 1724.2986,
+              "p50": 1631.2886,
+              "p95": 2273.595,
+              "p99": 2556.0381
+            },
+            "output_token_sample_count": 100,
+            "output_tokens": 8747,
+            "output_tokens_per_second": 201.1817,
+            "prompt_token_sample_count": 100,
+            "prompt_tokens": 80404,
+            "requests": 100,
+            "requests_per_second": 2.3,
+            "ttft_ms": {
+              "mean": 358.318,
+              "p50": 342.6691,
+              "p95": 506.7708
+            },
+            "ttft_sample_count": 100,
+            "ttft_status": "measured_from_streaming_response",
+            "wall_seconds": 43.478099
+          },
+          {
+            "completed": 100,
+            "concurrency": 8,
+            "error_samples": [],
+            "errors": 0,
+            "input_sequence_sha256": "109ea0528bd6919742285dbf9d9aa1a910ba4ad7ec59fe57f1745caadd9c6293",
+            "latency_ms": {
+              "mean": 2671.1046,
+              "p50": 2597.6066,
+              "p95": 3308.296,
+              "p99": 3629.9796
+            },
+            "output_token_sample_count": 100,
+            "output_tokens": 8975,
+            "output_tokens_per_second": 261.8781,
+            "prompt_token_sample_count": 100,
+            "prompt_tokens": 80404,
+            "requests": 100,
+            "requests_per_second": 2.9179,
+            "ttft_ms": {
+              "mean": 1388.6402,
+              "p50": 1326.0959,
+              "p95": 1771.6153
+            },
+            "ttft_sample_count": 100,
+            "ttft_status": "measured_from_streaming_response",
+            "wall_seconds": 34.271668
+          }
+        ],
+        "max_new_tokens": 192,
+        "model_id": "modelforge-tw-q8_0",
+        "model_revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "model_version": "qwen3-1.7b-merged-v5-q8_0-policy-v2",
+        "notes": [
+          "A report passes only when every measured request completes without error.",
+          "Error samples contain stable categories and exception types, never exception text.",
+          "Input hashes cover ordered canonical JSON inputs, not labels or record identifiers.",
+          "Input sequence order is submission index, not concurrent arrival or completion order.",
+          "TTFT requires a streaming adapter and is not represented as zero.",
+          "Fixture evidence validates the benchmark pipeline only and is not model performance.",
+          "GPU memory is sampled for the whole device, not attributed to one process."
+        ],
+        "passed": true,
+        "prompt_version": "optimized-v2",
+        "quantization": "q8_0",
+        "run_id": "fff0cb4e-5a82-43de-9676-788339ded07c",
+        "safety_policy_version": "risk-precedence-v2",
+        "schema_version": "1.4",
+        "structured_output_contract": "json-schema-v2",
+        "warmup_requests": 2,
+        "workload": {
+          "hash_contract": "sha256-canonical-json-input-sequence-v1",
+          "input_pool_records": 210,
+          "input_pool_sha256": "6388d3adf9886c89e1813e206a6d23e117a835a31ce3f136d68ddd8861a50eaf",
+          "requests_per_level": 100,
+          "warmup_input_sequence_sha256": "ab4b362a025cf8f1a139fa1b146b4edf852573e308f52e2958fe5a3737a0e14c"
+        }
+      }
+    },
+    "q4_k_m": {
+      "source_report": "outputs/benchmark-q4-v5-ctx8192-20260908.json",
+      "source_report_sha256": "62db15c97e48a98068f0db9c456b370433fe669c57c47d436c72e51d90b22b6a",
+      "report": {
+        "context_window_tokens": 2048,
+        "created_at": "2026-09-08T10:03:25.087903+08:00",
+        "engine": "openai-http",
+        "environment": {
+          "gpu_after": {
+            "driver_version": "616.64",
+            "memory_total_mib": 8151,
+            "memory_used_mib": 2528,
+            "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+            "utilization_percent": 53
+          },
+          "gpu_before": {
+            "driver_version": "616.64",
+            "memory_total_mib": 8151,
+            "memory_used_mib": 2531,
+            "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+            "utilization_percent": 86
+          },
+          "gpu_memory_scope": "host-wide nvidia-smi reading",
+          "logical_cpu_count": 12,
+          "peak_gpu_memory_used_mib": 2711,
+          "peak_process_rss_bytes": 94183424,
+          "platform": "Windows-10-10.0.26200-SP0",
+          "process_rss_after_bytes": 93728768,
+          "process_rss_before_bytes": 51347456,
+          "python": "3.11.9",
+          "ram_total_bytes": 16755937280
+        },
+        "evidence_kind": "measured",
+        "failure_reason": null,
+        "levels": [
+          {
+            "completed": 100,
+            "concurrency": 1,
+            "error_samples": [],
+            "errors": 0,
+            "input_sequence_sha256": "109ea0528bd6919742285dbf9d9aa1a910ba4ad7ec59fe57f1745caadd9c6293",
+            "latency_ms": {
+              "mean": 764.7084,
+              "p50": 769.2935,
+              "p95": 847.0123,
+              "p99": 897.0485
+            },
+            "output_token_sample_count": 100,
+            "output_tokens": 8300,
+            "output_tokens_per_second": 108.5269,
+            "prompt_token_sample_count": 100,
+            "prompt_tokens": 80404,
+            "requests": 100,
+            "requests_per_second": 1.3076,
+            "ttft_ms": {
+              "mean": 203.096,
+              "p50": 203.2307,
+              "p95": 215.3326
+            },
+            "ttft_sample_count": 100,
+            "ttft_status": "measured_from_streaming_response",
+            "wall_seconds": 76.478764
+          },
+          {
+            "completed": 100,
+            "concurrency": 2,
+            "error_samples": [],
+            "errors": 0,
+            "input_sequence_sha256": "109ea0528bd6919742285dbf9d9aa1a910ba4ad7ec59fe57f1745caadd9c6293",
+            "latency_ms": {
+              "mean": 960.6385,
+              "p50": 957.323,
+              "p95": 1061.364,
+              "p99": 1121.4612
+            },
+            "output_token_sample_count": 100,
+            "output_tokens": 8315,
+            "output_tokens_per_second": 172.9323,
+            "prompt_token_sample_count": 100,
+            "prompt_tokens": 80404,
+            "requests": 100,
+            "requests_per_second": 2.0798,
+            "ttft_ms": {
+              "mean": 262.7972,
+              "p50": 260.5071,
+              "p95": 306.8381
+            },
+            "ttft_sample_count": 100,
+            "ttft_status": "measured_from_streaming_response",
+            "wall_seconds": 48.082404
+          },
+          {
+            "completed": 100,
+            "concurrency": 4,
+            "error_samples": [],
+            "errors": 0,
+            "input_sequence_sha256": "109ea0528bd6919742285dbf9d9aa1a910ba4ad7ec59fe57f1745caadd9c6293",
+            "latency_ms": {
+              "mean": 1542.801,
+              "p50": 1556.5351,
+              "p95": 1819.7457,
+              "p99": 1926.3486
+            },
+            "output_token_sample_count": 100,
+            "output_tokens": 8279,
+            "output_tokens_per_second": 212.5322,
+            "prompt_token_sample_count": 100,
+            "prompt_tokens": 80404,
+            "requests": 100,
+            "requests_per_second": 2.5671,
+            "ttft_ms": {
+              "mean": 339.592,
+              "p50": 321.3967,
+              "p95": 506.2068
+            },
+            "ttft_sample_count": 100,
+            "ttft_status": "measured_from_streaming_response",
+            "wall_seconds": 38.954094
+          },
+          {
+            "completed": 100,
+            "concurrency": 8,
+            "error_samples": [],
+            "errors": 0,
+            "input_sequence_sha256": "109ea0528bd6919742285dbf9d9aa1a910ba4ad7ec59fe57f1745caadd9c6293",
+            "latency_ms": {
+              "mean": 2323.5018,
+              "p50": 2340.4548,
+              "p95": 2623.695,
+              "p99": 2947.4554
+            },
+            "output_token_sample_count": 100,
+            "output_tokens": 8306,
+            "output_tokens_per_second": 279.5495,
+            "prompt_token_sample_count": 100,
+            "prompt_tokens": 80404,
+            "requests": 100,
+            "requests_per_second": 3.3656,
+            "ttft_ms": {
+              "mean": 1204.581,
+              "p50": 1212.5062,
+              "p95": 1365.4048
+            },
+            "ttft_sample_count": 100,
+            "ttft_status": "measured_from_streaming_response",
+            "wall_seconds": 29.712088
+          }
+        ],
+        "max_new_tokens": 192,
+        "model_id": "modelforge-tw-q4_k_m",
+        "model_revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "model_version": "qwen3-1.7b-merged-v5-q4_k_m-policy-v2",
+        "notes": [
+          "A report passes only when every measured request completes without error.",
+          "Error samples contain stable categories and exception types, never exception text.",
+          "Input hashes cover ordered canonical JSON inputs, not labels or record identifiers.",
+          "Input sequence order is submission index, not concurrent arrival or completion order.",
+          "TTFT requires a streaming adapter and is not represented as zero.",
+          "Fixture evidence validates the benchmark pipeline only and is not model performance.",
+          "GPU memory is sampled for the whole device, not attributed to one process."
+        ],
+        "passed": true,
+        "prompt_version": "optimized-v2",
+        "quantization": "q4_k_m",
+        "run_id": "ed183e20-f8d7-4633-ac61-e2e81db34418",
+        "safety_policy_version": "risk-precedence-v2",
+        "schema_version": "1.4",
+        "structured_output_contract": "json-schema-v2",
+        "warmup_requests": 2,
+        "workload": {
+          "hash_contract": "sha256-canonical-json-input-sequence-v1",
+          "input_pool_records": 210,
+          "input_pool_sha256": "6388d3adf9886c89e1813e206a6d23e117a835a31ce3f136d68ddd8861a50eaf",
+          "requests_per_level": 100,
+          "warmup_input_sequence_sha256": "ab4b362a025cf8f1a139fa1b146b4edf852573e308f52e2958fe5a3737a0e14c"
+        }
+      }
+    }
+  }
+}

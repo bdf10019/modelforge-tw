@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import functools
+import hashlib
 import json
 import platform
 import statistics
@@ -11,6 +12,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import psutil
 
@@ -20,7 +22,7 @@ from modelforge_tw.engines.base import (
     validate_inference_result,
 )
 from modelforge_tw.io_utils import atomic_write_text
-from modelforge_tw.schemas import DatasetRecord, InferenceMetadata
+from modelforge_tw.schemas import DatasetRecord, InferenceMetadata, TriageRequest
 
 BENCHMARK_IDENTITY_FIELDS = (
     "engine",
@@ -44,6 +46,16 @@ def _benchmark_error_sample(error: Exception) -> dict[str, str]:
             "exception_type": "InferenceIdentityMismatchError",
         }
     return {"code": "inference_request_failed", "exception_type": type(error).__name__}
+
+
+def _input_sequence_sha256(inputs: list[TriageRequest]) -> str:
+    canonical = json.dumps(
+        [item.model_dump(mode="json") for item in inputs],
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _percentile(values: list[float], percentile: float) -> float:
@@ -137,8 +149,19 @@ def run_benchmark(
     if warmup_requests < 0:
         raise ValueError("warmup request count cannot be negative")
 
-    for index in range(warmup_requests):
-        engine.generate(records[index % len(records)].input)
+    input_pool = [record.input.model_copy(deep=True) for record in records]
+    measured_inputs = [input_pool[index % len(input_pool)] for index in range(requests_per_level)]
+    warmup_inputs = [input_pool[index % len(input_pool)] for index in range(warmup_requests)]
+    workload = {
+        "hash_contract": "sha256-canonical-json-input-sequence-v1",
+        "input_pool_sha256": _input_sequence_sha256(input_pool),
+        "input_pool_records": len(input_pool),
+        "requests_per_level": requests_per_level,
+        "warmup_input_sequence_sha256": _input_sequence_sha256(warmup_inputs),
+    }
+    measured_input_sha256 = _input_sequence_sha256(measured_inputs)
+    for request in warmup_inputs:
+        engine.generate(request)
 
     streaming_generate = getattr(engine, "generate_streaming", None)
     benchmark_generate = streaming_generate if callable(streaming_generate) else engine.generate
@@ -155,6 +178,7 @@ def run_benchmark(
     try:
         for concurrency in concurrency_levels:
             latencies: list[float] = []
+            prompt_tokens: list[int] = []
             output_tokens: list[int] = []
             ttfts: list[float] = []
             errors: list[dict[str, str]] = []
@@ -163,13 +187,14 @@ def run_benchmark(
             def execute(
                 index: int,
                 latency_sink: list[float],
+                prompt_token_sink: list[int],
                 token_sink: list[int],
                 ttft_sink: list[float],
                 error_sink: list[dict[str, str]],
             ) -> None:
                 request_started = time.perf_counter()
                 try:
-                    result = benchmark_generate(records[index % len(records)].input)
+                    result = benchmark_generate(measured_inputs[index])
                     result = validate_inference_result(engine, result)
                     with metadata_lock:
                         if not metadata_samples:
@@ -187,6 +212,8 @@ def run_benchmark(
                                     + ", ".join(identity_mismatches)
                                 )
                     latency_sink.append((time.perf_counter() - request_started) * 1000)
+                    if result.metadata.prompt_tokens is not None:
+                        prompt_token_sink.append(result.metadata.prompt_tokens)
                     if result.metadata.output_tokens is not None:
                         token_sink.append(result.metadata.output_tokens)
                     if result.metadata.ttft_ms is not None:
@@ -198,6 +225,7 @@ def run_benchmark(
                 worker = functools.partial(
                     execute,
                     latency_sink=latencies,
+                    prompt_token_sink=prompt_tokens,
                     token_sink=output_tokens,
                     ttft_sink=ttfts,
                     error_sink=errors,
@@ -209,6 +237,7 @@ def run_benchmark(
                 {
                     "concurrency": concurrency,
                     "requests": requests_per_level,
+                    "input_sequence_sha256": measured_input_sha256,
                     "completed": completed,
                     "errors": len(errors),
                     "error_samples": errors[:5],
@@ -222,6 +251,8 @@ def run_benchmark(
                         "p99": round(_percentile(latencies, 0.99), 4),
                         "mean": round(statistics.fmean(latencies), 4) if latencies else 0,
                     },
+                    "prompt_tokens": sum(prompt_tokens) if prompt_tokens else None,
+                    "prompt_token_sample_count": len(prompt_tokens),
                     "output_tokens": sum(output_tokens) if output_tokens else None,
                     "output_token_sample_count": len(output_tokens),
                     "output_tokens_per_second": (
@@ -257,7 +288,8 @@ def run_benchmark(
         level["errors"] == 0 and level["completed"] == level["requests"] for level in levels
     )
     return {
-        "schema_version": "1.3",
+        "schema_version": "1.4",
+        "run_id": str(uuid4()),
         "created_at": datetime.now(UTC).isoformat(),
         "passed": passed,
         "failure_reason": None if passed else "one_or_more_benchmark_requests_failed",
@@ -296,10 +328,13 @@ def run_benchmark(
             "gpu_memory_scope": "host-wide nvidia-smi reading",
         },
         "warmup_requests": warmup_requests,
+        "workload": workload,
         "levels": levels,
         "notes": [
             "A report passes only when every measured request completes without error.",
             "Error samples contain stable categories and exception types, never exception text.",
+            "Input hashes cover ordered canonical JSON inputs, not labels or record identifiers.",
+            "Input sequence order is submission index, not concurrent arrival or completion order.",
             "TTFT requires a streaming adapter and is not represented as zero.",
             "Fixture evidence validates the benchmark pipeline only and is not model performance.",
             "GPU memory is sampled for the whole device, not attributed to one process.",

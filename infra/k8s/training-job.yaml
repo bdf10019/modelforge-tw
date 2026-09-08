@@ -17,7 +17,11 @@ spec:
         - name: trainer
           image: modelforge-tw-gpu:0.1.0
           command: ["/bin/sh", "-lc"]
-          args: ["modelforge generate-data && modelforge train --config configs/training.json"]
+          args:
+            - >-
+              modelforge generate-data --output /app/data/generated
+              --challenge /app/data/source/challenge.jsonl &&
+              modelforge train --config /app/configs/training.json
           env:
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"

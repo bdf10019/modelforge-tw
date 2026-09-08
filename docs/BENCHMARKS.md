@@ -3,15 +3,18 @@
 ## 本機環境
 
 - Windows 11、Python 3.11.9、12 logical CPUs、RAM 16,755,937,280 bytes。
-- NVIDIA GeForce RTX 5060 Laptop GPU，8,151 MiB，compute capability 12.0，driver 610.88。
+- NVIDIA GeForce RTX 5060 Laptop GPU，8,151 MiB，compute capability 12.0；歷史 driver 610.88，
+  2026-09-08 壓測 driver 616.64。
 - PyTorch 2.13.0 + CUDA 13.0、Transformers 5.16.1。
 - llama.cpp official Windows CUDA release b10665，commit
   `ca3d5a3e10d53f7ea672cb9b6178faca3e2807bc`。
 
-所有數字都是 2026-08-28／29 的本機真實執行。GPU 記憶體由 `nvidia-smi` 取樣時，報告明確標示
+歷史數字來自 2026-08-28／29，新預設設定另於 2026-09-08 本機執行。GPU 記憶體由
+`nvidia-smi` 取樣時，報告明確標示
 為整張卡的 host-wide reading，不宣稱是單一程序的精確歸因。
-現有公開 Q8／Q4 報告是歷史 schema 1.0；新版 1.2 會額外逐請求核對推論身份並保存
-output-token／TTFT 樣本覆蓋數。這項 schema 改進不回填或改寫既有實測數字。
+原有公開 Q8／Q4 報告是歷史 schema 1.0；新版 1.4 逐請求核對推論身份，並保存
+prompt-token／output-token／TTFT 樣本覆蓋數、run ID 與有序輸入工作負載 hash。
+這項 schema 改進不回填或改寫既有實測數字。
 
 ## 訓練
 
@@ -71,14 +74,37 @@ AI4I 外部輸入的 prompt 約 967 tokens；再加 192-token output budget 後�
 
 目前 `serve-gguf.ps1` 與 Kubernetes baseline 改用 8192／4，API／報告宣告每 slot 2048；本機腳本
 拒絕低於 1536 的 slot。這項變更沒有回寫上方既有 4096-context 併發數字；若要宣稱新設定的吞吐量，
-必須另跑 8192-context benchmark。
+必須使用獨立的 8192-context benchmark。2026-09-08 已完成這項獨立壓測，見下一節。
+
+## 8192-context 暖機後壓測（2026-09-08）
+
+Q8／Q4 各使用相同 test pool 的前 100 個輸入，在 client concurrency 1／2／4／8 各跑 100 次；
+每個版本共 400/400 完成、零請求錯誤，prompt／output token 與 TTFT 樣本覆蓋皆完整。
+服務固定為 4 slots、每 slot 2048，client concurrency 8 是排隊負載，不是 8 個模型 slots。
+
+| 版本 | client concurrency | req/s | output tok/s | latency P95 | TTFT P50 |
+|---|---:|---:|---:|---:|---:|
+| Q8_0 | 4 | 2.3000 | 201.1817 | 2.274 s | 343 ms |
+| Q8_0 | 8 | 2.9179 | 261.8781 | 3.308 s | 1,326 ms |
+| Q4_K_M | 4 | 2.5671 | 212.5322 | 1.820 s | 321 ms |
+| Q4_K_M | 8 | 3.3656 | 279.5495 | 2.624 s | 1,213 ms |
+
+完整四級結果、輸入指紋、run ID、環境與原始報告 SHA-256 見
+[新設定壓測證據](current-context-benchmarks.json)。每級重複同一批 100 個輸入（機械 30、電氣 30、
+溫度 30、壓力 10），不是完整 210 筆 test，更不是 400 個獨立案例。各級依序在同一暖機 server
+執行，未重置預設 prefix cache；新舊測試的資料與 driver 不同，不把差異單獨歸因於 context。
+Q4 的品質 blocked 決策與正式 registry 均未變更。
 
 ## 未執行邊界
 
-- 新版 benchmark schema 1.3 明確保存 `passed` 與 `failure_reason`；只有所有量測請求零錯誤才成功，
+- benchmark schema 1.4 延續 `passed` 與 `failure_reason`；只有所有量測請求零錯誤才成功，
   否則腳本回傳非零狀態。`error_samples` 只保存穩定錯誤代碼與例外類型，不保存可能含私有端點、
   路徑或憑證片段的原始例外訊息。既有 Q8／Q4 報告為 schema 1.0，但公開摘要已核對皆為
   36/36、0 error。
+- `passed` 是推論完成／身份檢查結果，不是 JSON 原始品質或分類 gate；政策 fallback 仍可能算
+  完成。效能報告不授權發布，也不取代 224 筆品質評測。
+- 這些是暖機後、封閉式固定併發 client 對模型服務的負載測試；每個 worker 收到回應後才送
+  下一筆。不含統一 API 的認證／限流成本、冷啟動、固定到達率或長時間 soak 測試。
 - Transformers adapter 沒有 token-level streaming，因此其 TTFT 不可用，不填入誤導性的 0。
 - Docker／Compose／Kubernetes 因本機沒有 runtime，只做靜態設定、YAML 解析與程式測試。
 - vLLM、SGLang、ONNX Runtime、TensorRT-LLM 未在本機執行，不列效能數字。

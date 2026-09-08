@@ -36,6 +36,9 @@ row-disjoint holdout 得到 98/98 系統通過，卻讓內部 event F1 降至 69
 
 若以求職面試為目的，可直接依照 [10 分鐘展示走查](docs/INTERVIEW_WALKTHROUGH.md) 操作；它把
 現場 demo、量化取捨、外部回歸與誠實邊界排成一條可在有限時間內驗證的故事線。
+目前本機求職 MVP 已依 [收尾計畫](docs/MVP_CLOSEOUT_PLAN.md) 完成；固定展示、工程驗證與證據
+一致性結果見 [MVP 驗收紀錄](docs/MVP_ACCEPTANCE.md)。詳細範圍見 [專案進度](docs/PROJECT_STATUS.md)；
+完成代表凍結的本機求職作品範圍，不代表生產部署就緒。
 
 ## 快速驗證
 
@@ -64,7 +67,8 @@ API、安全 gate、評測與 registry 機制，其數字不代表 LLM 品質，
 - 每 replica 有 concurrency、5 秒 queue timeout 與有限 queue depth；逾時後不可取消的同步模型工作
   仍占用槽位，排隊滿載立即 503，Prometheus 分開呈現 HTTP、queue 與 engine job。
 - 關閉時先撤 readiness，再在有界寬限內排空背景工作；Kubernetes 的 Pod 終止期限刻意更長。
-- 推論路由支援至少 32 字元的 shared bearer key，Kubernetes baseline 缺少 Secret 時不啟動；只有
+- 推論路由支援至少 32 字元、無空白的可列印 ASCII shared bearer key，Kubernetes baseline
+  缺少 Secret 時不啟動；只有
   loopback／Compose demo 保留無認證模式。輸入原文 logging 不可開啟；這仍不等同企業 IAM、TLS、
   跨 replica rate limit 或集中稽核。
 - 新版 registry mutation 會把 typed event 封入 SHA-256 前向鏈；新候選必須使用完整 runtime identity 與

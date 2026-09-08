@@ -39,7 +39,8 @@
 - 模型 server 只接受具有 host、無內嵌帳密／query／fragment 的 HTTP(S) base URL；client 固定
   `trust_env=false`，事件原文不會因程序環境中的 `HTTP_PROXY`／`HTTPS_PROXY` 意外繞送代理。
 - 設定 `MODELFORGE_API_KEY` 後，兩個推論路由都要求標準 `Authorization: Bearer ...`；key 至少
-  32 字元、以 constant-time 比對、不出現在 config response。Kubernetes baseline 要求 Secret
+  32 字元、無空白的可列印 ASCII，以 constant-time 比對，不出現在 config response；
+  文字設定錯誤亦隱藏原始輸入。Kubernetes baseline 要求 Secret
   存在，遺漏時 Pod 不啟動，repository 不保存值；未設定模式只保留 loopback／Compose demo 相容性，
   Compose 的 published port 明確綁定 `127.0.0.1`，並移除全部 Linux capabilities。
 - 展示頁只在 config 宣告需要認證時顯示 password 欄位，將 bearer key 放進當次 request header；不寫入
