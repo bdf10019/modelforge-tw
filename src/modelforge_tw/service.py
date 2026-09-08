@@ -502,7 +502,7 @@ def create_app(
 
     app = FastAPI(
         title="ModelForge-TW",
-        version="0.1.0",
+        version="0.1.1",
         description="Validated Traditional Chinese industrial-event model serving",
         lifespan=lifespan,
     )

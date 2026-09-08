@@ -2,6 +2,11 @@
 
 本專案依 [Semantic Versioning](https://semver.org/) 標示公開版本。
 
+## 0.1.1 - 2026-09-09
+
+- 修正 Linux CI 對 Windows 檔案鎖定介面的跨平台型別解析。
+- 更新 GitHub Actions 至 Node 24 相容版本。
+
 ## 0.1.0 - 2026-09-09
 
 第一個公開 MVP 版本：

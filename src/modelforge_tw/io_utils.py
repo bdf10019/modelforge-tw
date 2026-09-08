@@ -27,11 +27,17 @@ class _FcntlModule(Protocol):
     def flock(self, file_descriptor: int, operation: int) -> None: ...
 
 
+class _MsvcrtModule(Protocol):
+    LK_NBLCK: int
+    LK_UNLCK: int
+
+    def locking(self, file_descriptor: int, mode: int, nbytes: int) -> None: ...
+
+
 def _try_lock(handle: BinaryIO) -> None:
     handle.seek(0)
     if os.name == "nt":
-        import msvcrt
-
+        msvcrt = cast(_MsvcrtModule, import_module("msvcrt"))
         msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
         return
 
@@ -42,8 +48,7 @@ def _try_lock(handle: BinaryIO) -> None:
 def _unlock(handle: BinaryIO) -> None:
     handle.seek(0)
     if os.name == "nt":
-        import msvcrt
-
+        msvcrt = cast(_MsvcrtModule, import_module("msvcrt"))
         msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
         return
 
