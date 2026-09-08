@@ -1,5 +1,9 @@
 # ModelForge-TW
 
+[![CI](https://github.com/bdf10019/modelforge-tw/actions/workflows/verify.yml/badge.svg)](https://github.com/bdf10019/modelforge-tw/actions/workflows/verify.yml)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 繁體中文設備事件模型適配、量化與推論發布平台。它以同一封存評測集比較 Base、prompt-only、
 QLoRA、合併權重與 GGUF 量化版本，並用實測報告回答品質、延遲、吞吐、VRAM、檔案大小與安全
 發布取捨。
@@ -155,3 +159,6 @@ tests/                   單元、API、資料洩漏、安全、registry 與端�
 架構、資料、模型、效能、安全與展示方式分別見 `docs/`。程式使用 [MIT License](LICENSE)，原創
 合成資料使用 CC BY 4.0；模型權重不隨 repository 散布。第三方來源與鎖定版本見
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+版本變更見 [CHANGELOG](CHANGELOG.md)；問題回報與原始碼位於
+[GitHub repository](https://github.com/bdf10019/modelforge-tw)。

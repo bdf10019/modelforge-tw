@@ -20,6 +20,11 @@ dependencies = [
   "uvicorn[standard]>=0.34,<1",
 ]
 
+[project.urls]
+Homepage = "https://github.com/bdf10019/modelforge-tw"
+Repository = "https://github.com/bdf10019/modelforge-tw"
+Issues = "https://github.com/bdf10019/modelforge-tw/issues"
+
 [project.optional-dependencies]
 dev = [
   "mypy>=1.14,<2",

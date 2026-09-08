@@ -82,10 +82,6 @@
 - Base／prompt-only 是早期 14 筆 challenge 對照，不宣稱現行 v5 的完整因果比較。
 - Docker／Kubernetes 僅有靜態設定與回歸測試，未宣稱實際叢集部署。
 - 歷史訓練與 registry 保留原始 schema，不事後補簽新版血緣。
-- Q4 壓測遺留一個只含既有 Q4 artifact hard link 的暫存目錄；兩次精確清理均被執行環境政策拒絕。
-  它不複製模型內容、不影響 Git、執行與驗收，也沒有背景程序。目錄為專案上一層的
-  `modelforge-serve-1dbc4ee4b851469989b3fccd1f1a3b94`；日後只需移除該 hard link 與空目錄，
-  不得刪除 `公司實務版/artifacts/gguf` 的原始 Q4 模型。
 
 ## 結論
 
