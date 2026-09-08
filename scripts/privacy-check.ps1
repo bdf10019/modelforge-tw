@@ -9,11 +9,9 @@ $patterns = @(
     'sk-[A-Za-z0-9_-]{16,}',
     'C:\\Users\\[^\\\s]+'
 )
-$exclude = @(
-    '-g', '!.venv/**', '-g', '!artifacts/**', '-g', '!outputs/**',
-    '-g', '!data/generated/**', '-g', '!tools/**', '-g', '!build/**', '-g', '!dist/**',
-    '-g', '!.mypy_cache/**', '-g', '!.pytest_cache/**', '-g', '!.ruff_cache/**',
-    '-g', '!**/__pycache__/**', '-g', '!**/*.egg-info/**', '-g', '!scripts/privacy-check.ps1'
+$excludedPrefixes = @(
+    ".venv/", "artifacts/", "outputs/", "data/generated/", "tools/", "build/", "dist/",
+    ".mypy_cache/", ".pytest_cache/", ".ruff_cache/"
 )
 $blockedExtensions = @(".safetensors", ".gguf", ".pt", ".pth", ".onnx", ".bin", ".sqlite", ".db")
 $largeFileLimitBytes = 5MB
@@ -21,13 +19,21 @@ $findings = @()
 
 Push-Location $projectRoot
 try {
-    foreach ($pattern in $patterns) {
-        $result = & rg -n --hidden @exclude --regexp $pattern . 2>$null
-        if ($LASTEXITCODE -eq 0) { $findings += $result }
-        elseif ($LASTEXITCODE -ne 1) { throw "rg 隱私掃描失敗" }
-    }
-    $publicFiles = & rg --files --hidden @exclude
-    if ($LASTEXITCODE -ne 0) { throw "rg 公開檔案清單失敗" }
+    $candidateFiles = & git ls-files --cached --others --exclude-standard
+    if ($LASTEXITCODE -ne 0) { throw "git 公開檔案清單失敗" }
+    $publicFiles = @($candidateFiles | Where-Object {
+        $relativePath = $_.Replace("\", "/")
+        $isExcluded = $relativePath -eq "scripts/privacy-check.ps1" -or
+            $relativePath -match '(^|/)__pycache__/' -or
+            $relativePath -match '(^|/)[^/]+\.egg-info/'
+        foreach ($prefix in $excludedPrefixes) {
+            if ($relativePath.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+                $isExcluded = $true
+                break
+            }
+        }
+        -not $isExcluded
+    })
     foreach ($relativePath in $publicFiles) {
         $item = Get-Item -LiteralPath $relativePath
         if ($item.Length -gt $largeFileLimitBytes) {
@@ -35,6 +41,10 @@ try {
         }
         if ($blockedExtensions -contains $item.Extension.ToLowerInvariant()) {
             $findings += "$relativePath 使用不得提交的模型／資料庫副檔名"
+        }
+        $matches = Select-String -LiteralPath $item.FullName -Pattern $patterns -AllMatches
+        foreach ($match in $matches) {
+            $findings += "$relativePath`:$($match.LineNumber) 疑似包含敏感內容"
         }
     }
     if ($findings.Count -gt 0) {

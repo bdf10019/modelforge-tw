@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "modelforge-tw"
-version = "0.1.1"
+version = "0.1.2"
 description = "Traditional Chinese LLM adaptation, quantization, evaluation, and serving platform"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
