@@ -1,7 +1,7 @@
 FROM python:3.11-slim AS build
 WORKDIR /build
 RUN python -m pip install --no-cache-dir build
-COPY pyproject.toml README.md LICENSE ./
+COPY pyproject.toml README.md LICENSE_INFORMATION.md ./
 COPY src ./src
 RUN python -m build --wheel
 

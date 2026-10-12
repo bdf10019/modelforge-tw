@@ -1,6 +1,6 @@
 # Third-party notices
 
-ModelForge-TW 的程式碼使用 MIT License；原創合成資料使用 CC BY 4.0。下列第三方項目不隨本
+ModelForge-TW 現行原創程式未另行授予通用開源授權，見 [授權說明](LICENSE_INFORMATION.md)；原創合成資料仍使用 CC BY 4.0。下列第三方項目不隨本
 repository 散布權重或大型 binary，實際使用時仍應以鎖定版本附帶的 license 為準。
 
 | 項目 | 用途 | 授權／來源 |
